@@ -1,13 +1,77 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #001B54;
-  --color-secondary: #00A0E3;
-  --color-accent: #0047BB;
-  
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-primary: #2563eb;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #64748b;
+  --color-secondary-foreground: #ffffff;
+  --color-accent: #f59e0b;
+  --color-accent-foreground: #ffffff;
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  --color-border: #e2e8f0;
+  --color-input: #e2e8f0;
+  --color-ring: #2563eb;
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 font-sans;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 font-sans;
+  }
 }
+
+.glass {
+  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-sm;
+}
+
+.card-hover {
+  @apply transition-all duration-300 hover:shadow-lg hover:-translate-y-1;
+}
+
+.btn-primary {
+  @apply bg-primary text-primary-foreground px-4 py-2 rounded-lg font-medium transition-all hover:bg-primary/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-secondary {
+  @apply bg-secondary text-secondary-foreground px-4 py-2 rounded-lg font-medium transition-all hover:bg-secondary/90 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-outline {
+  @apply border border-slate-200 bg-white text-slate-700 px-4 py-2 rounded-lg font-medium transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.btn-ghost {
+  @apply text-slate-600 px-4 py-2 rounded-lg font-medium transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-50 disabled:pointer-events-none;
+}
+
+.input-field {
+  @apply w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+}
+
+.badge-primary { background-color: color-mix(in srgb, var(--color-primary) 10%, transparent); color: var(--color-primary); }
+.badge-secondary { background-color: color-mix(in srgb, var(--color-secondary) 10%, transparent); color: var(--color-secondary); }
+.badge-success { background-color: #f0fdf4; color: #15803d; }
+.badge-warning { background-color: #fffbeb; color: #b45309; }
+.badge-error { background-color: #fef2f2; color: #b91c1c; }

@@ -1,10 +1,88 @@
-import { Link } from 'react-router-dom';
-import { Briefcase, CheckCircle2, Clock, FileText, Search, User, MapPin, Plus, Trash2, Camera } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Briefcase, CheckCircle2, Clock, FileText, Search, User, MapPin, Plus, Trash2, Camera, ArrowUp, ArrowDown, ArrowUpDown, Filter, X, AlertCircle, File, Image as ImageIcon, Download, DollarSign, Building2, CheckCircle, Eye } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { ChatInput } from '../components/ChatInput';
+import { logAudit } from '../lib/audit';
+import { logCandidaturaEvento } from '../lib/events';
 
 export function CandidateDashboard() {
+  const { profile } = useAuth();
+  const [stats, setStats] = useState({ active: 0, tests: 0, interviews: 0 });
+  const [recentApplications, setRecentApplications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+
+    const fetchDashboardData = async () => {
+      try {
+        const { data: candidaturas, error } = await supabase
+          .from('candidaturas')
+          .select('*, vagas(titulo)')
+          .eq('candidato_id', profile.uid);
+
+        if (error) throw error;
+
+        const active = candidaturas.filter(c => {
+          const status = c.status;
+          return !status || status === 'APROVADO';
+        }).length;
+        const tests = candidaturas.filter(c => {
+          const fase = c.fase || c.status || 'Triagem';
+          return fase === 'Prova' && c.aprovacao_teste === 'Aprovado';
+        }).length;
+        const interviews = candidaturas.filter(c => {
+          const fase = c.fase || c.status || 'Triagem';
+          return ['Entrevista RH', 'Entrevista Gestor'].includes(fase);
+        }).length;
+
+        setStats({ active, tests, interviews });
+
+        const recent = candidaturas
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 3)
+          .map(c => ({
+            id: c.id,
+            cargo: (c.vagas as any)?.titulo || 'Vaga',
+            data: c.created_at,
+            fase: c.fase || c.status || 'Triagem',
+            status: c.status || (c.visualizado ? 'ATIVO' : 'NOVO')
+          }));
+
+        setRecentApplications(recent);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, [profile]);
+
+  if (loading) return <div className="p-12 text-center">Carregando...</div>;
+
   return (
     <div className="space-y-6">
+      {profile?.resume_completed === false && (
+        <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-amber-100 rounded-lg text-amber-600">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-amber-900">Complete seu currículo</h3>
+              <p className="text-amber-700">Para se candidatar às vagas, você precisa preencher suas informações profissionais.</p>
+            </div>
+          </div>
+          <Link to="/candidato/curriculo" className="bg-amber-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-amber-700 transition-colors whitespace-nowrap">
+            Preencher agora
+          </Link>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-4 mb-4">
@@ -13,7 +91,7 @@ export function CandidateDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Candidaturas Ativas</p>
-              <h3 className="text-2xl font-bold text-slate-900">3</h3>
+              <h3 className="text-2xl font-bold text-slate-900">{stats.active}</h3>
             </div>
           </div>
           <Link to="/candidato/candidaturas" className="text-sm text-primary font-medium hover:underline">Ver todas</Link>
@@ -25,7 +103,7 @@ export function CandidateDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Provas Concluídas</p>
-              <h3 className="text-2xl font-bold text-slate-900">1</h3>
+              <h3 className="text-2xl font-bold text-slate-900">{stats.tests}</h3>
             </div>
           </div>
           <Link to="/candidato/provas" className="text-sm text-primary font-medium hover:underline">Ver provas</Link>
@@ -37,7 +115,7 @@ export function CandidateDashboard() {
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Entrevistas Agendadas</p>
-              <h3 className="text-2xl font-bold text-slate-900">1</h3>
+              <h3 className="text-2xl font-bold text-slate-900">{stats.interviews}</h3>
             </div>
           </div>
           <Link to="/candidato/mensagens" className="text-sm text-primary font-medium hover:underline">Ver mensagens</Link>
@@ -49,17 +127,20 @@ export function CandidateDashboard() {
           <h2 className="text-lg font-bold text-slate-900">Candidaturas recentes</h2>
         </div>
         <div className="divide-y divide-slate-200">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="p-6 flex items-center justify-between">
+          {recentApplications.map((app) => (
+            <div key={app.id} className="p-6 flex items-center justify-between">
               <div>
-                <h4 className="font-medium text-slate-900">Engenheiro de Produção Sênior</h4>
-                <p className="text-sm text-slate-500">Candidatura enviada em 10/10/2026</p>
+                <h4 className="font-medium text-slate-900">{app.cargo}</h4>
+                <p className="text-sm text-slate-500">Candidatura enviada em {new Date(app.data).toLocaleDateString('pt-BR')}</p>
               </div>
               <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-medium">
-                Em análise
+                {app.status ? app.status : app.fase}
               </span>
             </div>
           ))}
+          {recentApplications.length === 0 && (
+            <div className="p-12 text-center text-slate-500 italic">Nenhuma candidatura recente.</div>
+          )}
         </div>
       </div>
     </div>
@@ -69,49 +150,119 @@ export function CandidateDashboard() {
 type Experience = { id: string, empresa: string, cargo: string, dataInicio: string, dataFim: string, atual: boolean, descricao: string };
 type Education = { id: string, instituicao: string, curso: string, grau: string, anoInicio: string, anoFim: string };
 type Language = { id: string, idioma: string, nivel: string };
-type Certification = { id: string, nome: string, instituicao: string, ano: string };
+type Certification = { id: string, nome: string, instituicao: string, ano: string, nomePersonalizado?: string };
 
 export function CandidateResume() {
+  const { profile } = useAuth();
   const [formData, setFormData] = useState({
-    nome: 'João Silva',
-    email: 'joao.silva@email.com',
-    telefone: '(21) 99999-9999',
-    linkedin: 'https://linkedin.com/in/joaosilva',
-    dataNascimento: '1990-05-15',
-    genero: 'Masculino',
-    pcd: 'Não',
-    cep: '20000-000',
-    logradouro: 'Rua das Flores',
-    numero: '123',
-    complemento: 'Apto 402',
-    bairro: 'Centro',
-    cidade: 'Rio de Janeiro',
-    estado: 'RJ',
-    resumo: 'Engenheiro de produção com 5 anos de experiência na indústria farmacêutica...',
-    experiencias: [
-      { id: '1', empresa: 'Empresa X', cargo: 'Engenheiro de Produção Sênior', dataInicio: '2020-01', dataFim: '', atual: true, descricao: 'Otimização de processos produtivos e liderança de projetos Six Sigma.' }
-    ] as Experience[],
-    formacoes: [
-      { id: '1', instituicao: 'UFRJ', curso: 'Engenharia de Produção', grau: 'Graduação', anoInicio: '2015', anoFim: '2019' }
-    ] as Education[],
-    idiomas: [
-      { id: '1', idioma: 'Inglês', nivel: 'Avançado' }
-    ] as Language[],
-    certificacoes: [
-      { id: '1', nome: 'Green Belt Six Sigma', instituicao: 'Seta', ano: '2021' }
-    ] as Certification[],
-    habilidades: 'Lean Manufacturing, Six Sigma, Gestão de Projetos',
+    nome: '',
+    email: '',
+    telefone: '',
+    linkedin: '',
+    dataNascimento: '',
+    genero: '',
+    raca: '',
+    pcd: '',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+    resumo: '',
+    experiencias: [] as Experience[],
+    formacoes: [] as Education[],
+    idiomas: [] as Language[],
+    certificacoes: [] as Certification[],
+    habilidades: '',
     foto: ''
   });
 
   const [isSaved, setIsSaved] = useState(false);
+  const [certificacoesOpcoes, setCertificacoesOpcoes] = useState<string[]>([]);
 
   useEffect(() => {
-    const savedData = localStorage.getItem('candidateResumeStructured');
-    if (savedData) {
-      setFormData(JSON.parse(savedData));
-    }
-  }, []);
+    const loadData = async () => {
+      if (profile?.uid) {
+        const { data: userDoc, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('uid', profile.uid)
+          .single();
+
+        // [EDITABLE_START:curriculo_init_form]
+        if (userDoc && userDoc.resume_completed === true && userDoc.resume_data) {
+          const data = userDoc.resume_data;
+          setFormData({
+            nome: data.nome || '',
+            email: data.email || '',
+            telefone: data.telefone || '',
+            linkedin: data.linkedin || '',
+            dataNascimento: data.dataNascimento || '',
+            genero: data.genero || '',
+            raca: data.raca || '',
+            pcd: data.pcd || '',
+            cep: data.cep || '',
+            logradouro: data.logradouro || '',
+            numero: data.numero || '',
+            complemento: data.complemento || '',
+            bairro: data.bairro || '',
+            cidade: data.cidade || '',
+            estado: data.estado || '',
+            resumo: data.resumo || '',
+            experiencias: data.experiencias || [],
+            formacoes: data.formacoes || [],
+            idiomas: data.idiomas || [],
+            certificacoes: data.certificacoes || [],
+            habilidades: data.habilidades || '',
+            foto: data.foto || ''
+          });
+        } else {
+          setFormData(prev => ({
+            ...prev,
+            nome: profile?.nome || '',
+            email: profile?.email || '',
+            telefone: '',
+            linkedin: '',
+            dataNascimento: '',
+            genero: '',
+            raca: '',
+            pcd: '',
+            cep: '',
+            logradouro: '',
+            numero: '',
+            complemento: '',
+            bairro: '',
+            cidade: '',
+            estado: '',
+            resumo: '',
+            experiencias: [],
+            formacoes: [],
+            idiomas: [],
+            certificacoes: [],
+            habilidades: '',
+            foto: ''
+          }));
+        }
+        // [EDITABLE_END:curriculo_init_form]
+      }
+      
+      try {
+        const { data: certsData, error: certsError } = await supabase
+          .from('certificacoes')
+          .select('*')
+          .order('nome');
+
+        if (!certsError && certsData) {
+          setCertificacoesOpcoes(certsData.map((c: any) => c.nome));
+        }
+      } catch (error) {
+        console.error('Erro ao buscar certificações:', error);
+      }
+    };
+    loadData();
+  }, [profile]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -218,10 +369,41 @@ export function CandidateResume() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('candidateResumeStructured', JSON.stringify(formData));
-    localStorage.setItem('resumeCompleted', 'true');
+    
+    // Process certificacoes to handle 'Outros'
+    const processedFormData = {
+      ...formData,
+      certificacoes: formData.certificacoes.map(cert => {
+        if (cert.nome === 'Outros' && (cert as any).nomePersonalizado) {
+          return { ...cert, nome: (cert as any).nomePersonalizado };
+        }
+        return cert;
+      })
+    };
+
+    const isFullyCompleted = calculateCompletion() === 100;
+    localStorage.setItem('candidateResumeStructured', JSON.stringify(processedFormData));
+    localStorage.setItem('resumeCompleted', isFullyCompleted ? 'true' : 'false');
+    
+    if (profile?.uid) {
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            resume_completed: isFullyCompleted,
+            resume_data: processedFormData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('uid', profile.uid);
+
+        if (error) throw error;
+      } catch (error) {
+        console.error("Erro ao salvar currículo no Supabase:", error);
+      }
+    }
+    
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 3000);
   };
@@ -281,23 +463,23 @@ export function CandidateResume() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo <span className="text-red-500">*</span></label>
-                <input required type="text" name="nome" value={formData.nome} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="text" name="nome" value={formData.nome || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Data de Nascimento <span className="text-red-500">*</span></label>
-                <input required type="date" name="dataNascimento" value={formData.dataNascimento} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="date" name="dataNascimento" value={formData.dataNascimento || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-red-500">*</span></label>
-                <input required type="email" name="email" value={formData.email} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="email" name="email" value={formData.email || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Telefone <span className="text-red-500">*</span></label>
-                <input required type="tel" name="telefone" value={formData.telefone} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="tel" name="telefone" value={formData.telefone || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Gênero</label>
-                <select name="genero" value={formData.genero} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                <select name="genero" value={formData.genero || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                   <option value="">Selecione</option>
                   <option value="Feminino">Feminino</option>
                   <option value="Masculino">Masculino</option>
@@ -306,8 +488,21 @@ export function CandidateResume() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Pessoa com Deficiência (PcD)?</label>
-                <select name="pcd" value={formData.pcd} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Raça/Etnia <span className="text-red-500">*</span></label>
+                <select required name="raca" value={formData.raca || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                  <option value="">Selecione</option>
+                  <option value="Branco">Branco</option>
+                  <option value="Preto">Preto</option>
+                  <option value="Pardo">Pardo</option>
+                  <option value="Amarelo">Amarelo</option>
+                  <option value="Indígena">Indígena</option>
+                  <option value="Prefiro não informar">Prefiro não informar</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Pessoa com Deficiência (PcD)? <span className="text-red-500">*</span></label>
+                <select required name="pcd" value={formData.pcd || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                  <option value="">Selecione</option>
                   <option value="Não">Não</option>
                   <option value="Sim">Sim</option>
                 </select>
@@ -321,35 +516,35 @@ export function CandidateResume() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <div className="md:col-span-4">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Logradouro (Rua, Av.) <span className="text-red-500">*</span></label>
-                <input required type="text" name="logradouro" value={formData.logradouro} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="text" name="logradouro" value={formData.logradouro || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <div className="md:col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Número <span className="text-red-500">*</span></label>
-                <input required type="text" name="numero" value={formData.numero} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="text" name="numero" value={formData.numero || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div className="md:col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Complemento</label>
-                <input type="text" name="complemento" value={formData.complemento} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input type="text" name="complemento" value={formData.complemento || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Bairro <span className="text-red-500">*</span></label>
-                <input required type="text" name="bairro" value={formData.bairro} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="text" name="bairro" value={formData.bairro || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Cidade <span className="text-red-500">*</span></label>
-                <input required type="text" name="cidade" value={formData.cidade} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input required type="text" name="cidade" value={formData.cidade || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div className="md:col-span-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Estado (UF) <span className="text-red-500">*</span></label>
-                <input required type="text" name="estado" value={formData.estado} onChange={handleChange} maxLength={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary uppercase" />
+                <input required type="text" name="estado" value={formData.estado || ''} onChange={handleChange} maxLength={2} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary uppercase" />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">CEP</label>
-                <input type="text" name="cep" value={formData.cep} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input type="text" name="cep" value={formData.cep || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
             </div>
           </div>
@@ -360,15 +555,15 @@ export function CandidateResume() {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">LinkedIn</label>
-                <input type="url" name="linkedin" value={formData.linkedin} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                <input type="url" name="linkedin" value={formData.linkedin || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Resumo Profissional <span className="text-red-500">*</span></label>
-                <textarea required name="resumo" value={formData.resumo} onChange={handleChange} rows={4} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Fale um pouco sobre você e seus objetivos..."></textarea>
+                <textarea required name="resumo" value={formData.resumo || ''} onChange={handleChange} rows={4} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Fale um pouco sobre você e seus objetivos..."></textarea>
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Habilidades (separadas por vírgula)</label>
-                <input type="text" name="habilidades" value={formData.habilidades} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Ex: Pacote Office, Python, Gestão de Projetos" />
+                <input type="text" name="habilidades" value={formData.habilidades || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" placeholder="Ex: Pacote Office, Python, Gestão de Projetos" />
               </div>
             </div>
           </div>
@@ -393,30 +588,30 @@ export function CandidateResume() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
-                      <input required type="text" value={exp.empresa} onChange={(e) => handleExperienceChange(exp.id, 'empresa', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                      <input required type="text" value={exp.empresa || ''} onChange={(e) => handleExperienceChange(exp.id, 'empresa', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
-                      <input required type="text" value={exp.cargo} onChange={(e) => handleExperienceChange(exp.id, 'cargo', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                      <input required type="text" value={exp.cargo || ''} onChange={(e) => handleExperienceChange(exp.id, 'cargo', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
-                      <input required type="month" value={exp.dataInicio} onChange={(e) => handleExperienceChange(exp.id, 'dataInicio', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                      <input required type="month" value={exp.dataInicio || ''} onChange={(e) => handleExperienceChange(exp.id, 'dataInicio', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
                     </div>
                     <div>
                       <div className="flex justify-between items-center mb-1">
                         <label className="block text-sm font-medium text-slate-700">Data de Fim</label>
                         <label className="flex items-center gap-2 text-sm text-slate-600">
-                          <input type="checkbox" checked={exp.atual} onChange={(e) => handleExperienceChange(exp.id, 'atual', e.target.checked)} className="rounded text-primary focus:ring-primary" />
+                          <input type="checkbox" checked={exp.atual || false} onChange={(e) => handleExperienceChange(exp.id, 'atual', e.target.checked)} className="rounded text-primary focus:ring-primary" />
                           Trabalho atual
                         </label>
                       </div>
-                      <input type="month" value={exp.dataFim} disabled={exp.atual} onChange={(e) => handleExperienceChange(exp.id, 'dataFim', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-400" />
+                      <input type="month" value={exp.dataFim || ''} disabled={exp.atual} onChange={(e) => handleExperienceChange(exp.id, 'dataFim', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-400" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Descrição das Atividades</label>
-                    <textarea required value={exp.descricao} onChange={(e) => handleExperienceChange(exp.id, 'descricao', e.target.value)} rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"></textarea>
+                    <textarea required value={exp.descricao || ''} onChange={(e) => handleExperienceChange(exp.id, 'descricao', e.target.value)} rows={3} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"></textarea>
                   </div>
                 </div>
               ))}
@@ -443,11 +638,11 @@ export function CandidateResume() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Instituição de Ensino</label>
-                      <input required type="text" value={edu.instituicao} onChange={(e) => handleEducationChange(edu.id, 'instituicao', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                      <input required type="text" value={edu.instituicao || ''} onChange={(e) => handleEducationChange(edu.id, 'instituicao', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Grau de Educação</label>
-                      <select required value={edu.grau} onChange={(e) => handleEducationChange(edu.id, 'grau', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                      <select required value={edu.grau || ''} onChange={(e) => handleEducationChange(edu.id, 'grau', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                         <option value="Ensino Médio">Ensino Médio</option>
                         <option value="Ensino Técnico">Ensino Técnico</option>
                         <option value="Graduação">Graduação</option>
@@ -458,7 +653,7 @@ export function CandidateResume() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Curso</label>
-                      <input required type="text" value={edu.curso} onChange={(e) => handleEducationChange(edu.id, 'curso', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                      <input required type="text" value={edu.curso || ''} onChange={(e) => handleEducationChange(edu.id, 'curso', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
@@ -526,7 +721,24 @@ export function CandidateResume() {
                 <div key={cert.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50 relative">
                   <div className="md:col-span-5">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Certificação/Curso</label>
-                    <input required type="text" value={cert.nome} onChange={(e) => handleCertificationChange(cert.id, 'nome', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                    <select required value={cert.nome} onChange={(e) => handleCertificationChange(cert.id, 'nome', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                      <option value="">Selecione uma certificação</option>
+                      {certificacoesOpcoes.map((opcao, idx) => (
+                        <option key={idx} value={opcao}>{opcao}</option>
+                      ))}
+                      {cert.nome && cert.nome !== 'Outros' && !certificacoesOpcoes.includes(cert.nome) && (
+                        <option value={cert.nome}>{cert.nome}</option>
+                      )}
+                      <option value="Outros">Outros</option>
+                    </select>
+                    {cert.nome === 'Outros' && (
+                      <input 
+                        type="text" 
+                        placeholder="Especifique a certificação"
+                        className="w-full mt-2 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                        onChange={(e) => handleCertificationChange(cert.id, 'nomePersonalizado', e.target.value)}
+                      />
+                    )}
                   </div>
                   <div className="md:col-span-4">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Instituição Emissora</label>
@@ -565,18 +777,308 @@ export function CandidateResume() {
 }
 
 export function CandidateVagas() {
+  const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredVagas, setFilteredVagas] = useState([1, 2, 3, 4, 5, 6]);
+  const [vagas, setVagas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'created_at', direction: 'desc' });
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>({});
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  
+  // Modal states
+  const [selectedVaga, setSelectedVaga] = useState<any>(null);
+  const [provaVersao, setProvaVersao] = useState<any>(null);
+  const [loadingProva, setLoadingProva] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [modalType, setModalType] = useState<'success' | 'error' | 'applyForm'>('success');
+  const [isApplying, setIsApplying] = useState(false);
+  const [comoSoube, setComoSoube] = useState('');
+  const [indicacaoNome, setIndicacaoNome] = useState('');
 
-  const handleSearch = () => {
-    // Basic mock search logic
-    if (searchTerm.trim() === '') {
-      setFilteredVagas([1, 2, 3, 4, 5, 6]);
-    } else {
-      // Just mock filtering down to 2 items if there's a search term
-      setFilteredVagas([1, 2]);
+  useEffect(() => {
+    const fetchVagas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vagas')
+          .select('*')
+          .eq('status_vaga', 'ABERTA');
+
+        if (error) throw error;
+        
+        let finalVagas = data || [];
+
+        if (profile?.uid && finalVagas.length > 0) {
+          const { data: candidaturas } = await supabase
+            .from('candidaturas')
+            .select('vaga_id')
+            .eq('candidato_id', profile.uid);
+
+          if (candidaturas) {
+            const appliedIds = new Set(candidaturas.map(c => c.vaga_id));
+            finalVagas = finalVagas.map(v => ({
+              ...v,
+              ja_candidatado: appliedIds.has(v.id)
+            }));
+          }
+        }
+
+        setVagas(finalVagas);
+      } catch (error) {
+        console.error('Erro ao buscar vagas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchVagas();
+
+    // Subscribe to changes
+    const subscription = supabase
+      .channel('vagas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vagas', filter: 'status_vaga=eq.ABERTA' }, () => {
+        fetchVagas();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const fetchProvaDetails = async () => {
+      if (!selectedVaga?.exige_prova || !selectedVaga?.prova_versao_id) {
+        setProvaVersao(null);
+        return;
+      }
+
+      try {
+        setLoadingProva(true);
+        const { data, error } = await supabase
+          .from('provas')
+          .select('*')
+          .eq('id', selectedVaga.prova_id)
+          .single();
+
+        if (error) throw error;
+        setProvaVersao(data);
+      } catch (error) {
+        console.error('Erro ao buscar detalhes da prova:', error);
+        setProvaVersao(null);
+      } finally {
+        setLoadingProva(false);
+      }
+    };
+
+    if (showDetailsModal && selectedVaga) {
+      fetchProvaDetails();
+    }
+  }, [showDetailsModal, selectedVaga]);
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleApply = () => {
+    if (!selectedVaga) return;
+    
+    if (selectedVaga.status_vaga !== 'ABERTA') {
+      alert('Esta vaga não está disponível para candidatura');
+      return;
+    }
+
+    // Check if user is a candidate
+    if (!profile || profile.perfil !== 'Candidato') {
+      alert('Apenas candidatos podem se candidatar a vagas.');
+      return;
+    }
+
+    // Check if resume is completed
+    const isResumeCompleted = profile.resume_completed === true;
+    
+    if (!isResumeCompleted) {
+      setModalType('error');
+      setShowApplyModal(true);
+      return;
+    }
+
+    // If everything is okay, show the apply form modal
+    setModalType('applyForm');
+    setShowApplyModal(true);
+  };
+
+  const confirmApply = async () => {
+    if (!comoSoube || !selectedVaga || !profile?.uid) {
+      alert('Por favor, informe como soube da vaga.');
+      return;
+    }
+
+    if (comoSoube === 'Indicação de colaborador' && !indicacaoNome.trim()) {
+      alert('Por favor, informe o nome do colaborador que indicou.');
+      return;
+    }
+
+    if (isApplying) return;
+
+    try {
+      setIsApplying(true);
+      
+      // Check if already applied
+      const { data: existing } = await supabase
+        .from('candidaturas')
+        .select('id')
+        .eq('vaga_id', selectedVaga.id)
+        .eq('candidato_id', profile.uid)
+        .maybeSingle();
+      
+      if (existing) {
+        alert('Você já se candidatou a esta vaga.');
+        setShowApplyModal(false);
+        return;
+      }
+
+      const candidaturaData = {
+        vaga_id: selectedVaga.id,
+        candidato_id: profile.uid,
+        fase: 'Triagem',
+        status: 'NOVO',
+        origem: comoSoube,
+        como_soube: comoSoube,
+        indicacao_nome: comoSoube === 'Indicação de colaborador' ? indicacaoNome : '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        data_candidatura: new Date().toISOString(),
+        historico: [{
+          status: 'Triagem',
+          data: new Date().toISOString(),
+          entradaFase: new Date().toISOString(),
+          usuarioNome: 'Candidato'
+        }]
+      };
+
+      const { error: insertError } = await supabase
+        .from('candidaturas')
+        .insert(candidaturaData);
+
+      if (insertError) throw insertError;
+      
+      await logAudit('Candidatou-se', 'Portal do Candidato', `Candidatou-se à vaga ${selectedVaga.titulo}`);
+
+      // Update local state to show "Já se candidatou"
+      setVagas(prev => prev.map(v => v.id === selectedVaga.id ? { ...v, ja_candidatado: true } : v));
+      setSelectedVaga(prev => ({ ...prev, ja_candidatado: true }));
+
+      setModalType('success');
+    } catch (error: any) {
+      console.error('Erro ao se candidatar:', error);
+      alert(`Erro ao realizar candidatura: ${error.message || 'Tente novamente.'}`);
+    } finally {
+      setIsApplying(false);
     }
   };
+
+  const renderFilterInput = (columnKey: string, label: string) => {
+    const isActive = activeFilterColumn === columnKey;
+    const filterValue = columnFilters[columnKey] || '';
+
+    return (
+      <div className="relative flex items-center gap-2 group">
+        <div 
+          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+          onClick={() => handleSort(columnKey)}
+        >
+          {label}
+          {sortConfig?.key === columnKey ? (
+            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100" />
+          )}
+        </div>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveFilterColumn(isActive ? null : columnKey);
+          }}
+          className={`p-1 rounded hover:bg-slate-200 transition-colors ${filterValue ? 'text-primary' : 'text-slate-400'}`}
+        >
+          <Filter className="w-3 h-3" />
+        </button>
+        {isActive && (
+          <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-lg p-2 z-10 min-w-[200px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-slate-700">Filtrar {label}</span>
+              <button onClick={() => setActiveFilterColumn(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={filterValue}
+              onChange={(e) => handleFilterChange(columnKey, e.target.value)}
+              placeholder={`Buscar...`}
+              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              autoFocus
+            />
+            {filterValue && (
+              <button 
+                onClick={() => {
+                  handleFilterChange(columnKey, '');
+                  setActiveFilterColumn(null);
+                }}
+                className="mt-2 text-xs text-red-500 hover:text-red-700 font-medium w-full text-left"
+              >
+                Limpar Filtro
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredVagas = vagas.filter(vaga => {
+    // Global search
+    const matchesSearch = (vaga.titulo || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          (vaga.departamento || '').toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Column filters
+    const matchesFilters = Object.entries(columnFilters).every(([key, value]) => {
+      if (!value) return true;
+      const vagaValue = String(vaga[key] || '').toLowerCase();
+      return vagaValue.includes(String(value).toLowerCase());
+    });
+
+    return matchesSearch && matchesFilters;
+  }).sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+
+    if (sortConfig.key === 'created_at') {
+      const dateA = new Date(aValue || 0).getTime();
+      const dateB = new Date(bValue || 0).getTime();
+      return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (loading) {
+    return <div className="flex items-center justify-center p-12">Carregando vagas...</div>;
+  }
 
   return (
     <div className="space-y-6">
@@ -587,35 +1089,300 @@ export function CandidateVagas() {
             type="text" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Buscar por cargo ou palavra-chave..." 
             className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
         </div>
-        <button onClick={handleSearch} className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors">
-          Buscar
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVagas.map((i) => (
-          <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Analista de Laboratório</h3>
-            <div className="flex items-center gap-4 text-sm text-slate-500 mb-6">
-              <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> Rio de Janeiro, RJ</span>
-              <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> Presencial</span>
-            </div>
-            <Link to={`/candidato/vagas/${i}`} className="block w-full text-center bg-slate-50 text-primary font-medium py-2 rounded-lg hover:bg-primary hover:text-white transition-colors border border-slate-200 hover:border-primary">
-              Ver Detalhes
-            </Link>
-          </div>
-        ))}
-        {filteredVagas.length === 0 && (
-          <div className="col-span-full text-center py-12 text-slate-500">
-            Nenhuma vaga encontrada para "{searchTerm}".
-          </div>
-        )}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('codigo_vaga', 'Código')}</th>
+                <th className="px-6 py-4 align-top w-1/5">{renderFilterInput('titulo', 'Nome da Vaga')}</th>
+                <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('empresa', 'Empresa')}</th>
+                <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('local', 'Localização')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('tipo', 'Contrato')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('salario', 'Salário')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('created_at', 'Publicação')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('status', 'Status')}</th>
+                <th className="px-6 py-4 text-center align-top">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredVagas.map((vaga) => (
+                <tr key={vaga.id} className="hover:bg-slate-50 transition-colors group">
+                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{vaga.codigo_vaga || '-'}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{vaga.titulo}</td>
+                  <td className="px-6 py-4">{vaga.empresa || 'DFL'}</td>
+                  <td className="px-6 py-4">{vaga.local || 'Não especificado'}</td>
+                  <td className="px-6 py-4">{vaga.tipo || 'Não especificado'}</td>
+                  <td className="px-6 py-4">{vaga.salario || 'A combinar'}</td>
+                  <td className="px-6 py-4">
+                    {vaga.created_at ? new Date(vaga.created_at).toLocaleDateString('pt-BR') : '-'}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">
+                      {vaga.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button 
+                      onClick={() => {
+                        setSelectedVaga(vaga);
+                        setShowDetailsModal(true);
+                      }}
+                      className="text-primary hover:text-accent font-medium text-sm"
+                    >
+                      Ver Detalhes
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filteredVagas.length === 0 && (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
+                    Nenhuma vaga encontrada.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* Details Modal */}
+      {showDetailsModal && selectedVaga && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+              <h3 className="text-xl font-bold text-slate-900">Detalhes da Vaga</h3>
+              <button onClick={() => setShowDetailsModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8">
+              <div className="mb-8">
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">{selectedVaga.titulo}</h1>
+                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-600">
+                  <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-slate-400" /> {selectedVaga.local || 'Não especificado'}</span>
+                  <span className="flex items-center gap-1"><Briefcase className="w-4 h-4 text-slate-400" /> {selectedVaga.tipo || 'Não especificado'}</span>
+                  {selectedVaga.salario && (
+                    <span className="flex items-center gap-1"><DollarSign className="w-4 h-4 text-slate-400" /> {selectedVaga.salario}</span>
+                  )}
+                  {selectedVaga.departamento && (
+                    <span className="flex items-center gap-1"><Building2 className="w-4 h-4 text-slate-400" /> {selectedVaga.departamento}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="prose prose-slate max-w-none">
+                <h4 className="text-lg font-bold mb-2">Descrição</h4>
+                <p className="whitespace-pre-wrap mb-6 text-slate-600">{selectedVaga.descricao}</p>
+                
+                {selectedVaga.requisitos && (
+                  <>
+                    <h4 className="text-lg font-bold mb-2">Requisitos</h4>
+                    <p className="whitespace-pre-wrap mb-6 text-slate-600">{selectedVaga.requisitos}</p>
+                  </>
+                )}
+
+                {selectedVaga.beneficios && (
+                  <>
+                    <h4 className="text-lg font-bold mb-2">Benefícios</h4>
+                    <p className="whitespace-pre-wrap mb-6 text-slate-600">{selectedVaga.beneficios}</p>
+                  </>
+                )}
+
+                {selectedVaga.exige_prova && (
+                  <div className="mt-8 p-6 bg-primary/5 rounded-xl border border-primary/10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-2 bg-primary/10 rounded-lg">
+                        <FileText className="w-6 h-6 text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="text-lg font-bold text-slate-900 leading-tight">Prova de Avaliação</h4>
+                        <p className="text-sm text-slate-500">Esta vaga requer a realização de um teste</p>
+                      </div>
+                    </div>
+
+                    {loadingProva ? (
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                        Carregando detalhes da prova...
+                      </div>
+                    ) : provaVersao ? (
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap gap-4">
+                          <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+                            <span className="text-xs text-slate-500 block">Nome da Prova</span>
+                            <span className="font-medium text-slate-900">{provaVersao.provas?.nome || 'Não informada'}</span>
+                          </div>
+                          <div className="bg-white px-4 py-2 rounded-lg border border-slate-200 shadow-sm">
+                            <span className="text-xs text-slate-500 block">Versão</span>
+                            <span className="font-medium text-slate-900">{provaVersao.versao || '1.0'}</span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          {provaVersao.arquivo_url ? (
+                            <a 
+                              href={provaVersao.arquivo_url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors shadow-sm"
+                            >
+                              <Download className="w-4 h-4" />
+                              Baixar Prova
+                            </a>
+                          ) : provaVersao.link ? (
+                            <a 
+                              href={provaVersao.link} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors shadow-sm"
+                            >
+                              <Eye className="w-4 h-4" />
+                              Acessar Prova
+                            </a>
+                          ) : (
+                            <p className="text-sm text-amber-600 italic">O link ou arquivo da prova ainda não foi disponibilizado.</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">Detalhes da prova não encontrados.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+              <button 
+                onClick={() => setShowDetailsModal(false)} 
+                className="px-6 py-2 border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-white transition-colors"
+              >
+                Fechar
+              </button>
+              {selectedVaga.ja_candidatado ? (
+                <div className="bg-emerald-100 text-emerald-700 px-6 py-2 rounded-lg font-medium flex items-center gap-2 border border-emerald-200">
+                  <CheckCircle2 className="w-5 h-5" /> Já se candidatou
+                </div>
+              ) : (
+                <button 
+                  onClick={handleApply} 
+                  className="bg-primary text-white px-8 py-2 rounded-lg font-medium hover:bg-accent transition-colors"
+                >
+                  Candidatar-se
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apply Form Modal */}
+      {showApplyModal && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
+            {modalType === 'success' ? (
+              <>
+                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Candidatura Realizada!</h3>
+                <p className="text-slate-600 mb-6">Sua candidatura para {selectedVaga?.titulo} foi enviada com sucesso.</p>
+                <button 
+                  onClick={() => {
+                    setShowApplyModal(false);
+                    setShowDetailsModal(false);
+                  }}
+                  className="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors"
+                >
+                  Fechar
+                </button>
+              </>
+            ) : modalType === 'error' ? (
+              <>
+                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Currículo Incompleto</h3>
+                <p className="text-slate-600 mb-6">Você precisa preencher seu currículo antes de se candidatar.</p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowApplyModal(false)}
+                    className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={() => navigate('/candidato/curriculo')}
+                    className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors"
+                  >
+                    Preencher Currículo
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="text-left">
+                <h3 className="text-xl font-bold text-slate-900 mb-4">Finalizar Candidatura</h3>
+                <p className="text-sm text-slate-600 mb-6">Por favor, responda à pergunta abaixo para concluir sua candidatura para <strong>{selectedVaga?.titulo}</strong>.</p>
+                
+                <div className="space-y-4 mb-8">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Como soube da vaga? <span className="text-red-500">*</span></label>
+                    <select 
+                      value={comoSoube} 
+                      onChange={(e) => setComoSoube(e.target.value)}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    >
+                      <option value="">Selecione uma opção</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Site da Empresa">Site da Empresa</option>
+                      <option value="Indicação de colaborador">Indicação de colaborador</option>
+                      <option value="Outros">Outros</option>
+                    </select>
+                  </div>
+
+                  {comoSoube === 'Indicação de colaborador' && (
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Nome do colaborador <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        value={indicacaoNome}
+                        onChange={(e) => setIndicacaoNome(e.target.value)}
+                        placeholder="Nome de quem indicou"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowApplyModal(false)}
+                    className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={confirmApply}
+                    disabled={isApplying}
+                    className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50"
+                  >
+                    {isApplying ? 'Processando...' : 'Confirmar Candidatura'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -630,38 +1397,242 @@ export function CandidatePlaceholder({ title }: { title: string }) {
 }
 
 export function CandidateCandidaturas() {
-  const candidaturas = [
-    { id: 1, vaga: 'Engenheiro de Produção Sênior', data: '10/10/2026', status: 'Em análise', fase: 'Triagem de Currículos', ativa: true },
-    { id: 2, vaga: 'Gerente de Projetos', data: '05/10/2026', status: 'Avançou', fase: 'Entrevista com RH', ativa: true },
-    { id: 3, vaga: 'Analista de Qualidade', data: '01/10/2026', status: 'Reprovado', fase: 'Teste Técnico', ativa: false },
-  ];
+  const { profile } = useAuth();
+  const [candidaturas, setCandidaturas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'created_at', direction: 'desc' });
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>({});
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+
+    const fetchCandidaturas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('candidaturas')
+          .select('*, vagas(*)')
+          .eq('candidato_id', profile.uid);
+
+        if (error) throw error;
+
+        const candidaturasData = (data || []).map(d => {
+          const s = (d.status || '').toUpperCase();
+          const isClosed = ['REPROVADO', 'DESISTENTE', 'REJEITADO', 'APROVADO', 'CONTRATADO', 'DECLINADO', 'DESISTÊNCIA', 'DESISTENCIA'].includes(s);
+          
+          return {
+            ...d,
+            codigo_vaga: (d.vagas as any)?.codigo_vaga || null,
+            id_vaga: (d.vagas as any)?.id_vaga || null,
+            vagaTitulo: (d.vagas as any)?.titulo || 'Vaga não encontrada',
+            empresa: (d.vagas as any)?.empresa || 'DFL',
+            vagaStatus: (d.vagas as any)?.status_vaga || (d.vagas as any)?.status || 'N/A',
+            dataEncerramento: isClosed ? d.updated_at : null
+          };
+        });
+
+        setCandidaturas(candidaturasData);
+      } catch (error) {
+        console.error('Erro ao buscar candidaturas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCandidaturas();
+
+    const subscription = supabase
+      .channel('candidaturas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidaturas', filter: `candidato_id=eq.${profile.uid}` }, () => {
+        fetchCandidaturas();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [profile]);
+
+  const getStatusCandidato = (status: string, fase?: string) => {
+    const s = status || 'ATIVO';
+    const f = fase || '';
+    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADO') return 'Aprovado';
+    if (s === 'REPROVADO' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
+    if (s === 'RESERVA' || s === 'Reserva' || f === 'Reserva') return 'Reserva';
+    return 'Em processo';
+  };
+
+  const getStatusBadge = (status: string, fase?: string) => {
+    const statusCandidato = getStatusCandidato(status, fase);
+    switch (statusCandidato) {
+      case 'Em processo':
+        return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-medium">Em processo</span>;
+      case 'Aprovado':
+        return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">Aprovado</span>;
+      case 'Reprovado':
+        return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium">Reprovado</span>;
+      case 'Reserva':
+        return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Banco de Talentos</span>;
+      default:
+        return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">{statusCandidato}</span>;
+    }
+  };
+
+  const formatDate = (dateStr: any) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const renderFilterInput = (columnKey: string, label: string) => {
+    const isActive = activeFilterColumn === columnKey;
+    const filterValue = columnFilters[columnKey] || '';
+
+    return (
+      <div className="relative flex items-center gap-2 group">
+        <div 
+          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+          onClick={() => handleSort(columnKey)}
+        >
+          {label}
+          {sortConfig?.key === columnKey ? (
+            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100" />
+          )}
+        </div>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveFilterColumn(isActive ? null : columnKey);
+          }}
+          className={`p-1 rounded hover:bg-slate-200 transition-colors ${filterValue ? 'text-primary' : 'text-slate-400'}`}
+        >
+          <Filter className="w-3 h-3" />
+        </button>
+        {isActive && (
+          <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-lg p-2 z-10 min-w-[200px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-slate-700">Filtrar {label}</span>
+              <button onClick={() => setActiveFilterColumn(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={filterValue}
+              onChange={(e) => handleFilterChange(columnKey, e.target.value)}
+              placeholder={`Buscar...`}
+              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              autoFocus
+            />
+            {filterValue && (
+              <button 
+                onClick={() => {
+                  handleFilterChange(columnKey, '');
+                  setActiveFilterColumn(null);
+                }}
+                className="mt-2 text-xs text-red-500 hover:text-red-700 font-medium w-full text-left"
+              >
+                Limpar Filtro
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredCandidaturas = candidaturas.filter(c => {
+    const matchesFilters = Object.entries(columnFilters).every(([key, value]) => {
+      if (!value) return true;
+      let cValue = String(c[key] || '').toLowerCase();
+      if (key === 'statusCandidato') {
+        cValue = getStatusCandidato(c.status, c.fase).toLowerCase();
+      }
+      return cValue.includes(String(value).toLowerCase());
+    });
+    return matchesFilters;
+  }).sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    let aValue = a[sortConfig.key];
+    let bValue = b[sortConfig.key];
+
+    if (sortConfig.key === 'statusCandidato') {
+      aValue = getStatusCandidato(a.status, a.fase);
+      bValue = getStatusCandidato(b.status, b.fase);
+    }
+
+    if (sortConfig.key === 'created_at' || sortConfig.key === 'dataEncerramento') {
+      const dateA = new Date(aValue || 0).getTime();
+      const dateB = new Date(bValue || 0).getTime();
+      return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (loading) return <div className="p-8 text-center text-slate-500">Carregando candidaturas...</div>;
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-900">Minhas Candidaturas</h2>
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="divide-y divide-slate-200">
-          {candidaturas.map((c) => (
-            <div key={c.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h4 className="font-bold text-slate-900 text-lg">{c.vaga}</h4>
-                <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
-                  <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Candidatura: {c.data}</span>
-                  <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> Vaga {c.ativa ? 'Ativa' : 'Encerrada'}</span>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-2">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  c.status === 'Em análise' ? 'bg-amber-100 text-amber-700' :
-                  c.status === 'Avançou' ? 'bg-emerald-100 text-emerald-700' :
-                  'bg-red-100 text-red-700'
-                }`}>
-                  {c.status}
-                </span>
-                <span className="text-sm font-medium text-slate-700">Fase atual: {c.fase}</span>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('codigo_vaga', 'Código')}</th>
+                <th className="px-6 py-4 align-top w-1/5">{renderFilterInput('vagaTitulo', 'Nome da Vaga')}</th>
+                <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('empresa', 'Empresa')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('created_at', 'Data Candidatura')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('dataEncerramento', 'Encerramento')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('vagaStatus', 'Status Vaga')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('statusCandidato', 'Status Candidato')}</th>
+                <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('status', 'Etapa Atual')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredCandidaturas.map((c) => (
+                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{c.codigo_vaga || '-'}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{c.vagaTitulo}</td>
+                  <td className="px-6 py-4">{c.empresa}</td>
+                  <td className="px-6 py-4">{formatDate(c.created_at)}</td>
+                  <td className="px-6 py-4">{formatDate(c.dataEncerramento)}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${c.vagaStatus === 'ABERTA' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                      {c.vagaStatus}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">{getStatusBadge(c.status, c.fase)}</td>
+                  <td className="px-6 py-4">{(c.status || 'ATIVO') === 'ATIVO' ? (c.fase || c.status || 'Triagem') : (c.status || 'ATIVO')}</td>
+                </tr>
+              ))}
+              {filteredCandidaturas.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    Nenhuma candidatura encontrada.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -669,166 +1640,690 @@ export function CandidateCandidaturas() {
 }
 
 export function CandidateMensagens() {
-  const [selectedVagaId, setSelectedVagaId] = useState<number>(1);
-  const [newMessage, setNewMessage] = useState('');
+  const { profile } = useAuth();
+  const [selectedCandidaturaId, setSelectedCandidaturaId] = useState<string | null>(null);
+  const [candidaturas, setCandidaturas] = useState<any[]>([]);
+  const [mensagens, setMensagens] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'last_message_date', direction: 'desc' });
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>({});
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const [conversas, setConversas] = useState([
-    {
-      vagaId: 1,
-      vagaTitulo: 'Gerente de Projetos',
-      empresa: 'DFL',
-      ultimaMensagem: 'Olá João, gostaríamos de agendar...',
-      dataUltimaMensagem: 'Hoje, 10:30',
-      mensagens: [
-        { id: 1, remetente: 'RH', texto: 'Olá João, gostaríamos de agendar uma entrevista online para a vaga de Gerente de Projetos. Você teria disponibilidade na próxima terça-feira às 14h?', horario: '10:30' },
-        { id: 2, remetente: 'Candidato', texto: 'Olá! Sim, tenho disponibilidade na terça-feira às 14h. Aguardo o link para a reunião.', horario: '10:45' }
-      ]
-    },
-    {
-      vagaId: 2,
-      vagaTitulo: 'Engenheiro de Produção Sênior',
-      empresa: 'DFL',
-      ultimaMensagem: 'Recebemos seu currículo com sucesso.',
-      dataUltimaMensagem: '10/10/2026',
-      mensagens: [
-        { id: 1, remetente: 'RH', texto: 'Recebemos seu currículo com sucesso. Em breve daremos um retorno sobre as próximas etapas.', horario: '09:00' }
-      ]
-    }
-  ]);
+  useEffect(() => {
+    if (!profile?.uid) return;
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim()) return;
+    const fetchCandidaturas = async () => {
+      try {
+        const [candidaturasRes, mensagensRes] = await Promise.all([
+          supabase
+            .from('candidaturas')
+            .select('*, vagas(*)')
+            .eq('candidato_id', profile.uid),
+          supabase
+            .from('mensagens')
+            .select('*')
+            .eq('remetente_id', profile.uid)
+            .order('criado_em', { ascending: false })
+        ]);
 
-    const now = new Date();
-    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        if (candidaturasRes.error) throw candidaturasRes.error;
 
-    setConversas(prev => prev.map(conversa => {
-      if (conversa.vagaId === selectedVagaId) {
-        return {
-          ...conversa,
-          ultimaMensagem: newMessage,
-          dataUltimaMensagem: `Hoje, ${timeString}`,
-          mensagens: [
-            ...conversa.mensagens,
-            { id: Date.now(), remetente: 'Candidato', texto: newMessage, horario: timeString }
-          ]
-        };
+        const todasMensagens = mensagensRes.data || [];
+        const candidaturasData = (candidaturasRes.data || []).map(d => {
+          const msgsVaga = todasMensagens.filter(m => m.vaga_id === d.vaga_id);
+          const lastMsg = msgsVaga[0];
+
+          return {
+            ...d,
+            codigo_vaga: (d.vagas as any)?.codigo_vaga || null,
+            vagaTitulo: (d.vagas as any)?.titulo || 'Vaga não encontrada',
+            empresa: (d.vagas as any)?.empresa || 'DFL',
+            vagaStatus: (d.vagas as any)?.status_vaga || (d.vagas as any)?.status || 'N/A',
+            msgCount: msgsVaga.length,
+            ultimaMensagem: lastMsg ? (lastMsg.conteudo || lastMsg.mensagem) : 'Sem mensagens',
+            last_message_date: lastMsg ? (lastMsg.criado_em || lastMsg.created_at) : null
+          };
+        });
+        setCandidaturas(candidaturasData);
+      } catch (error) {
+        console.error('Erro ao buscar candidaturas:', error);
+      } finally {
+        setLoading(false);
       }
-      return conversa;
-    }));
+    };
 
-    console.log(`[SIMULAÇÃO DE E-MAIL] Para: rh@dfl.com.br | Assunto: Nova mensagem de candidato - Vaga: ${conversas.find(c => c.vagaId === selectedVagaId)?.vagaTitulo} | Mensagem: "${newMessage}"`);
-    alert('Mensagem enviada com sucesso para a equipe de Recursos Humanos!');
+    fetchCandidaturas();
 
-    setNewMessage('');
+    const subscription = supabase
+      .channel('candidaturas_msgs_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mensagens' }, () => {
+        fetchCandidaturas();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [profile]);
+
+  useEffect(() => {
+    if (!selectedCandidaturaId) return;
+
+    const fetchMensagens = async () => {
+      const candidatura = candidaturas.find(c => c.id === selectedCandidaturaId);
+      if (!candidatura || !profile?.uid) return;
+
+      const { data, error } = await supabase
+        .from('mensagens')
+        .select('*')
+        .eq('candidatura_id', selectedCandidaturaId)
+        .order('criado_em', { ascending: true });
+
+      if (!error) {
+        setMensagens(data || []);
+      }
+    };
+
+    fetchMensagens();
+
+    const subscription = supabase
+      .channel(`mensagens_${selectedCandidaturaId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'mensagens', 
+        filter: `candidatura_id=eq.${selectedCandidaturaId}` 
+      }, (payload) => {
+        setMensagens(prev => {
+          if (prev.find(m => m.id === payload.new.id)) return prev;
+          return [...prev, payload.new];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [selectedCandidaturaId]);
+
+  const handleSendMessage = async (text: string, attachments: any[]) => {
+    if ((!text.trim() && attachments.length === 0) || !selectedCandidaturaId || !profile?.uid) return;
+
+    const candidatura = candidaturas.find(c => c.id === selectedCandidaturaId);
+    if (!candidatura) return;
+
+    try {
+      const msgData: any = {
+        candidatura_id: selectedCandidaturaId,
+        vaga_id: candidatura.vaga_id,
+        remetente_id: profile.uid,
+        remetente_tipo: 'Candidato',
+        conteudo: text,
+        anexos: attachments,
+        criado_em: new Date().toISOString()
+      };
+
+      const { error: msgError } = await supabase.from('mensagens').insert(msgData);
+      if (msgError) throw msgError;
+
+      // Log action in candidacy history
+      await logCandidaturaEvento(
+        selectedCandidaturaId,
+        'MENSAGEM',
+        `Mensagem enviada pelo candidato: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
+        profile.uid
+      );
+      
+      /*
+      const { error: candError } = await supabase
+        .from('candidaturas')
+        .update({
+          last_message_date: new Date().toISOString(),
+          unread_messages_by_hr: 1 // Simplified increment for now
+        })
+        .eq('id', selectedCandidaturaId);
+
+      if (candError) throw candError;
+      */
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      alert('Erro ao enviar mensagem. Verifique as permissões.');
+    }
   };
 
-  const conversaAtiva = conversas.find(c => c.vagaId === selectedVagaId);
+  const getStatusCandidato = (status: string, fase?: string) => {
+    const s = status || 'ATIVO';
+    const f = fase || '';
+    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADO') return 'Aprovado';
+    if (s === 'REPROVADO' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
+    if (s === 'RESERVA' || s === 'Reserva' || f === 'Reserva') return 'Reserva';
+    return 'Em processo';
+  };
+
+  const getStatusBadge = (status: string, fase?: string) => {
+    const statusCandidato = getStatusCandidato(status, fase);
+    switch (statusCandidato) {
+      case 'Em processo':
+        return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-medium">Em processo</span>;
+      case 'Aprovado':
+        return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">Aprovado</span>;
+      case 'Reprovado':
+        return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium">Reprovado</span>;
+      case 'Reserva':
+        return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Banco de Talentos</span>;
+      default:
+        return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">{statusCandidato}</span>;
+    }
+  };
+
+  const formatDate = (dateStr: any) => {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const renderFilterInput = (columnKey: string, label: string) => {
+    const isActive = activeFilterColumn === columnKey;
+    const filterValue = columnFilters[columnKey] || '';
+
+    return (
+      <div className="relative flex items-center gap-2">
+        <div 
+          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+          onClick={() => handleSort(columnKey)}
+        >
+          {label}
+          {sortConfig?.key === columnKey ? (
+            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100" />
+          )}
+        </div>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveFilterColumn(isActive ? null : columnKey);
+          }}
+          className={`p-1 rounded hover:bg-slate-200 transition-colors ${filterValue ? 'text-primary' : 'text-slate-400'}`}
+        >
+          <Filter className="w-3 h-3" />
+        </button>
+        {isActive && (
+          <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-lg p-2 z-10 min-w-[200px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-slate-700">Filtrar {label}</span>
+              <button onClick={() => setActiveFilterColumn(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={filterValue}
+              onChange={(e) => handleFilterChange(columnKey, e.target.value)}
+              placeholder={`Buscar...`}
+              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              autoFocus
+            />
+            {filterValue && (
+              <button 
+                onClick={() => {
+                  handleFilterChange(columnKey, '');
+                  setActiveFilterColumn(null);
+                }}
+                className="mt-2 text-xs text-red-500 hover:text-red-700 font-medium w-full text-left"
+              >
+                Limpar Filtro
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredCandidaturas = candidaturas.filter(c => {
+    const matchesFilters = Object.entries(columnFilters).every(([key, value]) => {
+      if (!value) return true;
+      let cValue = String(c[key] || '').toLowerCase();
+      if (key === 'statusCandidato') {
+        cValue = getStatusCandidato(c.status, c.fase).toLowerCase();
+      }
+      return cValue.includes(String(value).toLowerCase());
+    });
+    return matchesFilters;
+  }).sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    let aValue = a[sortConfig.key];
+    let bValue = b[sortConfig.key];
+
+    if (sortConfig.key === 'statusCandidato') {
+      aValue = getStatusCandidato(a.status, a.fase);
+      bValue = getStatusCandidato(b.status, b.fase);
+    }
+
+    if (sortConfig.key === 'last_message_date') {
+      const dateA = new Date(aValue || 0).getTime();
+      const dateB = new Date(bValue || 0).getTime();
+      return sortConfig.direction === 'asc' ? dateA - dateB : dateB - dateA;
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const candidaturaAtiva = candidaturas.find(c => c.id === selectedCandidaturaId);
+
+  if (loading) {
+    return <div className="flex items-center justify-center p-12">Carregando mensagens...</div>;
+  }
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-900">Mensagens</h2>
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex h-[600px]">
-        {/* Lista de conversas */}
-        <div className="w-1/3 border-r border-slate-200 flex flex-col">
-          <div className="p-4 border-b border-slate-200 bg-slate-50">
-            <h3 className="font-bold text-slate-900">Minhas Candidaturas</h3>
-          </div>
-          <div className="divide-y divide-slate-200 overflow-y-auto flex-1">
-            {conversas.map(conversa => (
-              <div 
-                key={conversa.vagaId}
-                onClick={() => setSelectedVagaId(conversa.vagaId)}
-                className={`p-4 cursor-pointer border-l-4 transition-colors ${selectedVagaId === conversa.vagaId ? 'bg-primary/5 border-primary' : 'hover:bg-slate-50 border-transparent'}`}
-              >
-                <h4 className="font-bold text-slate-900 text-sm">{conversa.vagaTitulo}</h4>
-                <p className="text-xs text-slate-500 mt-1 truncate">{conversa.ultimaMensagem}</p>
-                <span className="text-[10px] text-slate-400 mt-2 block">{conversa.dataUltimaMensagem}</span>
-              </div>
-            ))}
+      
+      {!selectedCandidaturaId ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('codigo_vaga', 'Código')}</th>
+                  <th className="px-6 py-4 align-top w-1/4">{renderFilterInput('vagaTitulo', 'Nome da Vaga')}</th>
+                  <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('empresa', 'Empresa')}</th>
+                  <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('msgCount', 'Mensagens')}</th>
+                  <th className="px-6 py-4 align-top w-1/4">Última Mensagem</th>
+                  <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('vagaStatus', 'Status Vaga')}</th>
+                  <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('statusCandidato', 'Status Candidato')}</th>
+                  <th className="px-6 py-4 align-top w-1/12">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredCandidaturas.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedCandidaturaId(c.id)}>
+                    <td className="px-6 py-4 font-mono text-xs text-slate-500">{c.codigo_vaga || '-'}</td>
+                    <td className="px-6 py-4 font-medium text-slate-900">{c.vagaTitulo}</td>
+                    <td className="px-6 py-4">{c.empresa}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs font-bold">
+                        {c.msgCount}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <p className="text-xs text-slate-600 truncate max-w-[250px]" title={c.ultimaMensagem}>
+                          {c.ultimaMensagem}
+                        </p>
+                        <span className="text-[10px] text-slate-400">{formatDate(c.last_message_date)}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${c.vagaStatus === 'Aberta' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                        {c.vagaStatus}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">{getStatusBadge(c.status, c.fase)}</td>
+                    <td className="px-6 py-4">
+                      <button className="text-primary hover:text-primary/80 font-medium text-sm">
+                        Abrir Chat
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredCandidaturas.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                      Nenhuma conversa encontrada.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        {/* Chat ativo */}
-        {conversaAtiva ? (
-          <div className="flex-1 flex flex-col">
-            <div className="p-4 border-b border-slate-200 bg-white">
-              <h3 className="font-bold text-slate-900">{conversaAtiva.vagaTitulo}</h3>
-              <p className="text-xs text-slate-500">Recursos Humanos - {conversaAtiva.empresa}</p>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[600px]">
+          <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div>
+              <h3 className="font-bold text-slate-900">{candidaturaAtiva?.vagaTitulo}</h3>
+              <p className="text-xs text-slate-500">{candidaturaAtiva?.empresa} - Recursos Humanos</p>
             </div>
-            <div className="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-4">
-              {conversaAtiva.mensagens.map(msg => (
-                <div key={msg.id} className={`flex ${msg.remetente === 'Candidato' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`${msg.remetente === 'Candidato' ? 'bg-primary text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'} rounded-lg p-3 max-w-[80%]`}>
-                    <p className="text-sm">{msg.texto}</p>
-                    <span className={`text-[10px] mt-1 block ${msg.remetente === 'Candidato' ? 'text-primary-foreground/70 text-right' : 'text-slate-400'}`}>{msg.horario}</span>
-                  </div>
+            <button 
+              onClick={() => setSelectedCandidaturaId(null)}
+              className="text-slate-500 hover:text-slate-700 px-3 py-1 rounded border border-slate-300 hover:bg-slate-100 transition-colors text-sm font-medium"
+            >
+              Voltar para Lista
+            </button>
+          </div>
+          <div className="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-4">
+            {mensagens.map(msg => {
+              const isMe = msg.remetente_id === profile?.uid || msg.remetente_tipo === 'Candidato';
+              const isSystem = msg.remetente_tipo === 'SISTEMA' || msg.tipo === 'SISTEMA';
+
+              return (
+                <div key={msg.id} className={`flex ${isSystem ? 'justify-center' : isMe ? 'justify-end' : 'justify-start'}`}>
+                  {isSystem ? (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg text-xs font-medium max-w-[90%] text-center shadow-sm">
+                      <div className="flex items-center justify-center gap-2 mb-1">
+                        <AlertCircle className="w-3 h-3" />
+                        <span className="uppercase tracking-wider opacity-70">Notificação do Sistema</span>
+                      </div>
+                      {msg.conteudo || msg.mensagem}
+                      <span className="block mt-1 opacity-50 text-[9px]">{formatDate(msg.criado_em || msg.created_at)}</span>
+                    </div>
+                  ) : (
+                    <div className={`${isMe ? 'bg-primary text-white rounded-tr-none' : 'bg-white border border-slate-200 text-slate-700 rounded-tl-none'} rounded-lg p-3 max-w-[80%]`}>
+                      {(msg.conteudo || msg.mensagem) && <p className="text-sm whitespace-pre-wrap">{msg.conteudo || msg.mensagem}</p>}
+                      
+                      {msg.anexos && Array.isArray(msg.anexos) && msg.anexos.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-white/20 space-y-1">
+                          {msg.anexos.map((anexo: any, aIdx: number) => (
+                            <a 
+                              key={aIdx}
+                              href={anexo.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 p-1.5 rounded text-[11px] hover:bg-white/10 transition-colors ${isMe ? 'text-white' : 'text-primary'}`}
+                            >
+                              <FileText className="w-3 h-3" />
+                              <span className="truncate max-w-[150px]">{anexo.nome}</span>
+                              <Download className="w-3 h-3 ml-auto" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      <span className={`block mt-1 opacity-50 text-[9px] ${isMe ? 'text-right' : 'text-left'}`}>{formatDate(msg.criado_em || msg.created_at)}</span>
+                    </div>
+                  )}
                 </div>
-              ))}
-            </div>
-            <div className="p-4 border-t border-slate-200 bg-white">
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <input 
-                  type="text" 
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Digite sua mensagem para o RH..." 
-                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" 
-                />
-                <button type="submit" disabled={!newMessage.trim()} className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                  Enviar
-                </button>
-              </form>
-              <p className="text-xs text-slate-400 mt-2 text-center">As mensagens também são enviadas para o seu email cadastrado e para o RH.</p>
-            </div>
+              );
+            })}
+            <div ref={chatEndRef} />
           </div>
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-slate-50">
-            <p className="text-slate-500">Selecione uma vaga para ver as mensagens.</p>
+          {mensagens.length === 0 && (
+              <div className="text-center text-slate-400 text-sm py-8">
+                Nenhuma mensagem nesta conversa.
+              </div>
+            )}
+          <div className="p-4 border-t border-slate-200 bg-white">
+            <ChatInput 
+              onSendMessage={handleSendMessage} 
+              placeholder="Digite sua mensagem para o RH..." 
+              showAttachmentButton={candidaturaAtiva?.status !== 'Triagem'}
+            />
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export function CandidateProvas() {
-  const provas = [
-    { id: 1, vaga: 'Analista de Qualidade', prova: 'Teste de Excel Avançado', tipo: 'Online', status: 'Concluída', resultado: 'Aprovado (85%)', data: '02/10/2026' },
-    { id: 2, vaga: 'Engenheiro de Produção Sênior', prova: 'Teste de Lógica e Processos', tipo: 'PDF (Upload)', status: 'Pendente', resultado: '-', data: '-' },
-  ];
+  const { profile } = useAuth();
+  const [provas, setProvas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'vagaTitulo', direction: 'asc' });
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>({});
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!profile?.uid) return;
+
+    const fetchProvas = async () => {
+      try {
+        const { data: candidaturas, error } = await supabase
+          .from('candidaturas')
+          .select('*, vagas(*, provas(nome))')
+          .eq('candidato_id', profile.uid);
+        
+        if (error) throw error;
+
+        const provasData = (candidaturas || [])
+          .filter(c => (c.vagas as any)?.exige_prova)
+          .map(c => {
+            const vData = c.vagas as any;
+            return {
+              id: c.id,
+              codigo_vaga: vData.codigo_vaga || null,
+              vagaTitulo: vData.titulo,
+              empresa: vData.empresa || 'DFL',
+              vagaStatus: vData.status,
+              statusCandidato: c.status,
+              faseCandidato: c.fase,
+              provaNome: vData.provas?.nome || 'Prova Técnica',
+              nota: c.nota_teste || c.notaTeste || '-',
+              resultado: c.aprovacao_teste || c.aprovacaoTeste || 'Pendente'
+            };
+          });
+        
+        setProvas(provasData);
+      } catch (error) {
+        console.error('Erro ao buscar provas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProvas();
+
+    const channel = supabase
+      .channel('provas_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'candidaturas',
+        filter: `candidato_id=eq.${profile.uid}`
+      }, () => {
+        fetchProvas();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile]);
+
+  const getStatusCandidato = (status: string, fase?: string) => {
+    const s = status || 'ATIVO';
+    const f = fase || '';
+    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADO') return 'Aprovado';
+    if (s === 'REPROVADO' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
+    if (s === 'RESERVA' || s === 'Reserva' || f === 'Reserva') return 'Reserva';
+    return 'Em processo';
+  };
+
+  const getStatusBadge = (status: string, fase?: string) => {
+    const statusCandidato = getStatusCandidato(status, fase);
+    switch (statusCandidato) {
+      case 'Em processo':
+        return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-medium">Em processo</span>;
+      case 'Aprovado':
+        return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">Aprovado</span>;
+      case 'Reprovado':
+        return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium">Reprovado</span>;
+      case 'Reserva':
+        return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">Banco de Talentos</span>;
+      default:
+        return <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium">{statusCandidato}</span>;
+    }
+  };
+
+  const getResultadoBadge = (resultado: string) => {
+    switch (resultado) {
+      case 'Aprovado':
+        return <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full text-xs font-medium">Aprovado</span>;
+      case 'Reprovado':
+        return <span className="bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium">Reprovado</span>;
+      case 'Pendente':
+        return <span className="bg-amber-100 text-amber-700 px-2 py-1 rounded-full text-xs font-medium">Pendente</span>;
+      default:
+        return <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded-full text-xs font-medium">{resultado}</span>;
+    }
+  };
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleFilterChange = (key: string, value: string) => {
+    setColumnFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const renderFilterInput = (columnKey: string, label: string) => {
+    const isActive = activeFilterColumn === columnKey;
+    const filterValue = columnFilters[columnKey] || '';
+
+    return (
+      <div className="relative flex items-center gap-2">
+        <div 
+          className="flex items-center gap-1 cursor-pointer hover:text-primary transition-colors"
+          onClick={() => handleSort(columnKey)}
+        >
+          {label}
+          {sortConfig?.key === columnKey ? (
+            sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />
+          ) : (
+            <ArrowUpDown className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100" />
+          )}
+        </div>
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            setActiveFilterColumn(isActive ? null : columnKey);
+          }}
+          className={`p-1 rounded hover:bg-slate-200 transition-colors ${filterValue ? 'text-primary' : 'text-slate-400'}`}
+        >
+          <Filter className="w-3 h-3" />
+        </button>
+        {isActive && (
+          <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-lg p-2 z-10 min-w-[200px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-slate-700">Filtrar {label}</span>
+              <button onClick={() => setActiveFilterColumn(null)} className="text-slate-400 hover:text-slate-600">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={filterValue}
+              onChange={(e) => handleFilterChange(columnKey, e.target.value)}
+              placeholder={`Buscar...`}
+              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              autoFocus
+            />
+            {filterValue && (
+              <button 
+                onClick={() => {
+                  handleFilterChange(columnKey, '');
+                  setActiveFilterColumn(null);
+                }}
+                className="mt-2 text-xs text-red-500 hover:text-red-700 font-medium w-full text-left"
+              >
+                Limpar Filtro
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const filteredProvas = provas.filter(p => {
+    const matchesFilters = Object.entries(columnFilters).every(([key, value]) => {
+      if (!value) return true;
+      let pValue = String(p[key] || '').toLowerCase();
+      if (key === 'statusCandidato') {
+        pValue = getStatusCandidato(p.statusCandidato, p.faseCandidato).toLowerCase();
+      }
+      return pValue.includes(String(value).toLowerCase());
+    });
+    return matchesFilters;
+  }).sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    let aValue = a[sortConfig.key];
+    let bValue = b[sortConfig.key];
+
+    if (sortConfig.key === 'statusCandidato') {
+      aValue = getStatusCandidato(a.statusCandidato, a.faseCandidato);
+      bValue = getStatusCandidato(b.statusCandidato, b.faseCandidato);
+    }
+
+    if (sortConfig.key === 'nota') {
+      const numA = parseFloat(aValue) || 0;
+      const numB = parseFloat(bValue) || 0;
+      return sortConfig.direction === 'asc' ? numA - numB : numB - numA;
+    }
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  if (loading) return <div className="p-8 text-center text-slate-500">Carregando provas...</div>;
 
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold text-slate-900">Minhas Provas</h2>
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="divide-y divide-slate-200">
-          {provas.map((p) => (
-            <div key={p.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h4 className="font-bold text-slate-900 text-lg">{p.prova}</h4>
-                <p className="text-sm text-slate-600 font-medium">{p.vaga}</p>
-                <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
-                  <span className="flex items-center gap-1"><FileText className="w-4 h-4" /> Tipo: {p.tipo}</span>
-                  <span className="flex items-center gap-1"><Clock className="w-4 h-4" /> Realizada em: {p.data}</span>
-                </div>
-              </div>
-              <div className="flex flex-col items-end gap-3">
-                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  p.status === 'Concluída' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {p.status}
-                </span>
-                {p.status === 'Concluída' ? (
-                  <span className="text-sm font-bold text-slate-700">Resultado: {p.resultado}</span>
-                ) : (
-                  <button className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors">
-                    {p.tipo === 'Online' ? 'Acessar Prova' : 'Enviar Arquivo'}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-600">
+            <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
+              <tr>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('id_vaga', 'ID Vaga')}</th>
+                <th className="px-6 py-4 align-top w-1/5">{renderFilterInput('vagaTitulo', 'Nome da Vaga')}</th>
+                <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('empresa', 'Empresa')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('vagaStatus', 'Status Vaga')}</th>
+                <th className="px-6 py-4 align-top w-1/6">{renderFilterInput('statusCandidato', 'Status Candidato')}</th>
+                <th className="px-6 py-4 align-top w-1/5">{renderFilterInput('provaNome', 'Nome da Prova')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('nota', 'Nota')}</th>
+                <th className="px-6 py-4 align-top w-1/12">{renderFilterInput('resultado', 'Resultado')}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {filteredProvas.map((p) => (
+                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4 font-mono text-xs text-slate-500">{p.codigo_vaga || '-'}</td>
+                  <td className="px-6 py-4 font-medium text-slate-900">{p.vagaTitulo}</td>
+                  <td className="px-6 py-4">{p.empresa}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${p.vagaStatus === 'Aberta' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                      {p.vagaStatus}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">{getStatusBadge(p.statusCandidato, p.faseCandidato)}</td>
+                  <td className="px-6 py-4 font-medium text-slate-700">{p.provaNome}</td>
+                  <td className="px-6 py-4 font-bold text-slate-900">{p.nota}</td>
+                  <td className="px-6 py-4">{getResultadoBadge(p.resultado)}</td>
+                </tr>
+              ))}
+              {filteredProvas.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                    Nenhuma prova encontrada para suas candidaturas.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

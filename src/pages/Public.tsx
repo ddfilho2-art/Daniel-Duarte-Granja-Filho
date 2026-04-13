@@ -1,10 +1,58 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Search, MapPin, Briefcase, ChevronRight, CheckCircle2, Globe, Calendar, Users, FlaskConical, Award, Leaf, Building2, Rocket, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
+import { Search, MapPin, Briefcase, ChevronRight, CheckCircle2, Globe, Calendar, Users, FlaskConical, Award, Leaf, Building2, Rocket, ExternalLink, Eye, EyeOff, DollarSign, Database, Trash2, Plus, XCircle } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { logAudit } from '../lib/audit';
+import { logCandidaturaEvento } from '../lib/events';
+import { useAuth } from '../contexts/AuthContext';
+import { seedDatabase } from '../lib/seed';
 
 export function Home() {
-  // Em uma aplicação real, este número viria de uma API ou do estado global
-  const vagasAbertas = 6;
+  // [EDITABLE_START:public_home_state]
+  const { user } = useAuth();
+  const [vagasAbertas, setVagasAbertas] = useState(0);
+  const [vagasDestaque, setVagasDestaque] = useState<any[]>([]);
+  // [EDITABLE_END:public_home_state]
+
+  // [EDITABLE_START:public_home_useeffect_init]
+  useEffect(() => {
+    const fetchVagas = async () => {
+      try {
+        const { data, count, error } = await supabase
+          .from('vagas')
+          .select('*', { count: 'exact' })
+          .eq('status_vaga', 'ABERTA')
+          .limit(3);
+
+        if (error) throw error;
+        
+        let finalVagas = data || [];
+
+        if (user && finalVagas.length > 0) {
+          const { data: candidaturas } = await supabase
+            .from('candidaturas')
+            .select('vaga_id')
+            .eq('candidato_id', user.id)
+            .in('vaga_id', finalVagas.map(v => v.id));
+
+          if (candidaturas) {
+            const appliedIds = new Set(candidaturas.map(c => c.vaga_id));
+            finalVagas = finalVagas.map(v => ({
+              ...v,
+              ja_candidatado: appliedIds.has(v.id)
+            }));
+          }
+        }
+
+        setVagasAbertas(count || 0);
+        setVagasDestaque(finalVagas);
+      } catch (error) {
+        console.error('Erro ao buscar vagas:', error);
+      }
+    };
+    fetchVagas();
+  }, [user]);
+  // [EDITABLE_END:public_home_useeffect_init]
 
   return (
     <div>
@@ -40,47 +88,120 @@ export function Home() {
       </section>
 
       {/* Vagas em Destaque */}
-      <section className="py-20 bg-slate-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-end mb-10">
-            <div>
-              <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Vagas em destaque</h2>
-              <p className="text-slate-600 mt-2">Encontre a oportunidade perfeita para o seu perfil.</p>
-            </div>
-            <Link to="/vagas" className="text-primary font-medium hover:underline flex items-center gap-1">
-              Ver todas <ChevronRight className="w-4 h-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-3 bg-primary/5 rounded-lg text-primary">
-                    <Briefcase className="w-6 h-6" />
-                  </div>
-                  <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-1 rounded-full">
-                    Novo
-                  </span>
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Analista de Qualidade Pleno</h3>
-                <div className="flex items-center gap-4 text-sm text-slate-500 mb-6">
-                  <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> Rio de Janeiro, RJ</span>
-                  <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> Híbrido</span>
-                </div>
-                <Link to="/vagas/1" className="block w-full text-center bg-slate-50 text-primary font-medium py-2 rounded-lg hover:bg-primary hover:text-white transition-colors border border-slate-200 hover:border-primary">
-                  Ver Detalhes
-                </Link>
+      {vagasDestaque.length > 0 && (
+        <section className="py-20 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-end mb-10">
+              <div>
+                <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Vagas em destaque</h2>
+                <p className="text-slate-600 mt-2">Encontre a oportunidade perfeita para o seu perfil.</p>
               </div>
-            ))}
+              <Link to="/vagas" className="text-primary font-medium hover:underline flex items-center gap-1">
+                Ver todas <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vagasDestaque.map((vaga) => (
+                <div key={vaga.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="p-3 bg-primary/5 rounded-lg text-primary">
+                      <Briefcase className="w-6 h-6" />
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <span className="bg-emerald-100 text-emerald-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                        Novo
+                      </span>
+                      {vaga.codigo_vaga && (
+                        <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          {vaga.codigo_vaga}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900 mb-2">{vaga.titulo}</h3>
+                  <div className="flex items-center gap-4 text-sm text-slate-500 mb-6">
+                    <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {vaga.local || 'Não especificado'}</span>
+                    <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {vaga.tipo || 'Não especificado'}</span>
+                    {vaga.salario && (
+                      <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" /> {vaga.salario}</span>
+                    )}
+                  </div>
+                  <Link 
+                    to={`/vagas/${vaga.id}`} 
+                    className={`block w-full text-center font-medium py-2 rounded-lg transition-colors border ${
+                      vaga.ja_candidatado 
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                        : 'bg-slate-50 text-primary border-slate-200 hover:bg-primary hover:text-white hover:border-primary'
+                    }`}
+                  >
+                    {vaga.ja_candidatado ? 'Já se candidatou' : 'Ver Detalhes'}
+                  </Link>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }
 
 export function ListaVagas() {
+  // [EDITABLE_START:public_listavagas_state]
+  const { user } = useAuth();
+  const [vagas, setVagas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  // [EDITABLE_END:public_listavagas_state]
+
+  // [EDITABLE_START:public_listavagas_useeffect_init]
+  useEffect(() => {
+    const fetchVagas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('vagas')
+          .select('*')
+          .eq('status_vaga', 'ABERTA');
+
+        if (error) throw error;
+        
+        let finalVagas = data || [];
+
+        if (user && finalVagas.length > 0) {
+          const { data: candidaturas } = await supabase
+            .from('candidaturas')
+            .select('vaga_id')
+            .eq('candidato_id', user.id);
+
+          if (candidaturas) {
+            const appliedIds = new Set(candidaturas.map(c => c.vaga_id));
+            finalVagas = finalVagas.map(v => ({
+              ...v,
+              ja_candidatado: appliedIds.has(v.id)
+            }));
+          }
+        }
+
+        setVagas(finalVagas);
+      } catch (error) {
+        console.error('Erro ao buscar vagas:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchVagas();
+  }, [user]);
+  // [EDITABLE_END:public_listavagas_useeffect_init]
+
+  const filteredVagas = vagas.filter(vaga => {
+    const matchesSearch = vaga.titulo?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          vaga.descricao?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLocation = locationFilter ? vaga.local?.toLowerCase().includes(locationFilter.toLowerCase()) : true;
+    return matchesSearch && matchesLocation;
+  });
+
   return (
     <div className="py-12 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -93,40 +214,68 @@ export function ListaVagas() {
             <input 
               type="text" 
               placeholder="Buscar por cargo ou palavra-chave..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <div className="w-full md:w-64 relative">
             <MapPin className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <select className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none bg-white">
+            <select 
+              value={locationFilter}
+              onChange={(e) => setLocationFilter(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none bg-white"
+            >
               <option value="">Todas as localidades</option>
-              <option value="rj">Rio de Janeiro, RJ</option>
-              <option value="sp">São Paulo, SP</option>
+              <option value="rio de janeiro">Rio de Janeiro, RJ</option>
+              <option value="são paulo">São Paulo, SP</option>
               <option value="remoto">Remoto</option>
             </select>
           </div>
-          <button className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors">
-            Buscar
-          </button>
         </div>
 
         {/* List */}
         <div className="space-y-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Engenheiro de Produção Sênior</h3>
-                <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
-                  <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> Rio de Janeiro, RJ</span>
-                  <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> Presencial</span>
-                  <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">Engenharia</span>
+          {loading ? (
+            <div className="text-center py-12 text-slate-500">Carregando vagas...</div>
+          ) : filteredVagas.length === 0 ? (
+            <div className="text-center py-12 text-slate-500">Nenhuma vaga encontrada com os filtros atuais.</div>
+          ) : (
+            filteredVagas.map((vaga) => (
+              <div key={vaga.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-bold text-slate-900">{vaga.titulo}</h3>
+                    {vaga.codigo_vaga && (
+                      <span className="text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                        {vaga.codigo_vaga}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
+                    <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {vaga.local || 'Não especificado'}</span>
+                    <span className="flex items-center gap-1"><Briefcase className="w-4 h-4" /> {vaga.tipo || 'Não especificado'}</span>
+                    {vaga.salario && (
+                      <span className="flex items-center gap-1"><DollarSign className="w-4 h-4" /> {vaga.salario}</span>
+                    )}
+                    {vaga.departamento && (
+                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">{vaga.departamento}</span>
+                    )}
+                  </div>
                 </div>
+                <Link 
+                  to={`/vagas/${vaga.id}`} 
+                  className={`shrink-0 font-medium px-6 py-2 rounded-lg transition-colors border text-center ${
+                    vaga.ja_candidatado 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' 
+                      : 'bg-slate-50 text-primary border-slate-200 hover:bg-primary hover:text-white hover:border-primary'
+                  }`}
+                >
+                  {vaga.ja_candidatado ? 'Já se candidatou' : 'Ver Detalhes'}
+                </Link>
               </div>
-              <Link to={`/vagas/${i}`} className="shrink-0 bg-slate-50 text-primary font-medium px-6 py-2 rounded-lg hover:bg-primary hover:text-white transition-colors border border-slate-200 hover:border-primary text-center">
-                Ver Detalhes
-              </Link>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -134,23 +283,264 @@ export function ListaVagas() {
 }
 
 export function DetalheVaga() {
+  // [EDITABLE_START:public_detalhevaga_state]
+  const { user, profile } = useAuth();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showModal, setShowModal] = useState(false);
-  const [modalType, setModalType] = useState<'success' | 'error'>('success');
+  const [modalType, setModalType] = useState<'success' | 'error' | 'login' | 'applyForm'>('success');
+  const [vaga, setVaga] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [isApplying, setIsApplying] = useState(false);
+  const [jaCandidatado, setJaCandidatado] = useState(false);
+  const [comoSoube, setComoSoube] = useState('');
+  const [indicacaoNome, setIndicacaoNome] = useState('');
 
-  const handleApply = () => {
-    const isResumeCompleted = localStorage.getItem('resumeCompleted') === 'true';
-    if (isResumeCompleted) {
-      setModalType('success');
+  console.log('>>> DetalheVaga RENDER', { showModal, modalType, comoSoube, isApplying, jaCandidatado });
+  // [EDITABLE_END:public_detalhevaga_state]
+
+  // [EDITABLE_START:public_detalhevaga_useeffect_init]
+  useEffect(() => {
+    const fetchVaga = async () => {
+      if (!id) return;
+      try {
+        const { data, error } = await supabase
+          .from('vagas')
+          .select('*')
+          .eq('id', id)
+          .single();
+
+        if (error) throw error;
+        setVaga(data);
+
+        // Check if user already applied
+        if (user) {
+          const { data: existing } = await supabase
+            .from('candidaturas')
+            .select('id')
+            .eq('vaga_id', id)
+            .eq('candidato_id', user.id)
+            .maybeSingle();
+          
+          if (existing) {
+            setJaCandidatado(true);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao buscar vaga:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchVaga();
+  }, [id, user]);
+  // [EDITABLE_END:public_detalhevaga_useeffect_init]
+
+  // [EDITABLE_START:public_detalhevaga_handlers]
+  const handleApply = async () => {
+    console.log('handleApply chamado', { status_vaga: vaga?.status_vaga, user: user?.id, profile: profile?.perfil });
+    if (vaga?.status_vaga !== 'ABERTA') {
+      alert('Esta vaga não está disponível para candidatura');
+      return;
+    }
+
+    if (!user) {
+      setModalType('login');
       setShowModal(true);
-    } else {
+      return;
+    }
+
+    // Check if user is a candidate
+    if (!profile || profile.perfil !== 'Candidato') {
+      alert('Apenas candidatos podem se candidatar a vagas.');
+      return;
+    }
+
+    // Check if resume is completed
+    const isResumeCompleted = profile.resume_completed === true || localStorage.getItem('resumeCompleted') === 'true';
+    
+    if (!isResumeCompleted) {
       setModalType('error');
       setShowModal(true);
+      return;
     }
+
+    // If everything is okay, show the apply form modal
+    setModalType('applyForm');
+    setShowModal(true);
   };
 
+  const confirmApply = async () => {
+    console.log('>>> confirmApply INICIADO', { 
+      comoSoube, 
+      indicacaoNome, 
+      id, 
+      userId: user?.id,
+      isApplying 
+    });
+
+    if (!comoSoube) {
+      alert('Por favor, informe como soube da vaga.');
+      return;
+    }
+
+    if (comoSoube === 'Indicação de colaborador' && !indicacaoNome.trim()) {
+      alert('Por favor, informe o nome do colaborador que indicou.');
+      return;
+    }
+
+    if (isApplying) {
+      return;
+    }
+
+    try {
+      setIsApplying(true);
+      console.log('>>> PASSO: Validando vaga no Supabase...');
+
+      // 1. Antes de criar candidatura: Buscar vaga pelo id
+      const { data: currentVaga, error: vagaError } = await supabase
+        .from('vagas')
+        .select('status_vaga, titulo')
+        .eq('id', id)
+        .single();
+      
+      if (vagaError || !currentVaga) {
+        console.error('Erro ao validar vaga:', vagaError);
+        throw new Error('Erro ao validar vaga.');
+      }
+
+      console.log('Vaga validada:', currentVaga);
+
+      // 2. Validar: Se status_vaga != 'ABERTA'
+      if (currentVaga.status_vaga !== 'ABERTA') {
+        alert('Esta vaga não está disponível para candidatura');
+        setIsApplying(false);
+        setShowModal(false);
+        return;
+      }
+
+      // Check if already applied
+      console.log('Verificando candidatura existente...');
+      const { data: existing, error: checkError } = await supabase
+        .from('candidaturas')
+        .select('id')
+        .eq('vaga_id', id)
+        .eq('candidato_id', user?.id)
+        .maybeSingle();
+      
+      if (checkError) {
+        console.error('Erro ao verificar candidatura existente:', checkError);
+        throw checkError;
+      }
+      
+      if (existing) {
+        alert('Você já se candidatou a esta vaga.');
+        setShowModal(false);
+        return;
+      }
+
+      console.log('Preparando dados da candidatura...');
+      const candidaturaData = {
+        vaga_id: id,
+        candidato_id: user?.id,
+        fase: 'Triagem',
+        visualizado: false,
+        origem: comoSoube,
+        como_soube: comoSoube, // Mantendo ambos por segurança se a coluna existir
+        indicacao_nome: comoSoube === 'Indicação de colaborador' ? indicacaoNome : '',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        data_candidatura: new Date().toISOString()
+      };
+
+      console.log('Inserindo candidatura...', candidaturaData);
+      const { data: newCand, error: insertError } = await supabase
+        .from('candidaturas')
+        .insert(candidaturaData)
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Erro no insert da candidatura:', insertError);
+        throw insertError;
+      }
+      
+      console.log('Candidatura inserida com sucesso!');
+      
+      // Log action in audit
+      await logAudit('Candidatou-se', 'Portal do Candidato', `Candidatou-se à vaga ${currentVaga.titulo}`);
+
+      // Log action in candidacy history
+      if (newCand) {
+        await logCandidaturaEvento(
+          newCand.id,
+          'FASE',
+          'Candidatura iniciada na fase de Triagem',
+          user?.id
+        );
+      }
+
+      // Enviar e-mail de confirmação
+      try {
+        const { data: configData } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('id', 'email')
+          .single();
+        
+        if (configData) {
+          const settings = configData.data || configData;
+          if (settings.smtpHost && settings.smtpUser && settings.smtpPass && user?.email) {
+            const subject = `Confirmação de Candidatura - ${currentVaga.titulo}`;
+            const body = `Olá ${user?.user_metadata?.nome || 'Candidato'},\n\nSua candidatura para a vaga "${currentVaga.titulo}" foi recebida com sucesso!\n\nFique atento ao seu portal para acompanhar as próximas etapas.\n\nAtenciosamente,\nEquipe de RH`;
+            
+            const response = await fetch('/api/send-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                to: user.email,
+                subject,
+                body,
+                smtpConfig: {
+                  smtpHost: settings.smtpHost,
+                  smtpPort: settings.smtpPort,
+                  smtpUser: settings.smtpUser,
+                  smtpPass: settings.smtpPass
+                }
+              })
+            });
+            
+            if (response.ok) {
+              console.log('E-mail de confirmação enviado com sucesso.');
+            } else {
+              const errorData = await response.json();
+              console.warn('Falha ao enviar e-mail de confirmação:', errorData.message);
+            }
+          }
+        }
+      } catch (emailErr) {
+        console.error('Erro ao enviar e-mail de confirmação:', emailErr);
+      }
+
+      setModalType('success');
+      setShowModal(true);
+    } catch (error: any) {
+      console.error('Erro fatal ao se candidatar:', error);
+      alert(`Erro ao realizar candidatura: ${error.message || 'Tente novamente.'}`);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+  // [EDITABLE_END:public_detalhevaga_handlers]
+
+  if (loading) return <div className="py-12 text-center">Carregando detalhes da vaga...</div>;
+  if (!vaga) return <div className="py-12 text-center">Vaga não encontrada.</div>;
+
+  const isDashboard = location.pathname.startsWith('/candidato') || location.pathname.startsWith('/rh') || location.pathname.startsWith('/admin');
+
   return (
-    <div className="py-12 bg-slate-50 min-h-screen">
+    <div className={`${isDashboard ? '' : 'py-12 bg-slate-50 min-h-screen'}`}>
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
@@ -160,7 +550,7 @@ export function DetalheVaga() {
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">Candidatura Realizada!</h3>
-                <p className="text-slate-600 mb-6">Sua candidatura para Engenheiro de Produção Sênior foi enviada com sucesso.</p>
+                <p className="text-slate-600 mb-6">Sua candidatura para {vaga.titulo} foi enviada com sucesso.</p>
                 <button 
                   onClick={() => setShowModal(false)}
                   className="w-full bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors"
@@ -168,6 +558,84 @@ export function DetalheVaga() {
                   Fechar
                 </button>
               </>
+            ) : modalType === 'login' ? (
+              <>
+                <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Briefcase className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">Login Necessário</h3>
+                <p className="text-slate-600 mb-6">Você precisa estar logado como candidato para se candidatar.</p>
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowModal(false)}
+                    className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={() => navigate('/login')}
+                    className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors"
+                  >
+                    Fazer Login
+                  </button>
+                </div>
+              </>
+            ) : modalType === 'applyForm' ? (
+              <div className="text-left">
+                <h3 className="text-xl font-bold text-slate-900 mb-4">Finalizar Candidatura</h3>
+                <p className="text-sm text-slate-600 mb-6">Por favor, responda à pergunta abaixo para concluir sua candidatura para <strong>{vaga.titulo}</strong>.</p>
+                
+                <div className="space-y-4 mb-8">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Como soube da vaga? <span className="text-red-500">*</span></label>
+                    <select 
+                      value={comoSoube} 
+                      onChange={(e) => {
+                        console.log('>>> SELECT ALTERADO:', e.target.value);
+                        setComoSoube(e.target.value);
+                      }}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    >
+                      <option value="">Selecione uma opção</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Site da Empresa">Site da Empresa</option>
+                      <option value="Indicação de colaborador">Indicação de colaborador</option>
+                      <option value="Outros">Outros</option>
+                    </select>
+                  </div>
+
+                  {comoSoube === 'Indicação de colaborador' && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Nome de quem indicou <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        value={indicacaoNome}
+                        onChange={(e) => setIndicacaoNome(e.target.value)}
+                        placeholder="Informe o nome completo"
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    onClick={() => setShowModal(false)}
+                    className="flex-1 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-200 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={() => {
+                      confirmApply();
+                    }}
+                    disabled={isApplying || !comoSoube || (comoSoube === 'Indicação de colaborador' && !indicacaoNome.trim())}
+                    className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50"
+                  >
+                    {isApplying ? 'Processando...' : 'Confirmar'}
+                  </button>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -203,37 +671,68 @@ export function DetalheVaga() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-8 border-b border-slate-200">
             <div className="flex justify-between items-start gap-4 mb-4">
-              <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Engenheiro de Produção Sênior</h1>
-              <button onClick={handleApply} className="shrink-0 bg-primary text-white px-8 py-3 rounded-lg font-medium hover:bg-accent transition-colors">
-                Candidatar-se
-              </button>
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{vaga.titulo}</h1>
+                {vaga.codigo_vaga && (
+                  <span className="inline-block mt-2 text-sm font-mono text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                    Código: {vaga.codigo_vaga}
+                  </span>
+                )}
+              </div>
+              {jaCandidatado ? (
+                <div className="shrink-0 bg-emerald-100 text-emerald-700 px-8 py-3 rounded-lg font-medium flex items-center gap-2 border border-emerald-200">
+                  <CheckCircle2 className="w-5 h-5" /> Já se candidatou
+                </div>
+              ) : vaga.status_vaga === 'ABERTA' ? (
+                <button 
+                  onClick={handleApply} 
+                  disabled={isApplying}
+                  className="shrink-0 bg-primary text-white px-8 py-3 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50"
+                >
+                  {isApplying ? 'Processando...' : 'Candidatar-se'}
+                </button>
+              ) : (
+                <div className="shrink-0 bg-slate-100 text-slate-500 px-8 py-3 rounded-lg font-medium cursor-not-allowed">
+                  Vaga {vaga.status_vaga || vaga.status}
+                </div>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-6 text-sm text-slate-600">
-              <span className="flex items-center gap-2"><MapPin className="w-5 h-5 text-slate-400" /> Rio de Janeiro, RJ</span>
-              <span className="flex items-center gap-2"><Briefcase className="w-5 h-5 text-slate-400" /> Presencial</span>
-              <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5 text-slate-400" /> Tempo Integral</span>
+              <span className="flex items-center gap-2"><MapPin className="w-5 h-5 text-slate-400" /> {vaga.local || 'Não especificado'}</span>
+              <span className="flex items-center gap-2"><Briefcase className="w-5 h-5 text-slate-400" /> {vaga.tipo || 'Não especificado'}</span>
+              {vaga.salario && (
+                <span className="flex items-center gap-2"><DollarSign className="w-5 h-5 text-slate-400" /> {vaga.salario}</span>
+              )}
+              {vaga.departamento && (
+                <span className="flex items-center gap-2"><Building2 className="w-5 h-5 text-slate-400" /> {vaga.departamento}</span>
+              )}
             </div>
           </div>
           
           <div className="p-8 prose prose-slate max-w-none">
-            <h3>Descrição da Vaga</h3>
-            <p>Estamos em busca de um Engenheiro de Produção Sênior para atuar em nossa planta no Rio de Janeiro. O profissional será responsável por otimizar processos produtivos, garantindo a qualidade e eficiência da nossa linha de anestésicos e produtos odontológicos.</p>
+            <h3 className="text-lg font-bold mb-2">Descrição da Vaga</h3>
+            <p className="whitespace-pre-wrap mb-6">{vaga.descricao}</p>
             
-            <h3>Responsabilidades</h3>
-            <ul>
-              <li>Mapear e otimizar processos de produção.</li>
-              <li>Liderar projetos de melhoria contínua (Lean Manufacturing, Six Sigma).</li>
-              <li>Garantir o cumprimento das normas de qualidade e segurança (ANVISA, ISO).</li>
-              <li>Analisar indicadores de desempenho (KPIs) e propor planos de ação.</li>
-            </ul>
+            {vaga.requisitos && (
+              <>
+                <h3 className="text-lg font-bold mb-2">Requisitos</h3>
+                <p className="whitespace-pre-wrap mb-6">{vaga.requisitos}</p>
+              </>
+            )}
 
-            <h3>Requisitos</h3>
-            <ul>
-              <li>Formação superior completa em Engenharia de Produção, Química ou áreas correlatas.</li>
-              <li>Experiência comprovada em indústria farmacêutica ou de dispositivos médicos.</li>
-              <li>Conhecimento avançado em ferramentas de qualidade e melhoria contínua.</li>
-              <li>Inglês avançado.</li>
-            </ul>
+            {vaga.beneficios && (
+              <>
+                <h3 className="text-lg font-bold mb-2">Benefícios</h3>
+                <p className="whitespace-pre-wrap mb-6">{vaga.beneficios}</p>
+              </>
+            )}
+
+            {vaga.salario && (
+              <>
+                <h3 className="text-lg font-bold mb-2">Faixa Salarial</h3>
+                <p className="mb-6">{vaga.salario}</p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -242,63 +741,222 @@ export function DetalheVaga() {
 }
 
 export function Cadastro() {
+  // [EDITABLE_START:public_cadastro_state]
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const navigate = useNavigate();
+  const { user, profile, loading: authLoading } = useAuth();
+
+  const [formData, setFormData] = useState({
+    nome: '',
+    login: '',
+    email: '',
+    senha: '',
+    confirmarSenha: ''
+  });
+  // [EDITABLE_END:public_cadastro_state]
+
+  // [EDITABLE_START:public_cadastro_useeffect_redirect]
+  useEffect(() => {
+    if (!authLoading && user && profile && user.email_confirmed_at) {
+      const p = profile.perfil?.toLowerCase();
+      if (p === 'admin') navigate('/admin');
+      else if (p === 'rh') navigate('/rh');
+      else navigate('/candidato');
+    }
+  }, [user, profile, authLoading, navigate]);
+  // [EDITABLE_END:public_cadastro_useeffect_redirect]
+
+  // [EDITABLE_START:public_cadastro_handle_submit]
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (formData.senha !== formData.confirmarSenha) {
+      setError('As senhas não coincidem.');
+      return;
+    }
+
+    if (formData.senha.length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccessMsg('');
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.senha,
+        options: {
+          data: {
+            nome: formData.nome,
+            login: formData.login,
+            perfil: 'Candidato'
+          },
+          emailRedirectTo: `${window.location.origin}/login`
+        }
+      });
+
+      console.log('--- SIGNUP DEBUG ---');
+      console.log('Email:', formData.email);
+      console.log('Resposta completa:', authData);
+      console.log('Erro:', authError);
+
+      if (authError) {
+        if (authError.message.includes('User already registered')) {
+          setError('Este email já está cadastrado. Faça login.');
+          setLoading(false);
+          return;
+        }
+
+        console.error('Erro no cadastro:', authError.message);
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!authData.user) throw new Error('Erro ao criar usuário.');
+
+      console.log('Usuário criado no Auth:', authData.user.id);
+
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authData.user.id)
+        .maybeSingle();
+
+      if (existingUserError) {
+        console.error('Erro ao buscar usuário:', existingUserError);
+        throw new Error('Erro ao validar usuário existente.');
+      }
+
+      if (!existingUser) {
+        console.log('Inserindo na tabela users...');
+
+        const { error: userError } = await supabase.from('users').insert({
+          id: authData.user.id,
+          uid: authData.user.id,
+          nome: formData.nome,
+          email: formData.email,
+          login: formData.login,
+          login_lower: formData.login.toLowerCase(),
+          perfil: 'Candidato',
+          status: 'Ativo',
+          resume_completed: false
+        });
+
+        if (userError) {
+          console.error('Erro ao inserir usuário:', userError);
+
+          try {
+            await supabase.auth.admin.deleteUser(authData.user.id);
+            console.log('Rollback realizado: usuário removido do Auth');
+          } catch (deleteError) {
+            console.error('Erro ao fazer rollback no Auth:', deleteError);
+          }
+
+          throw new Error('Erro ao salvar usuário. Tente novamente.');
+        }
+      }
+
+      if (!authData.session) {
+        console.log('Tentando login automático...');
+
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.senha
+        });
+
+        if (loginError) {
+          console.warn('Login automático falhou:', loginError.message);
+        }
+      }
+
+      await logAudit('Cadastro', 'Candidato', `Novo candidato cadastrado: ${formData.nome}.`);
+
+      setSuccessMsg('Cadastro realizado com sucesso! Você já pode acessar o sistema.');
+
+      setFormData({
+        nome: '',
+        login: '',
+        email: '',
+        senha: '',
+        confirmarSenha: ''
+      });
+
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Erro ao realizar cadastro.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  // [EDITABLE_END:public_cadastro_handle_submit]
+
+  if (successMsg) {
+    return (
+      <div className="py-24 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="max-w-md w-full px-4 text-center">
+          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="w-8 h-8" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-4">Verifique seu e-mail</h2>
+            <p className="text-slate-600 mb-8 leading-relaxed">
+              {successMsg}
+            </p>
+            <Link to="/login" className="inline-flex items-center justify-center w-full bg-primary text-white py-3 rounded-lg font-bold hover:bg-accent transition-colors">
+              Ir para o Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="py-12 bg-slate-50 min-h-screen flex items-center justify-center">
-      <div className="max-w-md w-full px-4 sm:px-6">
+      <div className="max-w-md w-full px-4">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Crie sua conta</h1>
-          <p className="text-slate-600 mt-2">Cadastre-se para se candidatar às nossas vagas.</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Crie sua conta</h1>
+          <p className="text-slate-600 mt-2">Junte-se ao time DFL e construa o futuro conosco.</p>
         </div>
 
         <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
-          <Link to="/candidato" className="w-full flex items-center justify-center gap-3 bg-white border border-slate-300 text-slate-700 font-medium py-2.5 rounded-lg hover:bg-slate-50 transition-colors mb-6">
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            Continuar com Google
-          </Link>
+          {error && <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
 
-          <div className="relative flex items-center py-2 mb-6">
-            <div className="flex-grow border-t border-slate-200"></div>
-            <span className="shrink-0 px-4 text-sm text-slate-400">ou cadastre com email</span>
-            <div className="flex-grow border-t border-slate-200"></div>
-          </div>
+          <form onSubmit={handleRegister} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo *</label>
+              <input required type="text" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Seu nome completo" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Usuário de Login *</label>
+              <input required type="text" value={formData.login} onChange={e => setFormData({...formData, login: e.target.value})} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Ex: joaosilva" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">E-mail *</label>
+              <input required type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" placeholder="seu@email.com" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Senha *</label>
+              <input required type="password" value={formData.senha} onChange={e => setFormData({...formData, senha: e.target.value})} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Mínimo 8 caracteres" minLength={8} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Confirmar Senha *</label>
+              <input required type="password" value={formData.confirmarSenha} onChange={e => setFormData({...formData, confirmarSenha: e.target.value})} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" placeholder="Repita sua senha" />
+            </div>
 
-          <form className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo</label>
-              <input type="text" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-              <input type="email" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Usuário de Login</label>
-              <input 
-                type="text" 
-                pattern="^(?=.*[A-Z])(?=.*[!@#$%^&*()_+{}\[\]:;<>,.?~\\/-])[a-zA-Z0-9!@#$%^&*()_+{}\[\]:;<>,.?~\\/-]{8,}$"
-                title="Mínimo 8 caracteres, contendo pelo menos uma letra maiúscula e um símbolo"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" 
-              />
-              <p className="text-[10px] text-slate-500 mt-1">Mínimo 8 caracteres, com letra maiúscula e símbolo.</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-              <input type="password" className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-            </div>
-            <div className="pt-2">
-              <Link to="/candidato" className="block w-full text-center bg-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-accent transition-colors">
-                Criar conta
-              </Link>
-            </div>
+            <button disabled={loading} type="submit" className="w-full bg-primary text-white py-3 rounded-lg font-bold hover:bg-accent transition-colors disabled:opacity-50 mt-6">
+              {loading ? 'Cadastrando...' : 'Cadastrar'}
+            </button>
           </form>
-          
-          <p className="mt-6 text-center text-sm text-slate-600">
-            Já tem uma conta? <Link to="/login" className="text-primary font-medium hover:underline">Faça login</Link>
+
+          <p className="mt-8 text-center text-sm text-slate-600">
+            Já tem uma conta? <Link to="/login" className="text-primary font-medium hover:underline">Fazer Login</Link>
           </p>
         </div>
       </div>
@@ -307,20 +965,202 @@ export function Cadastro() {
 }
 
 export function Login() {
-  const [login, setLogin] = useState('rh_user');
-  const [password, setPassword] = useState('RH@DFL2026');
+  // [EDITABLE_START:public_login_state]
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [seedMsg, setSeedMsg] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotLogin, setForgotLogin] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
   const navigate = useNavigate();
+  const { user, profile, loading: authLoading } = useAuth();
+  // [EDITABLE_END:public_login_state]
 
-  const handleLogin = (e: React.FormEvent) => {
+  // [EDITABLE_START:public_login_useeffect_redirect]
+  useEffect(() => {
+    if (!authLoading && user && profile) {
+      console.log('Redirecionando usuário logado:', profile.perfil);
+      const p = profile.perfil?.toLowerCase();
+      if (p === 'rh') navigate('/rh', { replace: true });
+      else if (p === 'admin') navigate('/admin', { replace: true });
+      else navigate('/candidato', { replace: true });
+    }
+  }, [user, profile, authLoading, navigate]);
+  // [EDITABLE_END:public_login_useeffect_redirect]
+
+  // [EDITABLE_START:public_login_handle_submit]
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login === 'rh_user') {
-      navigate('/rh');
-    } else if (login === 'admin_master') {
-      navigate('/admin');
-    } else {
-      navigate('/candidato');
+    setLoading(true);
+    setError('');
+
+    try {
+      // Buscar usuário pelo login
+      const { data: users, error: findError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('login_lower', login.toLowerCase().trim())
+        .eq('status', 'Ativo')
+        .limit(1);
+
+      if (findError) throw findError;
+
+      if (!users || users.length === 0) {
+        setError('Usuário ou senha incorretos.');
+        return;
+      }
+
+      const userDoc = users[0];
+
+      // Autenticar com email real — NUNCA transformar login em email fictício
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: userDoc.email,
+        password: password,
+      });
+
+      if (authError) {
+        if (authError.message?.includes('rate limit')) {
+          setError('Muitas tentativas. Aguarde alguns minutos.');
+        } else {
+          setError('Usuário ou senha incorretos.');
+        }
+        return;
+      }
+
+      // Log sem bloquear o fluxo
+      try {
+        await supabase.from('logs').insert({
+          usuario_id: userDoc.id,
+          usuario_email: userDoc.email,
+          acao: 'Login',
+          modulo: 'Autenticação',
+          detalhes: `Usuário ${userDoc.login} efetuou login`,
+        });
+      } catch (logErr) {
+        console.warn('Erro ao registrar log:', logErr);
+      }
+
+      // Redirecionar por perfil
+      const perfil = userDoc.perfil?.toLowerCase();
+      if (perfil === 'admin') navigate('/admin');
+      else if (perfil === 'rh') navigate('/rh');
+      else navigate('/candidato');
+
+    } catch (err: any) {
+      console.error('Erro no login:', err);
+      setError('Erro inesperado. Tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
+  // [EDITABLE_END:public_login_handle_submit]
+
+  // [EDITABLE_START:public_login_handle_google]
+  const handleGoogleLogin = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      console.error(err);
+      setError('Erro ao entrar com Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  // [EDITABLE_END:public_login_handle_google]
+
+  // [EDITABLE_START:public_login_handle_forgot]
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotMsg('');
+    setError('');
+    setLoading(true);
+
+    try {
+      // Find user by login in Supabase
+      const { data: userDocs, error: findError } = await supabase
+        .from('users')
+        .select('email, login')
+        .eq('login', forgotLogin);
+
+      if (findError) throw findError;
+
+      if (!userDocs || userDocs.length === 0) {
+        setError('Usuário não encontrado.');
+        setLoading(false);
+        return;
+      }
+
+      const userDoc = userDocs[0];
+      
+      // Real password reset using Supabase Auth
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(userDoc.email, {
+        redirectTo: `${window.location.origin}/login?reset=true`,
+      });
+
+      if (resetError) throw resetError;
+
+      setForgotMsg(`Um link de recuperação foi enviado para o e-mail cadastrado.`);
+      
+    } catch (err: any) {
+      console.error(err);
+      setError('Erro ao processar solicitação.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  // [EDITABLE_END:public_login_handle_forgot]
+
+  if (showForgot) {
+    return (
+      <div className="py-12 bg-slate-50 min-h-screen flex items-center justify-center">
+        <div className="max-w-md w-full px-4 sm:px-6">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Recuperar Senha</h1>
+            <p className="text-slate-600 mt-2">Informe seu usuário de login para receber as instruções.</p>
+          </div>
+
+          <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+            {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
+            {forgotMsg && <div className="mb-4 p-3 bg-emerald-100 text-emerald-700 rounded-lg text-sm">{forgotMsg}</div>}
+            
+            <form className="space-y-4" onSubmit={handleForgot}>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Usuário de Login</label>
+                <input 
+                  required
+                  type="text" 
+                  value={forgotLogin}
+                  onChange={(e) => setForgotLogin(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" 
+                />
+              </div>
+              <div className="pt-2">
+                <button disabled={loading} type="submit" className="w-full bg-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50">
+                  {loading ? 'Enviando...' : 'Enviar Instruções'}
+                </button>
+              </div>
+            </form>
+            
+            <p className="mt-6 text-center text-sm text-slate-600">
+              Lembrou a senha? <button onClick={() => setShowForgot(false)} className="text-primary font-medium hover:underline">Voltar para o login</button>
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="py-12 bg-slate-50 min-h-screen flex items-center justify-center">
@@ -331,10 +1171,12 @@ export function Login() {
         </div>
 
         <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+          {error && <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">{error}</div>}
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">Usuário de Login</label>
               <input 
+                required
                 type="text" 
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
@@ -345,31 +1187,89 @@ export function Login() {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="block text-sm font-medium text-slate-700">Senha</label>
-                <a href="#" className="text-xs text-primary hover:underline">Esqueceu a senha?</a>
+                <button type="button" onClick={() => setShowForgot(true)} className="text-xs text-primary hover:underline">Esqueceu a senha?</button>
               </div>
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary" 
-              />
+              <div className="relative">
+                <input 
+                  required
+                  type={showPassword ? "text" : "password"} 
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary pr-10" 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
             <div className="pt-2">
-              <button type="submit" className="block w-full text-center bg-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-accent transition-colors">
-                Entrar
+              <button disabled={loading} type="submit" className="w-full bg-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50">
+                {loading ? 'Entrando...' : 'Entrar'}
               </button>
             </div>
           </form>
-          
-          <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
-            <p className="font-medium mb-2">Usuários de teste:</p>
-            <ul className="space-y-1">
-              <li><strong>RH:</strong> rh_user / RH@DFL2026</li>
-              <li><strong>Admin:</strong> admin_master / Admin@DFL2026</li>
-              <li><strong>Candidato:</strong> candidato / 123456</li>
-            </ul>
-          </div>
 
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-slate-500">Ou continue com</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleGoogleLogin}
+              disabled={loading}
+              className="mt-4 w-full flex items-center justify-center gap-3 bg-white border border-slate-300 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-50 transition-colors disabled:opacity-50"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+              </svg>
+              Google
+            </button>
+
+            <div className="relative mt-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-slate-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-slate-500">Desenvolvimento</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                setIsSeeding(true);
+                setSeedMsg('Populando banco de dados...');
+                try {
+                  await seedDatabase();
+                  setSeedMsg('Banco de dados populado! Tente logar agora.');
+                } catch (err: any) {
+                  console.error('Erro no seed:', err);
+                  setSeedMsg(`Erro ao popular banco: ${err.message || 'Erro desconhecido'}`);
+                } finally {
+                  setIsSeeding(false);
+                }
+              }}
+              disabled={isSeeding}
+              className="mt-4 w-full flex items-center justify-center gap-3 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-200 transition-colors disabled:opacity-50"
+            >
+              <Database className="w-5 h-5" />
+              {isSeeding ? 'Populando...' : 'Popular Banco de Dados (Seed)'}
+            </button>
+            {seedMsg && <p className="text-center text-[10px] mt-2 text-primary font-medium">{seedMsg}</p>}
+          </div>
+          
           <p className="mt-6 text-center text-sm text-slate-600">
             Não tem uma conta? <Link to="/cadastro" className="text-primary font-medium hover:underline">Cadastre-se</Link>
           </p>
