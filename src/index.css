@@ -1,11 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&family=Roboto:wght@400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Roboto", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Lexend", "Google Sans", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-primary: #2563eb;
+  --color-primary: #0054A6;
   --color-primary-foreground: #ffffff;
+  
+  --color-dfl-blue: #0054A6;
+  --color-dfl-green: #00A859;
+  --color-dfl-orange: #F8971D;
+  --color-dfl-red: #ED1C24;
+  --color-dfl-black: #1A1A1A;
+  --color-dfl-gray: #4D4D4D;
+
   --color-secondary: #64748b;
   --color-secondary-foreground: #ffffff;
   --color-accent: #f59e0b;
@@ -20,7 +30,7 @@
   --color-popover-foreground: #0f172a;
   --color-border: #e2e8f0;
   --color-input: #e2e8f0;
-  --color-ring: #2563eb;
+  --color-ring: #0054A6;
 }
 
 @layer base {

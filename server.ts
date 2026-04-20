@@ -1,127 +1,14 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import multer from 'multer';
-import { fileTypeFromFile } from 'file-type';
 import path from 'path';
 import fs from 'fs';
 import nodemailer from 'nodemailer';
-
-const ALLOWED_MIME_TYPES = [
-  'application/msword', // .doc
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'application/pdf', // .pdf
-  'image/jpeg', // .jpg, .jpeg
-  'image/png', // .png
-  'image/gif', // .gif
-  'image/webp', // .webp
-  'image/bmp' // .bmp
-];
-
-const MAX_FILE_SIZE = 6 * 1024 * 1024; // 6 MB
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    // Sanitize filename: remove special characters, prevent path traversal
-    const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + sanitizedName);
-  }
-});
-
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: MAX_FILE_SIZE, // 6MB limit in backend
-    files: 2 // Max 2 files per request
-  }
-});
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Serve uploaded files statically
-  app.use('/uploads', express.static(uploadsDir, {
-    setHeaders: (res, path) => {
-      // Prevent execution of files
-      res.setHeader('Content-Security-Policy', "default-src 'none'");
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-    }
-  }));
-
   // API routes FIRST
-  app.post('/api/upload', (req, res) => {
-    upload.array('files', 2)(req, res, async (err) => {
-      if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'Um dos arquivos excede o limite de 6 MB.' });
-        }
-        if (err.code === 'LIMIT_FILE_COUNT') {
-          return res.status(400).json({ error: 'Você pode anexar no máximo 2 arquivos por mensagem.' });
-        }
-        return res.status(500).json({ error: 'Não foi possível enviar o arquivo. Tente novamente.' });
-      }
-
-      try {
-        const files = req.files as Express.Multer.File[];
-        
-        if (!files || files.length === 0) {
-          return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
-        }
-
-        const uploadedFiles = [];
-
-        for (const file of files) {
-          // Validate MIME type using file-type (reads magic bytes)
-          const type = await fileTypeFromFile(file.path);
-          
-          let isValid = false;
-          let mimeType = file.mimetype;
-
-          if (type && ALLOWED_MIME_TYPES.includes(type.mime)) {
-            isValid = true;
-            mimeType = type.mime;
-          } else if (file.originalname.toLowerCase().endsWith('.doc') || file.originalname.toLowerCase().endsWith('.docx') || file.originalname.toLowerCase().endsWith('.pdf')) {
-            // file-type might not detect older .doc files reliably, fallback to multer's mimetype if it's in allowed list
-            if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-               isValid = true;
-            }
-          }
-
-          if (!isValid) {
-            // Delete invalid file
-            fs.unlinkSync(file.path);
-            return res.status(400).json({ 
-              error: `Tipo de arquivo não permitido. São aceitos apenas: Word (.doc, .docx), PDF (.pdf) e imagens (.jpg, .jpeg, .png, .gif, .webp, .bmp).` 
-            });
-          }
-
-          uploadedFiles.push({
-            nome: file.originalname,
-            url: `/uploads/${file.filename}`,
-            tipo: mimeType,
-            tamanho: file.size
-          });
-        }
-
-        res.json({ files: uploadedFiles });
-      } catch (error: any) {
-        console.error('Upload error:', error);
-        res.status(500).json({ error: 'Não foi possível enviar o arquivo. Tente novamente.' });
-      }
-    });
-  });
-
   app.use(express.json());
 
   app.post('/api/send-email', async (req, res) => {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+import { loginWithLogin } from '../lib/authService';
 
 interface UserProfile {
   id: string;
@@ -9,104 +9,125 @@ interface UserProfile {
   login: string;
   perfil: string;
   status: string;
+  avatar_url?: string;
+  cargo?: string;
+  matricula?: string;
+  unidade_negocio_id?: string;
+  resume_completed?: boolean;
 }
 
 interface AuthContextType {
-  user: any;
+  user: UserProfile | null;
   profile: UserProfile | null;
+  authLoading: boolean;
+  profileLoading: boolean;
+  isAuthenticated: boolean;
   loading: boolean;
+  login: (loginInput: string, passwordInput?: string) => Promise<void>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
+  updateProfile: (data: Partial<UserProfile>) => void; // 🔥 NOVO
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
+  authLoading: true,
+  profileLoading: true,
+  isAuthenticated: false,
   loading: true,
+  login: async () => {},
   signOut: async () => {},
+  refreshProfile: async () => {},
+  updateProfile: () => {}, // 🔥 NOVO
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // [EDITABLE_START:auth_state_control]
-  const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  // [EDITABLE_END:auth_state_control]
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // [EDITABLE_START:auth_fetch_user_data]
-  const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .eq('status', 'Ativo')
-      .single();
-
-    if (error || !data) {
-      console.error('Perfil não encontrado:', error);
-      return null;
-    }
-    return data;
-  };
-  // [EDITABLE_END:auth_fetch_user_data]
-
-  // [EDITABLE_START:auth_useeffect_session]
   useEffect(() => {
-    let mounted = true;
-    let currentUserId: string | null = null;
-    let initialLoad = true;
-
-    const handleSession = async (sessionUser: any, event: string | null = null) => {
-      const userId = sessionUser?.id || null;
-      const forceUpdate = event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED';
-      const userIdChanged = currentUserId !== userId;
-      
-      if (userIdChanged) {
-        currentUserId = userId;
-        if (mounted) setUser(sessionUser);
+    const stored = localStorage.getItem('session');
+    if (stored) {
+      try {
+        setProfile(JSON.parse(stored));
+      } catch (e) {
+        console.error('Failed to parse session', e);
       }
-
-      if (userIdChanged || forceUpdate) {
-        if (sessionUser) {
-          const p = await fetchProfile(sessionUser.id);
-          if (mounted) setProfile(p);
-        } else {
-          if (mounted) setProfile(null);
-        }
-      }
-      
-      if (mounted && initialLoad) {
-        initialLoad = false;
-        setLoading(false);
-      }
-    };
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      handleSession(session?.user ?? null, 'INITIAL');
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        handleSession(session?.user ?? null, event);
-      }
-    );
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
+    }
+    setAuthLoading(false);
   }, []);
-  // [EDITABLE_END:auth_useeffect_session]
 
-  // [EDITABLE_START:auth_logout_execute]
+  const login = async (loginInput: string, passwordInput?: string) => {
+    setAuthLoading(true);
+    try {
+      const session = await loginWithLogin(loginInput, passwordInput);
+      setProfile(session as UserProfile);
+
+      // 🔥 salva sessão
+      localStorage.setItem('session', JSON.stringify(session));
+
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
+    localStorage.removeItem('session');
     setProfile(null);
   };
-  // [EDITABLE_END:auth_logout_execute]
+
+  const refreshProfile = async () => {
+    if (profile?.login) {
+      try {
+        const session = await loginWithLogin(profile.login);
+        setProfile(session as UserProfile);
+
+        // 🔥 atualiza storage
+        localStorage.setItem('session', JSON.stringify(session));
+
+      } catch (e) {
+        console.error('Failed to refresh profile', e);
+      }
+    }
+  };
+
+  // 🔥🔥🔥 AQUI ESTÁ A CORREÇÃO PRINCIPAL
+  const updateProfile = (data: Partial<UserProfile>) => {
+    console.log("♻️ [UPDATE PROFILE CONTEXT]:", data);
+
+    setProfile((prev) => {
+      if (!prev) return prev;
+
+      const updated = {
+        ...prev,
+        ...data, // 🔥 merge correto
+      };
+
+      // 🔥 mantém sincronizado com localStorage
+      localStorage.setItem('session', JSON.stringify(updated));
+
+      return updated;
+    });
+  };
+
+  const isAuthenticated = !!profile;
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user: profile,
+        profile,
+        authLoading,
+        profileLoading: authLoading,
+        isAuthenticated,
+        loading: authLoading,
+        login,
+        signOut,
+        refreshProfile,
+        updateProfile // 🔥 EXPORTANDO
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

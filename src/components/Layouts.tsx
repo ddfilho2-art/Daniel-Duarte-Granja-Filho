@@ -132,7 +132,7 @@ function SidebarItem({ to, icon: Icon, label, badge }: { to: string, icon: any, 
 function DashboardLayout({ children, menuItems }: { children: React.ReactNode, menuItems: { to: string, icon: any, label: string, badge?: number }[] }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, authLoading, profileLoading, isAuthenticated, signOut } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -140,11 +140,16 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  const initialLoading = authLoading || profileLoading;
+
   React.useEffect(() => {
-    if (!loading && !user) {
+    // Só redireciona se o carregamento inicial e o refresh falharem/terminarem e o usuário não estiver autenticado
+    if (!authLoading && !profileLoading && !isAuthenticated) {
+      console.log("DashboardLayout: Redirecionando para login (não autenticado)");
+      console.log('➡️ [NAVIGATION] disparada - Redirecionando para login (DashboardLayout)');
       navigate('/login');
     }
-  }, [user, loading, navigate]);
+  }, [isAuthenticated, authLoading, profileLoading, navigate]);
   
   // Find the most specific matching menu item
   const currentMenuItem = [...menuItems].reverse().find(item => {
@@ -161,7 +166,8 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
       } catch (logError) {
         console.warn('Erro ao registrar log:', logError);
       }
-      await supabase.auth.signOut();
+      await signOut();
+      console.log('➡️ [NAVIGATION] disparada - Logout (DashboardLayout)');
       navigate('/login');
     } catch (error) {
       console.error("Error logging out:", error);
@@ -212,8 +218,9 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
 
   const userName = profile?.nome || 'Usuário';
   const userRole = profile?.perfil || 'Perfil';
+  const infraData = profile as any; // Alias para suportar o schema infraData do prompt no layout
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -237,12 +244,19 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
         
         <div className="p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-              {userName.charAt(0)}
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden shrink-0">
+              {infraData?.avatar_url ? (
+                <img src={infraData.avatar_url} alt={userName} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                userName.charAt(0).toUpperCase()
+              )}
             </div>
-            <div>
-              <p className="text-sm font-medium text-slate-900 truncate max-w-[150px]">{userName}</p>
-              <p className="text-xs text-slate-500">{userRole}</p>
+            <div className="flex flex-col min-w-0">
+              <p className="text-sm font-medium text-slate-900 truncate">{userName}</p>
+              <p className="text-xs text-slate-500 mb-1">{userRole}</p>
+              <Link to={profile?.perfil.toLowerCase() === 'admin' ? '/admin/perfil' : '/rh/perfil'} className="text-[10px] font-bold text-primary hover:underline uppercase tracking-widest transition-colors w-fit">
+                Meu Perfil
+              </Link>
             </div>
           </div>
         </div>
@@ -446,7 +460,7 @@ export function HRLayout() {
     { to: '/rh/provas', icon: CheckSquare, label: 'Provas' },
     { to: '/rh/talentos', icon: FileCheck, label: 'Banco de Talentos' },
     { to: '/rh/relatorios', icon: BarChart, label: 'Relatórios' },
-  ];
+     ];
 
   return (
     <DashboardLayout menuItems={menuItems}>

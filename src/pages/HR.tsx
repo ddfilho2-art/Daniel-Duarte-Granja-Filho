@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Briefcase, Users, CheckSquare, MessageSquare, FileCheck, Plus, Search, MoreVertical, Clock, TrendingUp, TrendingDown, Target, Heart, Award, PieChart as PieChartIcon, BarChart3, Download, Filter, XCircle, PauseCircle, PlayCircle, CheckCircle, ArrowLeft, Save, ArrowUpDown, ArrowUp, ArrowDown, X, UserPlus, CheckCircle2, User, Info, GraduationCap, MapPin, History, MessageCircle, Send, AlertCircle, Eye, File, Image as ImageIcon, FileText, Repeat, Layers, Trash2, PlusCircle, ExternalLink } from 'lucide-react';
+import { Briefcase, Users, CheckSquare, MessageSquare, FileCheck, Plus, Search, MoreVertical, Clock, TrendingUp, TrendingDown, Target, Heart, Award, PieChart as PieChartIcon, BarChart3, Download, Filter, XCircle, PauseCircle, PlayCircle, CheckCircle, ArrowLeft, Save, ArrowUpDown, ArrowUp, ArrowDown, X, UserPlus, CheckCircle2, User, Info, GraduationCap, MapPin, History, MessageCircle, Send, AlertCircle, Eye, File, Image as ImageIcon, FileText, Repeat, Layers, Trash2, PlusCircle, ExternalLink, Sparkles } from 'lucide-react';
+import { GoogleGenAI, Type } from '@google/genai';
 import { uploadFiles } from '../lib/upload';
+import { safeFetch } from '../lib/api';
 import { TransferOwnerModal } from '../components/TransferOwnerModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, LabelList } from 'recharts';
 import domtoimage from 'dom-to-image';
@@ -12,6 +14,7 @@ import { logAudit } from '../lib/audit';
 import { logCandidaturaEvento } from '../lib/events';
 import { ChatInput } from '../components/ChatInput';
 import { useAuth } from '../contexts/AuthContext';
+import { useVagas } from '../hooks/useVagas';
 
 const tempoPorEtapaData = [
   { name: 'Triagem', dias: 0 },
@@ -90,6 +93,8 @@ function CandidateProfileModal({
   const [eventos, setEventos] = useState<any[]>([]);
   const { profile } = useAuth();
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [aiEvaluation, setAiEvaluation] = useState<any>(null);
+  const [isEvaluatingAI, setIsEvaluatingAI] = useState(false);
 
   useEffect(() => {
     if (chatEndRef.current) {
@@ -143,6 +148,30 @@ function CandidateProfileModal({
           
           if (!fullError && fullData) {
             setFullCandidatoData(fullData);
+            
+            // Buscar análise IA existente se tivermos vaga e candidato
+            if (vaga?.id) {
+              const { data: existingAnalysis } = await supabase
+                .from('analise_ia_candidato')
+                .select('*')
+                .eq('candidato_id', fullData.id)
+                .eq('vaga_id', vaga.id)
+                .maybeSingle();
+              
+              if (existingAnalysis) {
+                setAiEvaluation({
+                  score_total: existingAnalysis.score_total,
+                  metricas: {
+                    tecnico: existingAnalysis.tecnico,
+                    experiencia: existingAnalysis.experiencia,
+                    formacao: existingAnalysis.formacao,
+                    soft_skills: existingAnalysis.soft_skills,
+                    ferramentas: existingAnalysis.ferramentas
+                  },
+                  justificativa: existingAnalysis.justificativa
+                });
+              }
+            }
           }
         }
       } catch (error) {
@@ -250,6 +279,170 @@ function CandidateProfileModal({
   const currentFase = candidatura?.fase || 'Triagem';
   const currentStatus = candidatura?.status;
   const isVisualizado = candidatura?.visualizado || false;
+
+  const handleAIEvaluate = async () => {
+    if (!vaga || (!candidato && !fullCandidatoData)) return;
+    
+    const candidatoId = fullCandidatoData?.id || candidato?.id;
+    const vagaId = vaga.id;
+
+    setIsEvaluatingAI(true);
+    try {
+      // 1. Verificar se já existe análise para o candidato e vaga antes de chamar IA
+      const { data: existingAnalysis, error: fetchError } = await supabase
+        .from('analise_ia_candidato')
+        .select('*')
+        .eq('candidato_id', candidatoId)
+        .eq('vaga_id', vagaId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.warn('Erro ao verificar análise existente:', fetchError);
+      }
+
+      if (existingAnalysis) {
+        console.log('Análise existente encontrada:', existingAnalysis);
+        setAiEvaluation({
+          score_total: existingAnalysis.score_total,
+          metricas: {
+            tecnico: existingAnalysis.tecnico,
+            experiencia: existingAnalysis.experiencia,
+            formacao: existingAnalysis.formacao,
+            soft_skills: existingAnalysis.soft_skills,
+            ferramentas: existingAnalysis.ferramentas
+          },
+          justificativa: existingAnalysis.justificativa
+        });
+        setIsEvaluatingAI(false);
+        return;
+      }
+
+      // 2. Se NÃO existir: autorizar chamada da IA
+      // FIX: Tratar importação segura de variáveis no Vite client-side e fallback
+      const rawViteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      
+      let apiConfigKey = '';
+      try {
+        // @ts-ignore
+        apiConfigKey = typeof process !== 'undefined' && process.env ? process.env.GEMINI_API_KEY : '';
+      } catch (e) {}
+
+      const activeGeminiKey = rawViteKey || apiConfigKey || '';
+
+      if (!activeGeminiKey) {
+        throw new Error("Chave do Gemini não configurada no ambiente Frontend do sistema.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
+      
+      const prompt = `
+        Atue como um recrutador especialista e avalie a aderência entre um candidato e uma vaga.
+
+        ---
+
+        DADOS DA VAGA:
+        ${JSON.stringify({
+          titulo: vaga.titulo || vaga.cargo,
+          departamento: vaga.departamento,
+          descricao: vaga.descricao,
+          requisitos: vaga.requisitos,
+          certificacoes: vaga.certificacoes
+        }, null, 2)}
+
+        ---
+
+        DADOS DO CANDIDATO:
+        ${JSON.stringify(fullCandidatoData || candidato, null, 2)}
+
+        ---
+
+        INSTRUÇÕES:
+
+        1. Avaliar o candidato com base na vaga
+        2. Atribuir notas de 0 a 10 para:
+           - tecnico
+           - experiencia
+           - formacao
+           - soft_skills
+           - ferramentas
+
+        3. Calcular score_total de 0 a 100
+
+        4. Gerar uma justificativa objetiva (máx 3 linhas)
+
+        ---
+
+        REGRAS IMPORTANTES:
+
+        - NÃO inventar informações
+        - NÃO sair do contexto fornecido
+        - NÃO usar linguagem genérica
+        - Ser consistente nas notas
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              score_total: { type: Type.NUMBER },
+              metricas: {
+                type: Type.OBJECT,
+                properties: {
+                  tecnico: { type: Type.NUMBER },
+                  experiencia: { type: Type.NUMBER },
+                  formacao: { type: Type.NUMBER },
+                  soft_skills: { type: Type.NUMBER },
+                  ferramentas: { type: Type.NUMBER }
+                },
+                required: ["tecnico", "experiencia", "formacao", "soft_skills", "ferramentas"]
+              },
+              justificativa: { type: Type.STRING }
+            },
+            required: ["score_total", "metricas", "justificativa"]
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("Resposta vazia do Gemini.");
+      
+      const evaluation = JSON.parse(text);
+      setAiEvaluation(evaluation);
+
+      // Salvar a análise da IA no banco Supabase usando a função RPC existente
+      try {
+        const { error: rpcError } = await supabase.rpc('upsert_analise_ia', {
+          p_candidato_id: fullCandidatoData?.id || candidato?.id,
+          p_vaga_id: vaga.id,
+          p_score_total: evaluation.score_total,
+          p_tecnico: evaluation.metricas.tecnico,
+          p_experiencia: evaluation.metricas.experiencia,
+          p_formacao: evaluation.metricas.formacao,
+          p_soft_skills: evaluation.metricas.soft_skills,
+          p_ferramentas: evaluation.metricas.ferramentas,
+          p_justificativa: evaluation.justificativa,
+          p_raw_json: evaluation
+        });
+
+        if (rpcError) {
+          console.error('Erro ao salvar análise IA via RPC:', rpcError);
+        } else {
+          console.log('Análise IA salva com sucesso no banco.');
+        }
+      } catch (saveError) {
+        console.error('Erro inesperado ao salvar análise IA:', saveError);
+      }
+    } catch (error: any) {
+      console.error('Erro na avaliação AI:', error);
+      alert('Erro ao avaliar com IA: ' + error.message);
+    } finally {
+      setIsEvaluatingAI(false);
+    }
+  };
 
   const handleAction = async (action: 'Aprovar' | 'Reprovar' | 'Reserva') => {
     if (!candidaturaId) return;
@@ -387,6 +580,16 @@ function CandidateProfileModal({
               <div className="text-center">
                 <h4 className="text-2xl font-bold text-slate-900">{nome}</h4>
                 <p className="text-slate-500 mb-4">{email}</p>
+                
+                <button
+                  onClick={handleAIEvaluate}
+                  disabled={isEvaluatingAI || !vaga}
+                  className="w-full mb-4 bg-indigo-50 text-indigo-700 border border-indigo-200 px-4 py-2 rounded-lg font-medium hover:bg-indigo-100 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  <Sparkles className={`w-4 h-4 ${isEvaluatingAI ? 'animate-pulse' : ''}`} />
+                  {isEvaluatingAI ? 'Analisando...' : 'Avaliar com IA'}
+                </button>
+
                 {candidaturaId && (
                   <div className="flex flex-col gap-2">
                     <button 
@@ -422,6 +625,34 @@ function CandidateProfileModal({
             </div>
 
             <div className="flex-1 space-y-8">
+              {aiEvaluation && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-indigo-700">
+                      <Sparkles className="w-5 h-5" />
+                      <h4 className="font-bold">Avaliação do Recrutador IA</h4>
+                    </div>
+                    <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                      Score: {aiEvaluation.score_total}/100
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                    {Object.entries(aiEvaluation.metricas).map(([key, value]: [string, any]) => (
+                      <div key={key} className="bg-white p-2 rounded-lg border border-indigo-100 text-center">
+                        <div className="text-[10px] uppercase font-bold text-slate-400 mb-1">{key.replace('_', ' ')}</div>
+                        <div className="text-lg font-bold text-indigo-600">{value}/10</div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="bg-white/50 p-3 rounded-lg border border-indigo-50">
+                    <p className="text-sm text-slate-700 italic leading-relaxed">
+                      "{aiEvaluation.justificativa}"
+                    </p>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <section className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <h5 className="font-bold text-slate-900 flex items-center gap-2 mb-3">
@@ -828,6 +1059,7 @@ export function HRDashboard() {
 
   useEffect(() => {
     const fetchStats = async () => {
+      console.log('[DASHBOARD] 🔍 BUSCANDO ESTATÍSTICAS...');
       try {
         setLoading(true);
         
@@ -855,16 +1087,22 @@ export function HRDashboard() {
           supabase.from('candidaturas').select('fase'),
 
           // Queries para outros cálculos (colunas específicas)
-          supabase.from('vagas').select('id, titulo, created_at, status, status_vaga, updated_at, transferencia_temporaria, provas(nome)'),
-          supabase.from('candidaturas').select('id, vaga_id, candidato_id, fase, status, created_at, data_candidatura, motivo_declinio'),
+          supabase.from('vagas').select('id, titulo, created_at, status, status_vaga, updated_at, provas(nome)'),
+          supabase.from('candidaturas').select('id, vaga_id, candidato_id, fase, status, created_at, data_candidatura'),
           supabase.from('users').select('id, nome, email').eq('perfil', 'RH').eq('status', 'Ativo'),
           supabase.from('candidatos').select('id, criado_em, created_at, genero, raca, pcd, resume_data')
         ]);
+
+        if (vagasAbertasRes.error) console.error('[DASHBOARD] ❌ Erro vagasAbertas:', vagasAbertasRes.error);
+        if (vagasRes.error) console.error('[DASHBOARD] ❌ Erro vagasRes:', vagasRes.error);
+        if (candidaturasRes.error) console.error('[DASHBOARD] ❌ Erro candidaturasRes:', candidaturasRes.error);
         
         const candidaturas = candidaturasRes.data || [];
         const candidatos = candidatosTableRes.data || [];
         const vagas = vagasRes.data || [];
         const rhUsers = rhUsersRes.data || [];
+        
+        console.log(`[DASHBOARD] 📊 DADOS CARREGADOS: ${vagas.length} vagas, ${candidaturas.length} candidaturas`);
         
         // 1. Vagas Abertas (Usando count do banco)
         const vagasAbertas = vagasAbertasRes.count || 0;
@@ -1507,7 +1745,7 @@ export function HRDashboard() {
         {/* Eficiência */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Eficiência: Tempo Médio por Etapa (Dias)</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={tempoState} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -1528,7 +1766,7 @@ export function HRDashboard() {
         {/* Qualidade e Conversão */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Qualidade: Funil de Seleção</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={funilState} margin={{ top: 20, right: 30, left: 20, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -1549,7 +1787,7 @@ export function HRDashboard() {
         {/* Custo e Volume */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Volume de Contratações (Últimos 6 meses)</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={volumeState} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -1568,7 +1806,7 @@ export function HRDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <h2 className="text-sm font-bold text-slate-900 mb-4 text-center">Fonte de Origem</h2>
-            <div className="h-48">
+            <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie 
@@ -1611,7 +1849,7 @@ export function HRDashboard() {
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
             <h2 className="text-sm font-bold text-slate-900 mb-4 text-center">Motivos de Declínio</h2>
-            <div className="h-48">
+            <div style={{ width: '100%', height: 300 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie 
@@ -1657,7 +1895,7 @@ export function HRDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Vagas por Status</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={vagasStatusState} margin={{ top: 20, right: 30, left: 20, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -1677,7 +1915,7 @@ export function HRDashboard() {
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Top 5 Vagas com Mais Candidatos</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={candidatosVagaState} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -1697,7 +1935,7 @@ export function HRDashboard() {
 
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Carga de Trabalho por Recrutador (Vagas Abertas)</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={cargaTrabalhoState} margin={{ top: 20, right: 30, left: 20, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -1802,13 +2040,12 @@ export function HRDashboard() {
 
 export function HRGestaoVagas() {
   const { profile } = useAuth();
+  const { vagas, setVagas, loading: loadingVagas, error: errorVagas, refresh: refreshVagas } = useVagas();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>({ key: 'createdAt', direction: 'desc' });
   const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>({});
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
-  const [vagas, setVagas] = useState<any[]>([]);
-  const [candidaturasStats, setCandidaturasStats] = useState<{ [key: string]: { total: number, ativos: number } }>({});
-  const [loading, setLoading] = useState(true);
+  const [candidaturasStats, setCandidaturasStats] = useState<{ [key: string]: { total: number, ativos: number, novidades: number } }>({});
   const [maxHoursToCancel, setMaxHoursToCancel] = useState(4);
   const [cancelModal, setCancelModal] = useState<{ isOpen: boolean, vagaId: string, vagaTitulo: string }>({ isOpen: false, vagaId: '', vagaTitulo: '' });
   const [transferModal, setTransferModal] = useState<{ isOpen: boolean, vaga: any }>({ isOpen: false, vaga: null });
@@ -1834,31 +2071,6 @@ export function HRGestaoVagas() {
       }
     };
     fetchSettings();
-
-    // Real-time Vagas
-    const vagasChannel = supabase
-      .channel('vagas-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vagas' }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setVagas(prev => [payload.new as any, ...prev]);
-        } else if (payload.eventType === 'UPDATE') {
-          setVagas(prev => prev.map(v => v.id === payload.new.id ? payload.new as any : v));
-        } else if (payload.eventType === 'DELETE') {
-          setVagas(prev => prev.filter(v => v.id === payload.old.id));
-        }
-      })
-      .subscribe();
-
-    // Initial fetch Vagas
-    supabase.from('vagas').select('*, provas(nome)').order('created_at', { ascending: false }).then(({ data, error }) => {
-      if (error) {
-        console.error('Erro ao buscar vagas:', error);
-      }
-      if (data) {
-        setVagas(data);
-        setLoading(false);
-      }
-    });
 
     // Real-time Candidaturas for stats
     const candidaturasChannel = supabase
@@ -1912,7 +2124,6 @@ export function HRGestaoVagas() {
     fetchCandidaturasStats();
 
     return () => {
-      supabase.removeChannel(vagasChannel);
       supabase.removeChannel(candidaturasChannel);
     };
   }, []);
@@ -1949,7 +2160,7 @@ export function HRGestaoVagas() {
       if (key === 'created_at') {
         itemValue = formatDateTime(vaga.created_at).toLowerCase();
       } else if (key === 'owner_nome') {
-        itemValue = String(vaga.owner_nome || vaga.owner?.nome || '').toLowerCase();
+        itemValue = String(vaga.owner_nome || '').toLowerCase();
       } else {
         itemValue = String(vaga[key as keyof typeof vaga] || '').toLowerCase();
       }
@@ -1976,8 +2187,8 @@ export function HRGestaoVagas() {
       aValue = new Date(a.created_at).getTime();
       bValue = new Date(b.created_at).getTime();
     } else if (key === 'owner_nome') {
-      aValue = String(a.owner?.nome || '').toLowerCase();
-      bValue = String(b.owner?.nome || '').toLowerCase();
+      aValue = String(a.owner_nome || '').toLowerCase();
+      bValue = String(b.owner_nome || '').toLowerCase();
     } else {
       aValue = String(aValue || '').toLowerCase();
       bValue = String(bValue || '').toLowerCase();
@@ -2180,7 +2391,13 @@ export function HRGestaoVagas() {
         </button>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {loadingVagas ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-500">Carregando vagas...</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm text-slate-600">
             <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
@@ -2223,10 +2440,10 @@ export function HRGestaoVagas() {
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                        {(vaga.owner_nome || vaga.owner?.nome || 'S').charAt(0)}
+                        {String(vaga.owner_nome || 'S').charAt(0)}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-xs">{vaga.owner_nome || vaga.owner?.nome || 'Sem proprietário'}</span>
+                        <span className="text-xs">{vaga.owner_nome || 'Sem proprietário'}</span>
                         {vaga.transferencia_ativa && (
                           <div className="flex items-center gap-1 text-[10px] text-blue-600 font-medium" title={`Proprietário temporário até ${new Date(vaga.transferencia_temporaria?.data_retorno).toLocaleDateString('pt-BR')}. Proprietário original: ${vaga.transferencia_temporaria?.original_owner_nome}`}>
                             <Clock className="w-3 h-3" />
@@ -2322,6 +2539,7 @@ export function HRGestaoVagas() {
           </table>
         </div>
       </div>
+    )}
 
       {/* Cancel Modal */}
       {cancelModal.isOpen && (
@@ -2355,8 +2573,9 @@ export function HRGestaoVagas() {
           isOpen={transferModal.isOpen}
           onClose={() => setTransferModal({ isOpen: false, vaga: null })}
           vaga={transferModal.vaga}
-          onSuccess={() => {
-            // Refresh logic is handled by onSnapshot
+            onSuccess={() => {
+            refreshVagas();
+            window.location.reload();
           }}
         />
       )}
@@ -2854,6 +3073,7 @@ export function HRCandidatos() {
           return vData.id === c.vaga_id && fase === 'Triagem' && !c.visualizado;
         }).length;
         return {
+          ...vData,
           id: vData.id,
           codigo_vaga: vData.codigo_vaga || null,
           cargo: vData.titulo,
@@ -2870,8 +3090,7 @@ export function HRCandidatos() {
 
       const candidaturasTriagem = candidaturas.filter(c => {
         const fase = c.fase || 'Triagem';
-        const status = c.status;
-        return (fase === 'Triagem' || fase === 'Prova' || fase === 'Reserva') && (!status || status === 'APROVADO');
+        return (fase === 'Triagem' || fase === 'Prova' || fase === 'Reserva');
       });
       const candidatoIds = Array.from(new Set(candidaturasTriagem.map(c => c.candidato_id)));
       
@@ -3231,16 +3450,22 @@ export function HRCandidatos() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <button onClick={() => { setSelectedVaga(null); setSelectedCandidates([]); }} className="text-slate-500 hover:text-slate-900">
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <h2 className="text-2xl font-bold text-slate-900">
-              Candidatos: {vaga?.cargo} 
-              <span className="ml-3 text-sm font-medium bg-primary/10 text-primary px-3 py-1 rounded-full">
-                Total: {filteredCandidatos.length}
-              </span>
-            </h2>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-4">
+              <button onClick={() => { setSelectedVaga(null); setSelectedCandidates([]); }} className="text-slate-500 hover:text-slate-900">
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <h2 className="text-2xl font-bold text-slate-900">
+                Candidatos: {vaga?.cargo} 
+                <span className="ml-3 text-sm font-medium bg-primary/10 text-primary px-3 py-1 rounded-full">
+                  Total: {filteredCandidatos.length}
+                </span>
+              </h2>
+            </div>
+            <div className="mt-2 text-[10px] text-slate-400 font-mono bg-slate-50 px-2 py-1 rounded border border-slate-100 italic">
+              Debug: Dados brutos encontrados para esta vaga: {candidatos.filter(c => c.vagaId === selectedVaga).length} registros 
+              (Filtro Atual: {filteredCandidatos.length})
+            </div>
           </div>
           {selectedCandidates.length > 0 && (
             <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-slate-200">
@@ -3668,7 +3893,7 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
         // Send real email via backend
         if (candidatoEmail && settings.smtpHost && settings.smtpUser && settings.smtpPass) {
           try {
-            const response = await fetch('/api/send-email', {
+            const { data: responseData, ok } = await safeFetch('/api/send-email', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -3684,12 +3909,11 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
               })
             });
 
-            if (response.ok) {
+            if (ok) {
               console.log('E-mail enviado com sucesso para o candidato.');
             } else {
-              const errorData = await response.json();
-              console.error('Erro ao enviar e-mail:', errorData.error_type, errorData.message);
-              alert(`❌ Erro ao enviar notificação por e-mail: ${errorData.message || errorData.error}`);
+              console.error('Erro ao enviar e-mail:', responseData.error_type, responseData.message);
+              alert(`❌ Erro ao enviar notificação por e-mail: ${responseData.message || responseData.error}`);
             }
           } catch (e) {
             console.error('Erro ao chamar API de e-mail:', e);
@@ -3816,6 +4040,7 @@ export function HREntrevistas() {
         }
 
         return {
+          ...vData,
           id: vData.id,
           codigo_vaga: vData.codigo_vaga || null,
           cargo: vData.titulo,
@@ -4509,6 +4734,7 @@ export function HRMensagens() {
           const ultimaMensagemVaga = todasMensagens.find(m => m.vaga_id === vData.id);
 
           return {
+            ...vData,
             id: vData.id,
             codigo_vaga: vData.codigo_vaga || null,
             cargo: vData.titulo,
@@ -4517,7 +4743,8 @@ export function HRMensagens() {
             status: vData.status,
             novidades: novidadesCount,
             ultimaMensagem: ultimaMensagemVaga ? ultimaMensagemVaga.mensagem : 'Sem mensagens',
-            ultimaMensagemData: ultimaMensagemVaga ? ultimaMensagemVaga.created_at : null
+            ultimaMensagemData: ultimaMensagemVaga ? ultimaMensagemVaga.created_at : null,
+            ownerId: vData.owner_id
           };
         });
 
@@ -4778,7 +5005,7 @@ export function HRMensagens() {
             // Send real email via backend
             if (settings.smtpHost && settings.smtpUser && settings.smtpPass) {
               try {
-                const response = await fetch('/api/send-email', {
+                const { data: responseData, ok } = await safeFetch('/api/send-email', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
@@ -4794,12 +5021,11 @@ export function HRMensagens() {
                   })
                 });
 
-                if (response.ok) {
+                if (ok) {
                   console.log('E-mail enviado com sucesso para o candidato.');
                 } else {
-                  const errorData = await response.json();
-                  console.error('Erro ao enviar e-mail:', errorData.error_type, errorData.message);
-                  alert(`❌ Erro ao enviar notificação por e-mail: ${errorData.message || errorData.error}`);
+                  console.error('Erro ao enviar e-mail:', responseData.error_type, responseData.message);
+                  alert(`❌ Erro ao enviar notificação por e-mail: ${responseData.message || responseData.error}`);
                 }
               } catch (e) {
                 console.error('Erro ao chamar API de e-mail:', e);
@@ -5285,7 +5511,7 @@ export function HRBancoTalentos() {
         const subject = `Convite para Processo Seletivo - ${vaga?.cargo}`;
         const body = `Olá ${talento?.nome},\n\nAvaliamos o seu perfil em nosso Banco de Talentos e identificamos que suas habilidades estão alinhadas com a nossa vaga de ${vaga?.cargo}.\n\nGostaríamos de convidá-lo(a) para participar do processo seletivo!\n\nPara confirmar sua participação, por favor, acesse a nossa plataforma e candidate-se formalmente à vaga.\n\nAtenciosamente,\nEquipe de RH`;
 
-        await fetch('/api/send-email', {
+        await safeFetch('/api/send-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -5618,7 +5844,6 @@ export function HRProvas() {
     nome: '',
     tipo: 'link', // 'arquivo' ou 'link'
     link: '',
-    arquivo_url: '',
     vaga_id: ''
   });
   const [vagas, setVagas] = useState<any[]>([]);
@@ -5674,7 +5899,6 @@ export function HRProvas() {
         nome: prova.nome || '',
         tipo: prova.tipo || 'link',
         link: prova.link || '',
-        arquivo_url: prova.arquivo_url || '',
         vaga_id: prova.vaga_id || ''
       });
     } else {
@@ -5683,7 +5907,6 @@ export function HRProvas() {
         nome: '',
         tipo: 'link',
         link: '',
-        arquivo_url: '',
         vaga_id: ''
       });
     }
@@ -5700,54 +5923,23 @@ export function HRProvas() {
 
     setIsProcessing(true);
     try {
-      let finalArquivoUrl = formData.arquivo_url;
+      let finalLink = formData.link;
 
       if (formData.tipo === 'arquivo' && file) {
-        const uploadedFiles = await uploadFiles([file]);
+        // CORREÇÃO OBRIGATÓRIA: Todo upload de prova DEVE usar bucket "provas"
+        const uploadedFiles = await uploadFiles([file], 'provas');
         if (uploadedFiles && uploadedFiles.length > 0) {
-          finalArquivoUrl = uploadedFiles[0].url;
+          finalLink = uploadedFiles[0].url;
         }
       }
 
-      // Automatic Versioning Logic
-      let nextVersion = 1;
       let grupoId = editingProva?.grupo_id || crypto.randomUUID();
-
-      if (editingProva?.grupo_id) {
-        // Get the current max version for this group
-        const { data: existingProvas, error: fetchError } = await supabase
-          .from('provas')
-          .select('versao')
-          .eq('grupo_id', grupoId)
-          .order('versao', { ascending: false })
-          .limit(1);
-
-        if (fetchError) throw fetchError;
-        nextVersion = existingProvas && existingProvas.length > 0 
-          ? (existingProvas[0].versao + 1) 
-          : 1;
-      } else if (editingProva) {
-        // Fallback for old data being versioned for the first time
-        const { data: existingProvas, error: fetchError } = await supabase
-          .from('provas')
-          .select('versao')
-          .eq('nome', formData.nome)
-          .order('versao', { ascending: false })
-          .limit(1);
-
-        if (fetchError) throw fetchError;
-        nextVersion = existingProvas && existingProvas.length > 0 
-          ? (existingProvas[0].versao + 1) 
-          : 1;
-      }
 
       const payload = {
         nome: formData.nome,
         tipo: formData.tipo,
-        link: formData.tipo === 'link' ? formData.link : null,
-        arquivo_url: formData.tipo === 'arquivo' ? finalArquivoUrl : null,
+        link: finalLink,
         vaga_id: formData.vaga_id || null,
-        versao: nextVersion,
         grupo_id: grupoId,
         created_at: new Date().toISOString()
       };
@@ -5757,7 +5949,7 @@ export function HRProvas() {
         .insert([payload]);
       
       if (error) throw error;
-      await logAudit('Salvar Prova', 'Gestão de Provas', `Salvou nova versão (${nextVersion}) da prova: ${formData.nome}`);
+      await logAudit('Salvar Prova', 'Gestão de Provas', `Salvou nova versão da prova: ${formData.nome}`);
 
       setIsModalOpen(false);
       fetchProvas();
@@ -5859,27 +6051,15 @@ export function HRProvas() {
                         >
                           <PlusCircle className="w-5 h-5" />
                         </button>
-                        {prova.tipo === 'link' ? (
-                          <a 
-                            href={prova.link} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
-                            title="Ver Link"
-                          >
-                            <ExternalLink className="w-5 h-5" />
-                          </a>
-                        ) : (
-                          <a 
-                            href={prova.arquivo_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
-                            title="Baixar Arquivo"
-                          >
-                            <Download className="w-5 h-5" />
-                          </a>
-                        )}
+                        <a 
+                          href={prova.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="p-2 text-slate-400 hover:text-blue-500 transition-colors"
+                          title={prova.tipo === 'link' ? "Ver Link" : "Baixar Arquivo"}
+                        >
+                          {prova.tipo === 'link' ? <ExternalLink className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                        </a>
                       </div>
                     </td>
                   </tr>
@@ -5965,8 +6145,8 @@ export function HRProvas() {
                     onChange={(e) => setFile(e.target.files?.[0] || null)}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   />
-                  {formData.arquivo_url && !file && (
-                    <p className="text-xs text-slate-500 mt-1">Arquivo atual: {formData.arquivo_url.split('/').pop()}</p>
+                  {formData.link && formData.tipo === 'arquivo' && !file && (
+                    <p className="text-xs text-slate-500 mt-1">Arquivo atual: {formData.link.split('/').pop()}</p>
                   )}
                 </div>
               )}
@@ -6099,27 +6279,15 @@ function VersionsModal({ prova, onClose }: { prova: any, onClose: () => void }) 
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {v.tipo === 'link' ? (
-                      <a 
-                        href={v.link} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-blue-500 transition-colors"
-                        title="Ver Link"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    ) : (
-                      <a 
-                        href={v.arquivo_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-blue-500 transition-colors"
-                        title="Baixar Arquivo"
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                    )}
+                    <a 
+                      href={v.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="p-2 bg-white border border-slate-200 rounded-lg text-slate-600 hover:text-blue-500 transition-colors"
+                      title={v.tipo === 'link' ? "Ver Link" : "Baixar Arquivo"}
+                    >
+                      {v.tipo === 'link' ? <ExternalLink className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                    </a>
                     <button 
                       onClick={() => deleteVersao(v.id, v.versao)}
                       className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-red-500 transition-colors"
@@ -6142,6 +6310,250 @@ function VersionsModal({ prova, onClose }: { prova: any, onClose: () => void }) 
             Fechar
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+export function HRProfile() {
+  const { profile, refreshProfile } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [unidades, setUnidades] = useState<any[]>([]);
+  const [formData, setFormData] = useState({
+    nome: '',
+    email: '',
+    cargo: '',
+    matricula: '',
+    unidade_negocio_id: '',
+    foto_url: ''
+  });
+  const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Buscar unidades de negócio ativas
+        const { data: unidadesData } = await supabase
+          .from('unidades_negocio')
+          .select('id, nome')
+          .eq('ativo', true)
+          .order('nome');
+        
+        setUnidades(unidadesData || []);
+
+        if (profile) {
+          setFormData({
+            nome: profile.nome || '',
+            email: profile.email || '',
+            cargo: profile.cargo || '',
+            matricula: profile.matricula || '',
+            unidade_negocio_id: profile.unidade_negocio_id || '',
+            foto_url: profile.foto_url || ''
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar dados do perfil:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [profile]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 2MB.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Usuário não autenticado');
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.user.id}_${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('attachments')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, foto_url: publicUrl }));
+    } catch (error: any) {
+      console.error('Erro no upload:', error);
+      alert('Erro ao fazer upload da imagem: ' + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (profile?.perfil !== 'RH') {
+      alert('Apenas usuários do tipo RH podem editar este perfil.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          nome: formData.nome,
+          cargo: formData.cargo,
+          matricula: formData.matricula,
+          unidade_negocio_id: formData.unidade_negocio_id || null,
+          foto_url: formData.foto_url,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', profile.id);
+
+      if (error) throw error;
+
+      await logAudit('Atualizar Perfil', 'RH', 'Usuário atualizou seus dados de perfil.');
+      await refreshProfile();
+      alert('Perfil atualizado com sucesso!');
+    } catch (error: any) {
+      console.error('Erro ao salvar perfil:', error);
+      alert('Erro ao salvar perfil: ' + error.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex items-center justify-center p-12">Carregando perfil...</div>;
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-slate-900">Meu Perfil Profissional</h1>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <form onSubmit={handleSubmit} className="divide-y divide-slate-200">
+          {/* Cabeçalho do Perfil / Foto */}
+          <div className="p-8 flex flex-col md:flex-row items-center gap-8 bg-slate-50/50">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-full bg-primary/10 border-4 border-white shadow-md overflow-hidden flex items-center justify-center text-primary text-4xl font-bold">
+                {formData.foto_url ? (
+                  <img src={formData.foto_url} alt="Foto de Perfil" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  formData.nome.charAt(0)
+                )}
+              </div>
+              <label className="absolute inset-0 flex items-center justify-center bg-black/40 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <div className="flex flex-col items-center">
+                  <ImageIcon className="w-6 h-6 mb-1" />
+                  <span className="text-[10px] font-medium">Alterar</span>
+                </div>
+                <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={uploading} />
+              </label>
+              {uploading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-full">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-xl font-bold text-slate-900">{formData.nome || 'Seu Nome'}</h2>
+              <p className="text-slate-500">{formData.email}</p>
+              <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Perfil RH
+              </div>
+            </div>
+          </div>
+
+          {/* Campos do Formulário */}
+          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
+              <input
+                type="text"
+                required
+                value={formData.nome}
+                onChange={(e) => setFormData(prev => ({ ...prev, nome: e.target.value }))}
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Cargo</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Briefcase className="h-4 w-4 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Ex: Analista de RH Senior"
+                  value={formData.cargo}
+                  onChange={(e) => setFormData(prev => ({ ...prev, cargo: e.target.value }))}
+                  className="pl-10 w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Matrícula</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <FileText className="h-4 w-4 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Ex: 123456"
+                  value={formData.matricula}
+                  onChange={(e) => setFormData(prev => ({ ...prev, matricula: e.target.value }))}
+                  className="pl-10 w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Unidade de Negócio</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                </div>
+                <select
+                  value={formData.unidade_negocio_id}
+                  onChange={(e) => setFormData(prev => ({ ...prev, unidade_negocio_id: e.target.value }))}
+                  className="pl-10 w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary appearance-none bg-white"
+                >
+                  <option value="">Selecione uma unidade...</option>
+                  {unidades.map(u => (
+                    <option key={u.id} value={u.id}>{u.nome}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8 bg-slate-50 flex justify-end">
+            <button
+              type="submit"
+              disabled={saving || uploading}
+              className="flex items-center gap-2 bg-primary text-white px-8 py-2.5 rounded-lg font-bold hover:bg-accent transition-all shadow-md hover:shadow-lg disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              {saving ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

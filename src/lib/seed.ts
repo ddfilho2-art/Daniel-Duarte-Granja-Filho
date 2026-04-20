@@ -1,5 +1,17 @@
-import { supabase, supabaseAdmin } from './supabase';
+import { supabase } from './supabase';
 import { fakerPT_BR as faker } from '@faker-js/faker';
+
+// Admin client para bypass RLS
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+import { createClient } from '@supabase/supabase-js';
+const supabaseAdmin = createClient(supabaseUrl || '', supabaseServiceRoleKey || '', {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 
 export async function ensureAdminUser() {
   const defaultUsers = [
@@ -169,12 +181,12 @@ export async function seedDatabase() {
         const email = faker.internet.email({ firstName: nome.split(' ')[0], lastName: nome.split(' ')[1] }).toLowerCase().substring(0, 49);
         const senha = 'Teste@123';
         
-        const safeLogin = email.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const dummyEmail = `${safeLogin}@dfl.system`;
+        // Using the same email for Auth and Database to avoid "Invalid login credentials"
+        const finalEmail = email;
 
         // Using admin client for candidates to ensure confirmed email
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: dummyEmail,
+          email: finalEmail,
           password: senha,
           email_confirm: true,
           user_metadata: {
@@ -191,7 +203,7 @@ export async function seedDatabase() {
             const { data: existingUser } = await supabaseAdmin
               .from('users')
               .select('id')
-              .eq('email', dummyEmail)
+              .eq('email', finalEmail)
               .maybeSingle();
             
             if (existingUser) {
@@ -199,7 +211,7 @@ export async function seedDatabase() {
               await supabaseAdmin.auth.admin.updateUserById(uid, { password: senha, email_confirm: true });
             }
           } else {
-            console.warn(`Erro ao criar usuário ${email}:`, authError.message);
+            console.warn(`Erro ao criar usuário ${finalEmail}:`, authError.message);
           }
         }
 
@@ -249,7 +261,7 @@ export async function seedDatabase() {
 
           const resumeData = {
             nome,
-            email,
+            email: finalEmail,
             telefone,
             data_nascimento: dataNascimento,
             genero,
@@ -278,9 +290,9 @@ export async function seedDatabase() {
             id: uid,
             uid: uid,
             nome,
-            email,
-            login: email,
-            login_lower: email.toLowerCase(),
+            email: finalEmail,
+            login: finalEmail,
+            login_lower: finalEmail.toLowerCase(),
             perfil: 'Candidato',
             status: 'Ativo',
             genero,
@@ -297,9 +309,9 @@ export async function seedDatabase() {
             .upsert(userDoc);
           
           if (userInsertError) {
-            console.warn(`Erro ao inserir perfil do usuário ${email}:`, userInsertError.message);
+            console.warn(`Erro ao inserir perfil do usuário ${finalEmail}:`, userInsertError.message);
           } else {
-            novosCandidatos.push({ nome, login: email, senha });
+            novosCandidatos.push({ nome, login: finalEmail, senha });
           }
         }
       } catch (e) {

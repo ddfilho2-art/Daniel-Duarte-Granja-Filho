@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Mail, Server, Key, User, FileText, Settings, Plus, Trash2, Edit2, GripVertical, Check, X, Briefcase, ChevronUp, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { safeFetch } from '../lib/api';
 
 const regrasSchema = [
   {
@@ -302,6 +303,14 @@ export function AdminConfiguracoes() {
   };
 
   const [testingEmail, setTestingEmail] = useState(false);
+  const [activeTab, setActiveTab] = useState('email');
+
+  const TABS = [
+    { id: 'email', label: 'E-mail (SMTP)', icon: Server },
+    { id: 'templates', label: 'Templates', icon: Mail },
+    { id: 'vagas', label: 'Vagas (Campos)', icon: Briefcase },
+    { id: 'regras', label: 'Regras de Negócio', icon: Settings }
+  ];
 
   const handleTestEmail = async () => {
     const emailDestino = prompt('Informe o e-mail para teste:');
@@ -309,7 +318,7 @@ export function AdminConfiguracoes() {
 
     setTestingEmail(true);
     try {
-      const response = await fetch('/api/send-email', {
+      const { data: result, ok } = await safeFetch('/api/send-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -325,8 +334,7 @@ export function AdminConfiguracoes() {
         })
       });
 
-      const result = await response.json();
-      if (response.ok) {
+      if (ok) {
         alert('✔ E-mail de teste enviado com sucesso! Verifique sua caixa de entrada.');
       } else {
         const errorMsg = result.message || result.error || 'Erro desconhecido';
@@ -356,269 +364,299 @@ export function AdminConfiguracoes() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Server className="w-5 h-5 text-primary" />
-              Configurações de E-mail (SMTP)
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Configure o servidor SMTP para envio de e-mails do sistema.</p>
+        <div className="flex flex-wrap gap-2 p-1.5 bg-[#F1F5F9] rounded-2xl w-fit border border-[#E2E8F0] shadow-sm">
+          {TABS.map((tab) => (
             <button
+              key={tab.id}
               type="button"
-              onClick={handleTestEmail}
-              disabled={testingEmail || !config.smtpHost || !config.smtpUser || !config.smtpPass}
-              className="mt-4 flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors disabled:opacity-50"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-3 px-8 py-3.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 ${
+                activeTab === tab.id
+                  ? 'bg-white text-[#0054A6] shadow-md ring-1 ring-[#0054A6]/20'
+                  : 'text-[#4D4D4D] hover:text-[#1A1A1A] hover:bg-white/40'
+              }`}
             >
-              <Mail className="w-4 h-4" />
-              {testingEmail ? 'Enviando teste...' : 'Testar Envio de E-mail'}
+              <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-[#0054A6]' : ''}`} />
+              {tab.label}
             </button>
-          </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Server className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  name="smtpHost"
-                  value={config.smtpHost}
-                  onChange={handleChange}
-                  placeholder="smtp.exemplo.com"
-                  className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Porta SMTP</label>
-              <input
-                type="text"
-                name="smtpPort"
-                value={config.smtpPort}
-                onChange={handleChange}
-                placeholder="587"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Usuário (E-mail)</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <User className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  type="email"
-                  name="smtpUser"
-                  value={config.smtpUser}
-                  onChange={handleChange}
-                  placeholder="rh@empresa.com"
-                  className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Key className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  type="password"
-                  name="smtpPass"
-                  value={config.smtpPass}
-                  onChange={handleChange}
-                  placeholder="••••••••"
-                  className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Mail className="w-5 h-5 text-primary" />
-              Template de Notificação de Mensagem
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Personalize o e-mail que o candidato recebe quando o RH envia uma mensagem.</p>
-            <div className="mt-2 text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
-              <strong>Variáveis disponíveis:</strong> [Nome do Candidato], [Título da Vaga]
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Assunto do E-mail</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FileText className="h-4 w-4 text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  name="emailTemplateSubject"
-                  value={config.emailTemplateSubject}
-                  onChange={handleChange}
-                  className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Corpo do E-mail</label>
-              <textarea
-                name="emailTemplateBody"
-                value={config.emailTemplateBody}
-                onChange={handleChange}
-                rows={8}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
-              ></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-primary" />
-              Parâmetros de Campos de Vagas
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Configure as listas de opções utilizadas nos formulários de vagas.</p>
-          </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Departamentos */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <label className="block text-sm font-medium text-slate-700">Departamento / Área</label>
+        <div className="relative min-h-[400px]">
+          {activeTab === 'email' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-200 bg-slate-50">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Server className="w-5 h-5 text-primary" />
+                  Configurações de E-mail (SMTP)
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">Configure o servidor SMTP para envio de e-mails do sistema.</p>
                 <button
                   type="button"
-                  onClick={() => handleAddListItem('departamentos')}
-                  className="text-xs flex items-center gap-1 text-primary hover:text-accent font-medium"
+                  onClick={handleTestEmail}
+                  disabled={testingEmail || !config.smtpHost || !config.smtpUser || !config.smtpPass}
+                  className="mt-4 flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors disabled:opacity-50"
                 >
-                  <Plus className="w-3 h-3" /> Adicionar novo
+                  <Mail className="w-4 h-4" />
+                  {testingEmail ? 'Enviando teste...' : 'Testar Envio de E-mail'}
                 </button>
               </div>
-              <div className="space-y-2">
-                {config.departamentos?.map((dept: any, index: number) => (
-                  <ListItem
-                    key={dept.id}
-                    item={dept}
-                    index={index}
-                    listName="departamentos"
-                    onUpdate={handleUpdateListItem}
-                    onDelete={handleDeleteListItem}
-                    onMove={handleMoveListItem}
-                    showOrder={true}
-                    totalItems={config.departamentos.length}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Certificações */}
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <label className="block text-sm font-medium text-slate-700">Certificações Desejadas / Obrigatórias</label>
-                <button
-                  type="button"
-                  onClick={() => handleAddListItem('certificacoes')}
-                  className="text-xs flex items-center gap-1 text-primary hover:text-accent font-medium"
-                >
-                  <Plus className="w-3 h-3" /> Adicionar novo
-                </button>
-              </div>
-              <div className="space-y-2">
-                {config.certificacoes?.map((cert: any, index: number) => (
-                  <ListItem
-                    key={cert.id}
-                    item={cert}
-                    index={index}
-                    listName="certificacoes"
-                    onUpdate={handleUpdateListItem}
-                    onDelete={handleDeleteListItem}
-                    showOrder={false}
-                    totalItems={config.certificacoes.length}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Settings className="w-5 h-5 text-primary" />
-              Parâmetros de Regras de Negócio
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Configure as regras dinâmicas do sistema.</p>
-          </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {regrasSchema.map(regra => (
-              <div key={regra.id}>
-                <label className="block text-sm font-medium text-slate-700 mb-1">{regra.label}</label>
-                <p className="text-xs text-slate-500 mb-2">{regra.description}</p>
-                <div className="relative flex items-center">
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Server className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="text"
+                      name="smtpHost"
+                      value={config.smtpHost}
+                      onChange={handleChange}
+                      placeholder="smtp.exemplo.com"
+                      className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Porta SMTP</label>
                   <input
-                    type={regra.type}
-                    name={regra.id}
-                    value={config[regra.id] ?? regra.defaultValue}
+                    type="text"
+                    name="smtpPort"
+                    value={config.smtpPort}
                     onChange={handleChange}
-                    className={`w-full px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${regra.unit ? 'rounded-l-lg' : 'rounded-lg'}`}
+                    placeholder="587"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                   />
-                  {regra.unit && (
-                    <span className="bg-slate-100 border border-l-0 border-slate-300 px-3 py-2 rounded-r-lg text-slate-600 text-sm">{regra.unit}</span>
-                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Usuário (E-mail)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="email"
+                      name="smtpUser"
+                      value={config.smtpUser}
+                      onChange={handleChange}
+                      placeholder="rh@empresa.com"
+                      className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Key className="h-4 w-4 text-slate-400" />
+                    </div>
+                    <input
+                      type="password"
+                      name="smtpPass"
+                      value={config.smtpPass}
+                      onChange={handleChange}
+                      placeholder="••••••••"
+                      className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    />
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-6 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Mail className="w-5 h-5 text-primary" />
-              Template de Convite para Candidatura
-            </h2>
-            <p className="text-sm text-slate-500 mt-1">Permite configurar o e-mail enviado ao convidar um candidato do banco de talentos para uma vaga.</p>
-            <div className="mt-2 text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
-              <strong>Variáveis disponíveis:</strong> [Nome do Candidato], [Título da Vaga], [Nome da Empresa]
             </div>
-          </div>
-          <div className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Assunto do E-mail</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <FileText className="h-4 w-4 text-slate-400" />
+          )}
+
+          {activeTab === 'templates' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-200 bg-slate-50">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Mail className="w-5 h-5 text-primary" />
+                    Template de Notificação de Mensagem
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Personalize o e-mail que o candidato recebe quando o RH envia uma mensagem.</p>
+                  <div className="mt-2 text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
+                    <strong>Variáveis disponíveis:</strong> [Nome do Candidato], [Título da Vaga]
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  name="inviteTemplateSubject"
-                  value={config.inviteTemplateSubject}
-                  onChange={handleChange}
-                  className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
+                <div className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Assunto do E-mail</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FileText className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        name="emailTemplateSubject"
+                        value={config.emailTemplateSubject}
+                        onChange={handleChange}
+                        className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Corpo do E-mail</label>
+                    <textarea
+                      name="emailTemplateBody"
+                      value={config.emailTemplateBody}
+                      onChange={handleChange}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-200 bg-slate-50">
+                  <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Mail className="w-5 h-5 text-primary" />
+                    Template de Convite para Candidatura
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-1">Permite configurar o e-mail enviado ao convidar um candidato do banco de talentos para uma vaga.</p>
+                  <div className="mt-2 text-xs text-slate-500 bg-slate-100 p-2 rounded border border-slate-200">
+                    <strong>Variáveis disponíveis:</strong> [Nome do Candidato], [Título da Vaga], [Nome da Empresa]
+                  </div>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Assunto do E-mail</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <FileText className="h-4 w-4 text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        name="inviteTemplateSubject"
+                        value={config.inviteTemplateSubject}
+                        onChange={handleChange}
+                        className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Corpo do E-mail</label>
+                    <textarea
+                      name="inviteTemplateBody"
+                      value={config.inviteTemplateBody}
+                      onChange={handleChange}
+                      rows={8}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
+                    ></textarea>
+                  </div>
+                </div>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Corpo do E-mail</label>
-              <textarea
-                name="inviteTemplateBody"
-                value={config.inviteTemplateBody}
-                onChange={handleChange}
-                rows={8}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary font-sans"
-              ></textarea>
+          )}
+
+          {activeTab === 'vagas' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-200 bg-slate-50">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-primary" />
+                  Parâmetros de Campos de Vagas
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">Configure as listas de opções utilizadas nos formulários de vagas.</p>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Departamentos */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <label className="block text-sm font-medium text-slate-700">Departamento / Área</label>
+                    <button
+                      type="button"
+                      onClick={() => handleAddListItem('departamentos')}
+                      className="text-xs flex items-center gap-1 text-primary hover:text-accent font-medium"
+                    >
+                      <Plus className="w-3 h-3" /> Adicionar novo
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {config.departamentos?.map((dept: any, index: number) => (
+                      <ListItem
+                        key={dept.id}
+                        item={dept}
+                        index={index}
+                        listName="departamentos"
+                        onUpdate={handleUpdateListItem}
+                        onDelete={handleDeleteListItem}
+                        onMove={handleMoveListItem}
+                        showOrder={true}
+                        totalItems={config.departamentos.length}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Certificações */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <label className="block text-sm font-medium text-slate-700">Certificações Desejadas / Obrigatórias</label>
+                    <button
+                      type="button"
+                      onClick={() => handleAddListItem('certificacoes')}
+                      className="text-xs flex items-center gap-1 text-primary hover:text-accent font-medium"
+                    >
+                      <Plus className="w-3 h-3" /> Adicionar novo
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {config.certificacoes?.map((cert: any, index: number) => (
+                      <ListItem
+                        key={cert.id}
+                        item={cert}
+                        index={index}
+                        listName="certificacoes"
+                        onUpdate={handleUpdateListItem}
+                        onDelete={handleDeleteListItem}
+                        showOrder={false}
+                        totalItems={config.certificacoes.length}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === 'regras' && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-6 border-b border-slate-200 bg-slate-50">
+                <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <Settings className="w-5 h-5 text-primary" />
+                  Parâmetros de Regras de Negócio
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">Configure as regras dinâmicas do sistema.</p>
+              </div>
+              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {regrasSchema.map(regra => (
+                  <div key={regra.id}>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">{regra.label}</label>
+                    <p className="text-xs text-slate-500 mb-2">{regra.description}</p>
+                    <div className="relative flex items-center">
+                      <input
+                        type={regra.type}
+                        name={regra.id}
+                        value={config[regra.id] ?? regra.defaultValue}
+                        onChange={handleChange}
+                        className={`w-full px-3 py-2 border border-slate-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${regra.unit ? 'rounded-l-lg' : 'rounded-lg'}`}
+                      />
+                      {regra.unit && (
+                        <span className="bg-slate-100 border border-l-0 border-slate-300 px-3 py-2 rounded-r-lg text-slate-600 text-sm">{regra.unit}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end pt-6 border-t border-slate-200">
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50 shadow-sm"
           >
             <Save className="w-5 h-5" />
             {saving ? 'Salvando...' : 'Salvar Configurações'}

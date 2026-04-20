@@ -59,8 +59,7 @@ export function HRRelatorios() {
         // Listar todas as vagas para permitir a validação solicitada
         const { data, error } = await supabase
           .from('vagas')
-          .select('*, candidaturas(count)')
-          .order('criado_em', { ascending: false });
+          .select('*, candidaturas(count)');
 
         if (error) throw error;
         setVagas(data || []);
@@ -378,7 +377,7 @@ export function HRRelatorios() {
                 <TrendingUp className="w-5 h-5 text-primary" />
                 Funil de Recrutamento
               </h3>
-              <div className="h-[350px]">
+              <div style={{ width: '100%', height: 350 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <FunnelChart>
                     <Tooltip />
@@ -412,7 +411,7 @@ export function HRRelatorios() {
                 <Clock className="w-5 h-5 text-primary" />
                 Tempo Médio por Etapa (Dias)
               </h3>
-              <div className="h-[350px]">
+              <div style={{ width: '100%', height: 350 }}>
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={reportData.stats.tempoMedioPorEtapa} layout="vertical">
                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />

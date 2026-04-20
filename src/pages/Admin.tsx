@@ -1,20 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Shield, BarChart, Plus, Search, Activity, Ban, Snowflake, Unlock, CheckCircle2, Database, Eye, EyeOff, Filter, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, FileText, UserPlus, Repeat, Clock, AlertCircle, Check, Trash2, RefreshCw } from 'lucide-react';
-import { seedDatabase } from '../lib/seed';
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { Users, Shield, BarChart, Plus, Search, Activity, Ban, Snowflake, Unlock, CheckCircle2, Database, Eye, EyeOff, Filter, XCircle, ArrowUpDown, ArrowUp, ArrowDown, Briefcase, FileText, UserPlus, Repeat, Clock, AlertCircle, Check, Trash2, RefreshCw, ChevronRight } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
+
+// Admin client para bypass RLS
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+const supabaseAdmin = createClient(supabaseUrl || '', supabaseServiceRoleKey || '', {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+});
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { TransferOwnerModal } from '../components/TransferOwnerModal';
 import { useAuth } from '../contexts/AuthContext';
 import { logAudit } from '../lib/audit';
+import { AuditTrail } from '../components/AuditTrail';
 
 const PRIMARY_COLORS = ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'];
 
 export function AdminDashboard() {
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [seedMessage, setSeedMessage] = useState({ show: false, text: '', type: 'success' });
-
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
@@ -28,15 +36,6 @@ export function AdminDashboard() {
   });
 
   const [cargaTrabalhoState, setCargaTrabalhoState] = useState<any[]>([]);
-  const [isCheckingIntegrity, setIsCheckingIntegrity] = useState(false);
-  const [integrityResults, setIntegrityResults] = useState<{
-    total: number;
-    missingVaga: number;
-    missingCandidato: number;
-    fixed: number;
-    deleted: number;
-    show: boolean;
-  }>({ total: 0, missingVaga: 0, missingCandidato: 0, fixed: 0, deleted: 0, show: false });
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -166,119 +165,6 @@ export function AdminDashboard() {
     fetchRecentLogs();
   }, []);
 
-  const handleSeed = async () => {
-    setIsSeeding(true);
-    try {
-      const novosCandidatos = await seedDatabase();
-      console.log('--- CANDIDATOS CRIADOS ---');
-      console.table(novosCandidatos);
-      setSeedMessage({ show: true, text: 'Banco de dados populado com sucesso! Verifique o console para os logins.', type: 'success' });
-      
-      const { data, error } = await supabase
-        .from('logs')
-        .select('*')
-        .order('data', { ascending: false })
-        .limit(5);
-      if (!error) setRecentLogs(data || []);
-    } catch (error) {
-      console.error('Erro ao popular banco de dados:', error);
-      setSeedMessage({ show: true, text: 'Erro ao popular banco de dados. Verifique o console.', type: 'error' });
-    } finally {
-      setIsSeeding(false);
-      setTimeout(() => setSeedMessage({ show: false, text: '', type: 'success' }), 5000);
-    }
-  };
-
-  const handleIntegrityCheck = async () => {
-    setIsCheckingIntegrity(true);
-    try {
-      // 1. Buscar todas as mensagens
-      const { data: mensagens, error: msgError } = await supabaseAdmin
-        .from('mensagens_chat')
-        .select('*');
-      
-      if (msgError) throw msgError;
-
-      const total = mensagens?.length || 0;
-      let missingVaga = 0;
-      let missingCandidato = 0;
-      let fixed = 0;
-      let deleted = 0;
-
-      const toDelete: string[] = [];
-      const toUpdate: any[] = [];
-
-      // 2. Buscar candidaturas para tentar recuperar IDs
-      const { data: candidaturas } = await supabaseAdmin.from('candidaturas').select('id, candidato_id, vaga_id');
-
-      for (const msg of (mensagens || [])) {
-        let needsFix = false;
-        let currentVagaId = msg.vaga_id;
-        let currentCandidatoId = msg.candidato_id;
-
-        if (!currentVagaId) missingVaga++;
-        if (!currentCandidatoId) missingCandidato++;
-
-        if (!currentVagaId || !currentCandidatoId) {
-          // Tentar encontrar via candidatura se tiver pelo menos um ID
-          if (currentCandidatoId && !currentVagaId) {
-            const candVagas = candidaturas?.filter(c => c.candidato_id === currentCandidatoId) || [];
-            if (candVagas.length === 1) {
-              currentVagaId = candVagas[0].vaga_id;
-              needsFix = true;
-            }
-          } else if (currentVagaId && !currentCandidatoId) {
-            const vagaCands = candidaturas?.filter(c => c.vaga_id === currentVagaId) || [];
-            if (vagaCands.length === 1) {
-              currentCandidatoId = vagaCands[0].candidato_id;
-              needsFix = true;
-            }
-          }
-
-          if (needsFix && currentVagaId && currentCandidatoId) {
-            toUpdate.push({ id: msg.id, vaga_id: currentVagaId, candidato_id: currentCandidatoId });
-            fixed++;
-          } else {
-            // Se não conseguiu corrigir e falta um ID essencial, marcar para exclusão
-            toDelete.push(msg.id);
-            deleted++;
-          }
-        }
-      }
-
-      // 3. Executar correções
-      if (toUpdate.length > 0) {
-        for (const up of toUpdate) {
-          await supabaseAdmin.from('mensagens_chat').update({
-            vaga_id: up.vaga_id,
-            candidato_id: up.candidato_id
-          }).eq('id', up.id);
-        }
-      }
-
-      // 4. Executar exclusões
-      if (toDelete.length > 0) {
-        await supabaseAdmin.from('mensagens_chat').delete().in('id', toDelete);
-      }
-
-      setIntegrityResults({
-        total,
-        missingVaga,
-        missingCandidato,
-        fixed,
-        deleted,
-        show: true
-      });
-
-      await logAudit('Verificação de Integridade', 'Admin', `Mensagens verificadas: ${total}. Corrigidas: ${fixed}. Excluídas: ${deleted}.`);
-    } catch (error) {
-      console.error('Erro na verificação de integridade:', error);
-      alert('Erro ao verificar integridade das mensagens.');
-    } finally {
-      setIsCheckingIntegrity(false);
-    }
-  };
-
   const formatTimeAgo = (dateStr: any) => {
     if (!dateStr) return '-';
     const date = new Date(dateStr);
@@ -296,73 +182,8 @@ export function AdminDashboard() {
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold text-slate-900">Dashboard Administrativo</h1>
-          {seedMessage.show && (
-            <div className={`px-4 py-2 rounded-lg text-sm font-medium ${seedMessage.type === 'success' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {seedMessage.text}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={handleIntegrityCheck}
-            disabled={isCheckingIntegrity}
-            className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-          >
-            <Shield className="w-5 h-5" />
-            {isCheckingIntegrity ? 'Verificando...' : 'Corrigir Mensagens (Integridade)'}
-          </button>
-          <button
-            onClick={handleSeed}
-            disabled={isSeeding}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
-          >
-            <Database className="w-5 h-5" />
-            {isSeeding ? 'Populando...' : 'Popular Banco de Dados (Seed)'}
-          </button>
         </div>
       </div>
-
-      {/* Resultado da Integridade */}
-      {integrityResults.show && (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-amber-200 flex items-start gap-4">
-          <div className="p-3 bg-amber-100 rounded-lg text-amber-600">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-          <div className="flex-1">
-            <div className="flex justify-between items-start">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Resultado da Verificação de Integridade</h3>
-                <p className="text-sm text-slate-500">A verificação de mensagens do chat foi concluída.</p>
-              </div>
-              <button onClick={() => setIntegrityResults(prev => ({ ...prev, show: false }))} className="text-slate-400 hover:text-slate-600">
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[10px] text-slate-500 uppercase font-bold">Total Analisado</p>
-                <p className="text-xl font-bold text-slate-900">{integrityResults.total}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[10px] text-slate-500 uppercase font-bold">Sem Vaga ID</p>
-                <p className="text-xl font-bold text-amber-600">{integrityResults.missingVaga}</p>
-              </div>
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <p className="text-[10px] text-slate-500 uppercase font-bold">Sem Candidato ID</p>
-                <p className="text-xl font-bold text-amber-600">{integrityResults.missingCandidato}</p>
-              </div>
-              <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-100">
-                <p className="text-[10px] text-emerald-600 uppercase font-bold">Corrigidas</p>
-                <p className="text-xl font-bold text-emerald-700">{integrityResults.fixed}</p>
-              </div>
-              <div className="p-3 bg-rose-50 rounded-lg border border-rose-100">
-                <p className="text-[10px] text-rose-600 uppercase font-bold">Excluídas (Órfãs)</p>
-                <p className="text-xl font-bold text-rose-700">{integrityResults.deleted}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* TOPO: KPIs Principais */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -439,42 +260,49 @@ export function AdminDashboard() {
 
       {/* MEIO: Indicadores Secundários */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full hover:shadow-md transition-shadow">
           <div className="flex items-center gap-4 mb-4">
             <div className="p-3 bg-primary/10 rounded-lg text-primary shrink-0">
               <Users className="w-6 h-6" />
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Usuários RH Ativos</p>
-              <h3 className="text-2xl font-bold text-slate-900">24</h3>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight">24</h3>
             </div>
           </div>
-          <Link to="/admin/users" className="text-sm text-primary font-medium hover:underline mt-auto">Gerenciar usuários</Link>
+          <Link to="/admin/users" className="text-sm text-primary font-semibold hover:text-accent transition-colors mt-auto flex items-center gap-1 group">
+            Gerenciar usuários 
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full hover:shadow-md transition-shadow">
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-emerald-100 rounded-lg text-emerald-600 shrink-0">
+            <div className="p-3 bg-emerald-50 rounded-lg text-emerald-600 shrink-0">
               <Activity className="w-6 h-6" />
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Acessos Hoje</p>
-              <h3 className="text-2xl font-bold text-slate-900">1,245</h3>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight">1,245</h3>
             </div>
           </div>
-          <Link to="/admin/auditoria" className="text-sm text-primary font-medium hover:underline mt-auto">Ver logs de auditoria</Link>
+          <Link to="/admin/auditoria" className="text-sm text-primary font-semibold hover:text-accent transition-colors mt-auto flex items-center gap-1 group">
+            Ver logs de auditoria
+            <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+          </Link>
         </div>
 
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between h-full hover:shadow-md transition-shadow">
           <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-amber-100 rounded-lg text-amber-600 shrink-0">
+            <div className="p-3 bg-amber-50 rounded-lg text-amber-600 shrink-0">
               <BarChart className="w-6 h-6" />
             </div>
             <div>
               <p className="text-sm font-medium text-slate-500">Vagas Preenchidas (Mês)</p>
-              <h3 className="text-2xl font-bold text-slate-900">18</h3>
+              <h3 className="text-2xl font-bold text-slate-900 tracking-tight">18</h3>
             </div>
           </div>
+          <div className="h-5" />
         </div>
       </div>
 
@@ -482,7 +310,7 @@ export function AdminDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-bold text-slate-900 mb-4">Carga de Trabalho por Recrutador (Vagas Abertas)</h2>
-          <div className="h-64">
+          <div style={{ width: '100%', height: 300 }}>
             <ResponsiveContainer width="100%" height="100%">
               <ReBarChart data={cargaTrabalhoState} margin={{ top: 20, right: 30, left: 20, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -540,42 +368,7 @@ export function AdminTransferencias() {
   const [isProcessingReturn, setIsProcessingReturn] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    const fetchVagas = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('vagas')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        
-        const vagasData = data || [];
-        setVagas(vagasData);
-        checkExpiredTransfers(vagasData);
-      } catch (error) {
-        console.error('Erro ao buscar vagas:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchVagas();
-
-    // Realtime subscription
-    const channel = supabase
-      .channel('vagas_admin_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vagas' }, () => {
-        fetchVagas();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
-  const checkExpiredTransfers = (vagasList: any[]) => {
+  const checkExpiredTransfers = useCallback((vagasList: any[]) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -590,7 +383,50 @@ export function AdminTransferencias() {
     });
 
     setExpiredTransfers(expired);
-  };
+  }, []);
+
+  const fetchVagas = useCallback(async () => {
+    try {
+      setLoading(true);
+      console.log('[DEBUG-QUERY] 2. A QUERY (Fetch Vagas): select * from vagas order by created_at desc');
+      const { data, error } = await supabase
+        .from('vagas')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      console.log('[DEBUG-DB] 3. RESPOSTA DO SERVIDOR (Fetch):', { count: data?.length, error });
+
+      if (error) {
+        console.error('[DEBUG-DB] FRACASSO NA BUSCA:', error);
+        throw error;
+      }
+      
+      const vagasData = data || [];
+      console.log('[DEBUG-STATE] 5. O ESTADO (Updating vagas state):', vagasData.length, 'records');
+      setVagas(vagasData);
+      checkExpiredTransfers(vagasData);
+    } catch (error) {
+      console.error('[DEBUG-UI] Erro ao buscar vagas:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [checkExpiredTransfers]);
+
+  useEffect(() => {
+    fetchVagas();
+
+    // Realtime subscription
+    const channel = supabase
+      .channel('vagas_admin_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vagas' }, () => {
+        fetchVagas();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchVagas]);
 
   const handleAutoReturn = async (vaga: any) => {
     try {
@@ -602,6 +438,8 @@ export function AdminTransferencias() {
           owner_id: vaga.transferencia_temporaria.original_owner_id || null,
           owner_nome: vaga.transferencia_temporaria.original_owner_nome || 'Sem proprietário',
           transferencia_ativa: false,
+          transferencia_tipo: null, // Limpa o tipo ao retornar ao original
+          transferencia_temporaria: null,
           updated_at: new Date().toISOString()
         })
         .eq('id', vaga.id);
@@ -640,11 +478,20 @@ export function AdminTransferencias() {
     }
   };
 
-  const filteredVagas = vagas.filter(v => 
-    v.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (v.ownerNome && v.ownerNome.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (v.codigo_vaga && v.codigo_vaga.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredVagas = vagas.filter(v => {
+    const matchesSearch = v.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (v.owner_nome && v.owner_nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (v.codigo_vaga && v.codigo_vaga.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    return matchesSearch;
+  });
+
+  console.log('[DEBUG-UI] 4. REGRA DE NEGÓCIO PARA RENDERIZAÇÃO (filteredVagas):', { 
+    total: vagas.length, 
+    filtered: filteredVagas.length, 
+    loading, 
+    hasData: filteredVagas.length > 0 
+  });
 
   return (
     <div className="space-y-6">
@@ -671,7 +518,7 @@ export function AdminTransferencias() {
                 <div key={vaga.id} className="flex items-center gap-2 bg-white border border-amber-200 px-3 py-1.5 rounded-lg text-xs shadow-sm">
                   <span className="font-medium text-slate-700">{vaga.titulo}</span>
                   <span className="text-slate-400">|</span>
-                  <span className="text-slate-600">Retorno: {vaga.transferenciaTemporaria.originalOwnerNome}</span>
+                  <span className="text-slate-600">Retorno: {vaga.transferencia_temporaria?.original_owner_nome || 'N/A'}</span>
                   <button
                     onClick={() => handleAutoReturn(vaga)}
                     disabled={isProcessingReturn}
@@ -727,12 +574,17 @@ export function AdminTransferencias() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
-                          {(vaga.ownerNome || 'S').charAt(0)}
-                        </div>
-                        <span className="text-xs">{vaga.ownerNome || 'Sem proprietário'}</span>
-                      </div>
+                      {(() => {
+                        const nome = vaga.owner_nome || 'Sem proprietário';
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-[10px] font-bold">
+                              {nome.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-sm font-medium text-slate-700">{nome}</span>
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       {vaga.transferencia_ativa ? (
@@ -744,6 +596,10 @@ export function AdminTransferencias() {
                             Retorno: {new Date(vaga.transferencia_temporaria?.data_retorno).toLocaleDateString('pt-BR')}
                           </span>
                         </div>
+                      ) : vaga.transferencia_tipo === 'Definitiva' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 w-fit">
+                          Definitiva
+                        </span>
                       ) : (
                         <span className="text-[10px] text-slate-400 italic">Nenhuma transferência ativa</span>
                       )}
@@ -770,7 +626,7 @@ export function AdminTransferencias() {
           isOpen={transferModal.isOpen}
           onClose={() => setTransferModal({ isOpen: false, vaga: null })}
           vaga={transferModal.vaga}
-          onSuccess={() => {}}
+          onSuccess={fetchVagas}
         />
       )}
     </div>
@@ -795,6 +651,7 @@ export function AdminGestaoUsuarios() {
   // Form States
   const [formData, setFormData] = useState({ nome: '', email: '', login: '', senha: '' });
   const [isSaving, setIsSaving] = useState(false);
+  const [statusLoadingId, setStatusLoadingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [showSenha, setShowSenha] = useState(false);
 
@@ -862,8 +719,7 @@ export function AdminGestaoUsuarios() {
 
       if (dbError) throw dbError;
 
-      await logAudit('Criação de Usuário', 'Admin', `Criou usuário RH: ${formData.nome} (${formData.login})`);
-      
+      // Sucesso imediato na UI
       setIsCreateModalOpen(false);
       setFormData({ nome: '', email: '', login: '', senha: '' });
       fetchUsers();
@@ -898,8 +754,7 @@ export function AdminGestaoUsuarios() {
         if (authError) throw authError;
       }
 
-      await logAudit('Edição de Usuário', 'Admin', `Editou usuário RH: ${selectedUser.login}`);
-      
+      // Sucesso imediato na UI
       setIsEditModalOpen(false);
       fetchUsers();
     } catch (err: any) {
@@ -921,8 +776,7 @@ export function AdminGestaoUsuarios() {
 
       if (authError) throw authError;
 
-      await logAudit('Reset de Senha', 'Admin', `Resetou senha do usuário RH: ${selectedUser.login}`);
-      
+      // Sucesso imediato na UI
       setIsResetModalOpen(false);
       setFormData(prev => ({ ...prev, senha: '' }));
     } catch (err: any) {
@@ -934,22 +788,36 @@ export function AdminGestaoUsuarios() {
 
   const handleStatusChange = async (user: any, newStatus: string) => {
     try {
-      const updateData: any = { status: newStatus };
-      if (newStatus === 'Inativo') {
+      setStatusLoadingId(user.id);
+      // Protocolo DFL: Se o status for inativar, use 'cancelado'
+      const targetStatus = newStatus === 'Inativo' ? 'cancelado' : newStatus;
+      
+      const updateData: any = { status: targetStatus };
+      if (targetStatus === 'cancelado') {
         updateData.removed_at = new Date().toISOString();
       }
+
+      console.log(`[OPS-RH] Executando status change para ${targetStatus} no ID ${user.id}`);
 
       const { error } = await supabase
         .from('users')
         .update(updateData)
-        .eq('id', user.id);
+        .eq('id', String(user.id)); // Força String no ID conforme protocolo
 
       if (error) throw error;
 
-      await logAudit('Alteração de Status', 'Admin', `Alterou status de ${user.login} para ${newStatus}`);
-      fetchUsers();
+      // Sucesso imediato na UI (Trigger do banco cuida do log)
+      await fetchUsers();
+      
+      // Feedback operacional solicitado
+      if (targetStatus === 'cancelado') {
+        alert('Status atualizado com sucesso no banco. O log de auditoria aparecerá em breve.');
+      }
     } catch (err) {
-      console.error('Erro ao alterar status:', err);
+      console.error('[OPS-FATAL] Falha na alteração de status:', err);
+      alert('Erro operacional: Não foi possível alterar o status do usuário.');
+    } finally {
+      setStatusLoadingId(null);
     }
   };
 
@@ -994,12 +862,12 @@ export function AdminGestaoUsuarios() {
         <select 
           value={statusFilter}
           onChange={e => setStatusFilter(e.target.value)}
-          className="px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+          className="px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white sm:text-sm font-medium"
         >
           <option value="Todos">Todos os Status</option>
           <option value="Ativo">Ativo</option>
           <option value="Congelado">Congelado</option>
-          <option value="Inativo">Inativo</option>
+          <option value="cancelado">Cancelado</option>
         </select>
       </div>
 
@@ -1013,7 +881,7 @@ export function AdminGestaoUsuarios() {
                 <th className="px-6 py-4">Email / Login</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Criação</th>
-                <th className="px-6 py-4">Remoção</th>
+                <th className="px-6 py-4 text-center">Remoção</th>
                 <th className="px-6 py-4 text-center">Ações</th>
               </tr>
             </thead>
@@ -1036,7 +904,7 @@ export function AdminGestaoUsuarios() {
                       <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                         u.status === 'Ativo' ? 'bg-emerald-100 text-emerald-700' :
                         u.status === 'Congelado' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
+                        'bg-red-100 text-[#ED1C24]'
                       }`}>
                         {u.status}
                       </span>
@@ -1044,63 +912,71 @@ export function AdminGestaoUsuarios() {
                     <td className="px-6 py-4 text-slate-500">
                       {new Date(u.created_at).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 text-slate-500">
-                      {u.removed_at ? new Date(u.removed_at).toLocaleDateString('pt-BR') : '-'}
+                    <td className="px-6 py-4 text-center text-slate-500 font-medium">
+                      {(u.status === 'cancelado' || u.status?.toUpperCase() === 'INATIVO') 
+                        ? new Date(u.removed_at || u.updated_at || new Date()).toLocaleDateString('pt-BR') 
+                        : '-'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-2">
-                        {u.status !== 'Inativo' && (
-                          <>
-                            <button 
-                              onClick={() => {
-                                setSelectedUser(u);
-                                setFormData({ nome: u.nome, email: u.email, login: u.login, senha: '' });
-                                setIsEditModalOpen(true);
-                              }}
-                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
-                              title="Editar"
-                            >
-                              <FileText className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => {
-                                setSelectedUser(u);
-                                setFormData(prev => ({ ...prev, senha: '' }));
-                                setIsResetModalOpen(true);
-                              }}
-                              className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" 
-                              title="Resetar Senha"
-                            >
-                              <Unlock className="w-4 h-4" />
-                            </button>
-                            {u.status === 'Ativo' ? (
+                        {statusLoadingId === u.id ? (
+                          <div className="flex items-center gap-2 text-[#0054A6] animate-pulse">
+                            <span className="text-[10px] font-bold uppercase">Processando...</span>
+                          </div>
+                        ) : (
+                          u.status !== 'cancelado' && (
+                            <>
                               <button 
-                                onClick={() => handleStatusChange(u, 'Congelado')}
-                                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" 
-                                title="Congelar"
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setFormData({ nome: u.nome, email: u.email, login: u.login, senha: '' });
+                                  setIsEditModalOpen(true);
+                                }}
+                                className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                                title="Editar"
                               >
-                                <Snowflake className="w-4 h-4" />
+                                <FileText className="w-4 h-4" />
                               </button>
-                            ) : (
                               <button 
-                                onClick={() => handleStatusChange(u, 'Ativo')}
-                                className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" 
-                                title="Ativar"
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setFormData(prev => ({ ...prev, senha: '' }));
+                                  setIsResetModalOpen(true);
+                                }}
+                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors" 
+                                title="Resetar Senha"
                               >
-                                <CheckCircle2 className="w-4 h-4" />
+                                <Unlock className="w-4 h-4" />
                               </button>
-                            )}
-                            <button 
-                              onClick={() => {
-                                setSelectedUser(u);
-                                setIsInactivateModalOpen(true);
-                              }}
-                              className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
-                              title="Inativar"
-                            >
-                              <Ban className="w-4 h-4" />
-                            </button>
-                          </>
+                              {u.status === 'Ativo' ? (
+                                <button 
+                                  onClick={() => handleStatusChange(u, 'Congelado')}
+                                  className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors" 
+                                  title="Congelar"
+                                >
+                                  <Snowflake className="w-4 h-4" />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => handleStatusChange(u, 'Ativo')}
+                                  className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" 
+                                  title="Ativar"
+                                >
+                                  <CheckCircle2 className="w-4 h-4" />
+                                </button>
+                              )}
+                              <button 
+                                onClick={() => {
+                                  setSelectedUser(u);
+                                  setIsInactivateModalOpen(true);
+                                }}
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                                title="Cancelar Usuário"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </button>
+                            </>
+                          )
                         )}
                       </div>
                     </td>
@@ -1211,24 +1087,24 @@ export function AdminGestaoUsuarios() {
         </div>
       )}
 
-      {/* Modal Inativar */}
+      {/* Modal Cancelar */}
       {isInactivateModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center">
             <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <Ban className="w-8 h-8" />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Inativar Usuário</h3>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Cancelar Usuário</h3>
             <p className="text-slate-600 mb-6">
-              Você tem certeza que deseja inativar <strong>{selectedUser?.nome}</strong>? <br/>
-              <span className="text-red-600 font-bold text-xs uppercase mt-2 block">Usuários inativados não podem ser reativados.</span>
+              Você tem certeza que deseja cancelar o acesso de <strong>{selectedUser?.nome}</strong>? <br/>
+              <span className="text-red-600 font-bold text-xs uppercase mt-2 block">Usuários cancelados não podem ser reativados pelo RH.</span>
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setIsInactivateModalOpen(false)} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-lg font-bold hover:bg-slate-200 transition-colors">Cancelar</button>
+              <button onClick={() => setIsInactivateModalOpen(false)} className="flex-1 bg-slate-100 text-slate-700 py-3 rounded-lg font-bold hover:bg-slate-200 transition-colors">Voltar</button>
               <button onClick={() => {
                 handleStatusChange(selectedUser, 'Inativo');
                 setIsInactivateModalOpen(false);
-              }} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition-colors">Sim, Inativar</button>
+              }} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold hover:bg-red-700 transition-colors">Sim, Cancelar</button>
             </div>
           </div>
         </div>
@@ -1247,204 +1123,5 @@ export function AdminPlaceholder({ title }: { title: string }) {
 }
 
 export function AdminAuditoria() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Sorting and Filtering
-  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
-  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>({});
-  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchLogs = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('logs')
-          .select('*')
-          .order('data', { ascending: false })
-          .limit(50);
-        
-        if (error) throw error;
-        setLogs(data || []);
-      } catch (error) {
-        console.error("Erro ao buscar logs:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLogs();
-  }, []);
-
-  const formatData = (dateStr: any) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('pt-BR');
-  };
-
-  const formatHora = (dateStr: any) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('pt-BR');
-  };
-
-  const handleSort = (key: string) => {
-    let direction: 'asc' | 'desc' = 'asc';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const handleColumnFilterChange = (key: string, value: string) => {
-    setColumnFilters(prev => ({ ...prev, [key]: value }));
-  };
-
-  const getSortValue = (obj: any, key: string) => {
-    if (key === 'data' || key === 'hora') {
-      if (!obj.data) return 0;
-      return new Date(obj.data).getTime();
-    }
-    if (key === 'usuario') {
-      return (obj.usuario_email || obj.usuario_id || '').toLowerCase();
-    }
-    return obj[key] ? String(obj[key]).toLowerCase() : '';
-  };
-
-  const filteredLogs = logs.filter(log => {
-    const matchesColumnFilters = Object.entries(columnFilters).every(([key, value]) => {
-      if (!value) return true;
-      let logValue = '';
-      if (key === 'data') {
-        logValue = formatData(log.data);
-      } else if (key === 'hora') {
-        logValue = formatHora(log.data);
-      } else if (key === 'usuario') {
-        logValue = (log.usuario_email || log.usuario_id || '').toLowerCase();
-      } else {
-        logValue = String(log[key] || '').toLowerCase();
-      }
-      return logValue.includes(String(value).toLowerCase());
-    });
-    return matchesColumnFilters;
-  }).sort((a, b) => {
-    if (!sortConfig) return 0;
-    const { key, direction } = sortConfig;
-    const aValue = getSortValue(a, key);
-    const bValue = getSortValue(b, key);
-    
-    if (aValue < bValue) return direction === 'asc' ? -1 : 1;
-    if (aValue > bValue) return direction === 'asc' ? 1 : -1;
-    return 0;
-  });
-
-  const renderFilterInput = (key: string) => {
-    return (
-      <div className="relative flex items-center mt-1">
-        <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            setActiveFilterColumn(activeFilterColumn === key ? null : key);
-          }}
-          className={`p-1 rounded hover:bg-slate-200 ${columnFilters[key] ? 'text-primary' : 'text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity'}`}
-        >
-          <Filter className="w-3.5 h-3.5" />
-        </button>
-        {activeFilterColumn === key && (
-          <div className="absolute top-full left-0 mt-1 bg-white border border-slate-200 shadow-lg rounded-lg p-2 z-10 w-48" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-slate-700">Filtrar</span>
-              <button onClick={() => setActiveFilterColumn(null)} className="text-slate-400 hover:text-slate-600">
-                <XCircle className="w-4 h-4" />
-              </button>
-            </div>
-            <input
-              type="text"
-              placeholder="Digite para filtrar..."
-              value={columnFilters[key] || ''}
-              onChange={(e) => handleColumnFilterChange(key, e.target.value)}
-              className="w-full px-2 py-1 text-sm border border-slate-300 rounded focus:outline-none focus:border-primary"
-              autoFocus
-            />
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  const renderSortIcon = (key: string) => {
-    if (sortConfig?.key !== key) return <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="w-3.5 h-3.5 text-primary" /> : <ArrowDown className="w-3.5 h-3.5 text-primary" />;
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-slate-900">Trilha de Auditoria (Audit Trail)</h2>
-      </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
-              <tr>
-                <th className="px-6 py-4">
-                  <div className="flex items-center gap-2 cursor-pointer group" onClick={() => handleSort('data')}>
-                    Data {renderSortIcon('data')}
-                  </div>
-                  {renderFilterInput('data')}
-                </th>
-                <th className="px-6 py-4">
-                  <div className="flex items-center gap-2 cursor-pointer group" onClick={() => handleSort('hora')}>
-                    Hora {renderSortIcon('hora')}
-                  </div>
-                  {renderFilterInput('hora')}
-                </th>
-                <th className="px-6 py-4">
-                  <div className="flex items-center gap-2 cursor-pointer group" onClick={() => handleSort('usuario')}>
-                    Usuário {renderSortIcon('usuario')}
-                  </div>
-                  {renderFilterInput('usuario')}
-                </th>
-                <th className="px-6 py-4">Ação</th>
-                <th className="px-6 py-4">
-                  <div className="flex items-center gap-2 cursor-pointer group" onClick={() => handleSort('modulo')}>
-                    Módulo {renderSortIcon('modulo')}
-                  </div>
-                  {renderFilterInput('modulo')}
-                </th>
-                <th className="px-6 py-4">Detalhes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center">Carregando logs...</td>
-                </tr>
-              ) : filteredLogs.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center">Nenhum log encontrado.</td>
-                </tr>
-              ) : (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-500">{formatData(log.data)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-slate-500">{formatHora(log.data)}</td>
-                    <td className="px-6 py-4 font-medium text-slate-900">{log.usuario_email || log.usuario_id}</td>
-                    <td className="px-6 py-4">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-1 rounded text-xs font-medium">
-                        {log.acao}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">{log.modulo}</td>
-                    <td className="px-6 py-4 text-slate-500">{log.detalhes}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+  return <AuditTrail />;
 }

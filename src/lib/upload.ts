@@ -1,30 +1,55 @@
-export async function uploadFiles(files: File[]) {
-  const formData = new FormData();
-  files.forEach(file => formData.append('files', file));
+import { supabase } from './supabase';
 
-  const response = await fetch('/api/upload', {
-    method: 'POST',
-    body: formData,
-  });
+export async function uploadFiles(files: File[], bucket: string = 'attachments') {
+  // Garantir que o usuário está autenticado antes de qualquer operação de upload
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = 'Erro ao enviar arquivo.';
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      console.error('Erro ao processar resposta de erro do upload:', text);
+  if (authError || !user) {
+    console.error("Tentativa de upload sem autenticação.");
+    throw new Error("Usuário não autenticado");
+  }
+
+  const results = [];
+  
+  for (const file of files) {
+    // Sanitize filename and add timestamp to avoid collisions
+    const timestamp = Date.now();
+    const sanitizedName = file.name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, "_");
+    const filePath = `${timestamp}_${sanitizedName}`;
+
+    console.log('🚀 [UPLOAD] início', {
+      tamanhoMB: (file.size / 1024 / 1024).toFixed(2),
+      bucket,
+      fileName: file.name
+    });
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      console.error('💥 [UPLOAD ERROR]', error);
+      // Se o erro for que o bucket não existe, podemos tentar criar ou avisar
+      throw new Error(`Falha ao enviar o arquivo ${file.name}. Detalhes: ${error.message}`);
     }
-    throw new Error(errorMessage);
+
+    const { data: urlData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(filePath);
+
+    results.push({
+      name: file.name,
+      url: urlData.publicUrl,
+      type: file.type,
+      size: file.size,
+      path: filePath
+    });
+    
+    console.log('✅ [UPLOAD] sucesso', { url: urlData.publicUrl });
   }
 
-  const text = await response.text();
-  try {
-    const data = JSON.parse(text);
-    return data.files;
-  } catch (e) {
-    console.error('Resposta do servidor não é um JSON válido:', text);
-    throw new Error('Resposta inválida do servidor ao enviar arquivo.');
-  }
+  return results;
 }

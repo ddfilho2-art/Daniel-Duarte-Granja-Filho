@@ -123,7 +123,7 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
         data_execucao: new Date().toISOString(),
         tipo: type,
         proprietario_anterior_id: vaga.owner_id || null,
-        proprietario_anterior_nome: vaga.owner?.nome || vaga.owner_nome || 'Sem proprietário',
+        proprietario_anterior_nome: vaga.owner_nome || 'Sem proprietário',
         novo_proprietario_id: newOwner.id,
         novo_proprietario_nome: newOwner.nome,
         justificativa: justification,
@@ -141,52 +141,93 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
         transferData.data_efetivacao = effectiveDate;
       }
 
-      // 1. Add to history
-      const { error: historyError } = await supabase
-        .from('transferencias')
-        .insert(transferData);
-      
-      if (historyError) throw historyError;
+      console.log('[DEBUG-DB] 1. DADOS DE ENTRADA (Transferência):', transferData);
+
+      // 1. Add to history (Non-blocking as per Flow Check)
+      try {
+        const { error: historyError } = await supabase
+          .from('transferencias')
+          .insert(transferData);
+        
+        if (historyError) {
+          console.error('[ERRO-REAL] Falha no Insert de Histórico:', {
+            message: historyError.message,
+            details: historyError.details,
+            hint: historyError.hint
+          });
+          // Não lançamos erro aqui para permitir que a mudança de dono ocorra
+        } else {
+          console.log('[DEBUG-DB] SUCESSO na gravação do histórico.');
+        }
+      } catch (err) {
+        console.error('[ERRO-REAL] Exceção ao gravar histórico:', err);
+      }
 
       // 2. Update vaga
-      const vagaUpdate: any = {
+      const patchData = { 
         owner_id: newOwner.id,
         owner_nome: newOwner.nome,
         transferencia_ativa: type === 'Temporária',
+        transferencia_tipo: type,
+        transferencia_temporaria: type === 'Temporária' ? {
+          original_owner_id: vaga.owner_id || null,
+          original_owner_nome: vaga.owner_nome || 'Sem proprietário',
+          data_retorno: endDate,
+          auto_retorno: autoReturn
+        } : null,
         updated_at: new Date().toISOString()
       };
 
-      if (type === 'Temporária') {
-        vagaUpdate.transferencia_temporaria = {
-          original_owner_id: vaga.owner_id || null,
-          original_owner_nome: vaga.owner?.nome || vaga.owner_nome || 'Sem proprietário',
-          data_retorno: endDate,
-          auto_retorno: autoReturn
-        };
-      } else {
-        // Clear temporary transfer info if it was definitive
-        vagaUpdate.transferencia_temporaria = null;
-      }
+      console.log('[DEBUG-DB] 1. DADOS DE ENTRADA (PATCH Vaga):', patchData);
 
-      const { error: updateError } = await supabase
+      const { data, error, count } = await supabase
         .from('vagas')
-        .update(vagaUpdate)
-        .eq('id', vaga.id);
-      
-      if (updateError) throw updateError;
+        .update(patchData)
+        .eq('id', vaga.id)
+        .select();
 
-      // 3. Log audit
-      try {
-        await logAudit('Transferência de Proprietário', 'Gestão de Vagas', `Vaga ${vaga.titulo} transferida de ${vaga.owner?.nome || vaga.owner_nome || 'Sem proprietário'} para ${newOwner.nome} (${type}).`);
-      } catch (logError) {
-        console.warn('Erro ao registrar log:', logError);
+      if (error) {
+        console.error('[ERRO-REAL] Falha no PATCH Vagas:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        alert('Erro ao atualizar banco: ' + error.message);
+        return;
+      }
+      
+      console.log('[DEBUG-DB] SUCESSO no update da vaga.');
+      console.log('[DEBUG-DB] 3. RESPOSTA DO SERVIDOR (PATCH):', { data, error, count });
+
+      // [INÍCIO DO BLOCO DE INSPEÇÃO]
+      console.log('[DEBUG-QUERY] 2. A QUERY (Verificação de Sincronização): select owner_nome where id =', vaga.id);
+      const { data: verify, error: verifyError } = await supabase.from('vagas').select('owner_nome').eq('id', vaga.id).single();
+      
+      if (verifyError) {
+        console.error('[ERRO-REAL] Falha na Verificação:', verifyError);
       }
 
-      onSuccess();
-      onClose();
-    } catch (error) {
-      console.error('Erro ao executar transferência:', error);
-      alert('Erro ao executar transferência. Verifique as permissões.');
+      const syncSuccess = verify?.owner_nome === newOwner.nome;
+      console.log('[DEBUG-UI] 4. REGRA DE NEGÓCIO PARA RENDERIZAÇÃO (Sync Check):', { syncSuccess, expected: newOwner.nome, actual: verify?.owner_nome });
+
+      if (syncSuccess) {
+        alert('Sucesso: Banco sincronizado.');
+        onSuccess?.(); // Chamada explícita de refresh (via Admin.tsx)
+        onClose();
+      } else {
+        console.error('[DEBUG-UI] 6. O GARGALO DE ATUALIZAÇÃO: Falha de Persistência Detectada');
+        alert('Erro de Sincronização: O banco não refletiu a mudança. Forçando recarregamento.');
+        window.location.reload();
+      }
+      // [FIM DO BLOCO DE INSPEÇÃO]
+    } catch (error: any) {
+      console.error('[ERRO-REAL] Erro Crítico no Fluxo:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        error
+      });
+      alert(error.message || 'Erro ao executar transferência. Verifique as permissões.');
     } finally {
       setLoading(false);
     }
@@ -213,7 +254,7 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200 text-sm">
             <div>
               <p className="text-slate-500 font-medium">Proprietário Atual</p>
-              <p className="text-slate-900 font-bold">{vaga.owner?.nome || vaga.owner_nome || 'Sem proprietário'}</p>
+              <p className="text-slate-900 font-bold">{vaga.owner_nome || 'Sem proprietário'}</p>
             </div>
             <div>
               <p className="text-slate-500 font-medium">Status</p>

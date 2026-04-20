@@ -12,12 +12,39 @@ export function CandidateDashboard() {
   const [stats, setStats] = useState({ active: 0, tests: 0, interviews: 0 });
   const [recentApplications, setRecentApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCurriculoCompletoState, setIsCurriculoCompletoState] = useState(true);
 
   useEffect(() => {
     if (!profile?.uid) return;
 
     const fetchDashboardData = async () => {
       try {
+        // Fetch user profile to get resume_data
+        const { data: userDoc } = await supabase
+          .from('users')
+          .select('resume_data')
+          .eq('uid', profile.uid)
+          .single();
+
+        const isCurriculoCompleto = (data: any) => {
+          if (!data) return false;
+
+          return (
+            !!data.nome &&
+            !!data.telefone &&
+            Array.isArray(data.experiencias) &&
+            data.experiencias.length > 0 &&
+            (
+              !!data.escolaridade ||
+              (Array.isArray(data.formacoes) && data.formacoes.length > 0)
+            )
+          );
+        };
+
+        const completo = isCurriculoCompleto(userDoc?.resume_data);
+        setIsCurriculoCompletoState(completo);
+        console.log("📊 [GLOBAL CHECK] Currículo completo:", completo);
+
         const { data: candidaturas, error } = await supabase
           .from('candidaturas')
           .select('*, vagas(titulo)')
@@ -66,7 +93,7 @@ export function CandidateDashboard() {
 
   return (
     <div className="space-y-6">
-      {profile?.resume_completed === false && (
+      {!isCurriculoCompletoState && (
         <div className="bg-amber-50 border border-amber-200 p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-amber-100 rounded-lg text-amber-600">
@@ -153,6 +180,11 @@ type Language = { id: string, idioma: string, nivel: string };
 type Certification = { id: string, nome: string, instituicao: string, ano: string, nomePersonalizado?: string };
 
 export function CandidateResume() {
+  useEffect(() => {
+    console.log('🟢 [FORM] MONTADO');
+    return () => console.log('🔴 [FORM] DESMONTADO');
+  }, []);
+
   const { profile } = useAuth();
   const [formData, setFormData] = useState({
     nome: '',
@@ -192,7 +224,7 @@ export function CandidateResume() {
           .single();
 
         // [EDITABLE_START:curriculo_init_form]
-        if (userDoc && userDoc.resume_completed === true && userDoc.resume_data) {
+        if (userDoc && userDoc.resume_data) {
           const data = userDoc.resume_data;
           setFormData({
             nome: data.nome || '',
@@ -304,10 +336,18 @@ export function CandidateResume() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      console.log('🚀 [UPLOAD] início (foto)', {
+        tamanhoMB: (file.size / 1024 / 1024).toFixed(2),
+        fileName: file.name
+      });
       const reader = new FileReader();
       reader.onloadend = () => {
+        console.log('✅ [UPLOAD] sucesso (foto lida localmente)');
         setFormData({ ...formData, foto: reader.result as string });
         setIsSaved(false);
+      };
+      reader.onerror = (error) => {
+        console.error('💥 [UPLOAD ERROR] (foto)', error);
       };
       reader.readAsDataURL(file);
     }
@@ -889,7 +929,7 @@ export function CandidateVagas() {
     setColumnFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (!selectedVaga) return;
     
     if (selectedVaga.status_vaga !== 'ABERTA') {
@@ -903,10 +943,51 @@ export function CandidateVagas() {
       return;
     }
 
-    // Check if resume is completed
-    const isResumeCompleted = profile.resume_completed === true;
-    
-    if (!isResumeCompleted) {
+    // Fetch user profile to get resume_data
+    const { data: userDoc } = await supabase
+      .from('users')
+      .select('resume_data')
+      .eq('uid', profile.uid)
+      .single();
+
+    const resumeData = userDoc?.resume_data;
+
+    console.log("🧪 ===== TESTE DE CANDIDATURA =====");
+    console.log("🧠 user:", user);
+    console.log("🧠 profile:", profile);
+    console.log("🧠 user.id:", user?.id);
+    console.log("🧠 profile.id:", profile?.id);
+    console.log("🧠 profile.uid:", profile?.uid);
+    console.log("📄 resume_data (antes da validação):", resumeData);
+
+    const isCurriculoCompleto = (data: any) => {
+      if (!data) return false;
+
+      return (
+        !!data.nome &&
+        !!data.telefone &&
+        Array.isArray(data.experiencias) &&
+        data.experiencias.length > 0 &&
+        (!!data.escolaridade || (Array.isArray(data.formacoes) && data.formacoes.length > 0))
+      );
+    };
+
+    const completo = isCurriculoCompleto(resumeData);
+    console.log("📊 [GLOBAL CHECK] Currículo completo:", completo);
+
+    const resultadoValidacao = completo;
+
+    console.log("📊 Resultado da validação:", resultadoValidacao);
+
+    if (!resultadoValidacao) {
+      console.log("❌ BLOQUEADO: currículo considerado incompleto");
+    } else {
+      console.log("✅ LIBERADO: currículo completo");
+    }
+
+    if (!completo) {
+      console.log("❌ [CANDIDATURA BLOQUEADA] Currículo incompleto", resumeData);
+      alert("Seu currículo ainda não está completo.");
       setModalType('error');
       setShowApplyModal(true);
       return;
@@ -1321,7 +1402,10 @@ export function CandidateVagas() {
                     Cancelar
                   </button>
                   <button 
-                    onClick={() => navigate('/candidato/curriculo')}
+                    onClick={() => {
+                      console.log('➡️ [NAVIGATION] disparada - Indo para /candidato/curriculo');
+                      navigate('/candidato/curriculo');
+                    }}
                     className="flex-1 bg-primary text-white py-2.5 rounded-lg font-medium hover:bg-accent transition-colors"
                   >
                     Preencher Currículo
