@@ -6316,7 +6316,7 @@ function VersionsModal({ prova, onClose }: { prova: any, onClose: () => void }) 
 }
 
 export function HRProfile() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, updateProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [unidades, setUnidades] = useState<any[]>([]);
@@ -6349,7 +6349,7 @@ export function HRProfile() {
             cargo: profile.cargo || '',
             matricula: profile.matricula || '',
             unidade_negocio_id: profile.unidade_negocio_id || '',
-            foto_url: profile.foto_url || ''
+            foto_url: profile.foto_url || profile.avatar_url || ''
           });
         }
       } catch (error) {
@@ -6391,6 +6391,11 @@ export function HRProfile() {
         .getPublicUrl(filePath);
 
       setFormData(prev => ({ ...prev, foto_url: publicUrl }));
+      
+      // Injeta a URL pública direto no contexto garantindo a sincronização em tempo real
+      if (updateProfile) {
+        updateProfile({ avatar_url: publicUrl });
+      }
     } catch (error: any) {
       console.error('Erro no upload:', error);
       alert('Erro ao fazer upload da imagem: ' + error.message);
@@ -6401,8 +6406,8 @@ export function HRProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (profile?.perfil !== 'RH') {
-      alert('Apenas usuários do tipo RH podem editar este perfil.');
+    if (profile?.perfil !== 'RH' && profile?.perfil !== 'Admin') {
+      alert('Apenas usuários do tipo RH ou Admin podem editar este perfil.');
       return;
     }
 
@@ -6421,6 +6426,16 @@ export function HRProfile() {
         .eq('id', profile.id);
 
       if (error) throw error;
+
+      if (updateProfile) {
+        updateProfile({ 
+          avatar_url: formData.foto_url,
+          nome: formData.nome,
+          cargo: formData.cargo,
+          matricula: formData.matricula,
+          unidade_negocio_id: formData.unidade_negocio_id
+        });
+      }
 
       await logAudit('Atualizar Perfil', 'RH', 'Usuário atualizou seus dados de perfil.');
       await refreshProfile();
