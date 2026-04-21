@@ -49,7 +49,7 @@ export function HRDetalheVaga() {
         .from('vagas')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
       
       if (vagaError) throw vagaError;
       
@@ -179,7 +179,7 @@ export function HRDetalheVaga() {
           quantidade_vagas: Number(formData.quantidade_vagas),
           exige_prova: exige_prova === 'Sim',
           prova_id: exige_prova === 'Sim' ? formData.prova_id : null,
-          prova_versao_id: exige_prova === 'Sim' ? formData.prova_versao_id : null,
+          prova_versao_id: exige_prova === 'Sim' ? (formData as any).prova_versao_id : null,
           owner_id: selectedOwnerId,
           owner_nome: selectedOwnerNome,
           certificacoes: finalCertificacoes,
@@ -402,7 +402,7 @@ export function HRDetalheVaga() {
                     <input
                       disabled={!canEdit}
                       type="text"
-                      value={outraCertificacao}
+                      value={outraCertificacao || ''}
                       onChange={(e) => setOutraCertificacao(e.target.value)}
                       placeholder="Especifique a certificação"
                       className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"

@@ -94,7 +94,7 @@ export function HRRelatorios() {
         .from('vagas')
         .select('*, provas(*)')
         .eq('id', selectedVagaId)
-        .single();
+        .maybeSingle();
 
       if (vagaError) throw vagaError;
 
@@ -141,7 +141,7 @@ export function HRRelatorios() {
           if (c.aprovacao_teste === 'Aprovado') aprovadosTeste++;
         }
 
-        if (status === 'APROVADO' || c.fase === 'Contratado') {
+        if (status === 'APROVADA' || c.fase === 'Contratado') {
           totalContratados++;
         }
       });
@@ -152,7 +152,7 @@ export function HRRelatorios() {
         // Contar quantos passaram por essa fase (usando o histórico se disponível, ou a fase atual se for posterior)
         const count = candidaturas.filter(c => {
           const candEvents = (eventos || []).filter(e => e.candidatura_id === c.id);
-          const passouPelaFase = candEvents.some((e: any) => e.descricao.includes(stage) || e.tipo === stage);
+          const passouPelaFase = candEvents.some((e: any) => String(e.descricao || '').includes(stage) || e.tipo === stage);
           const estaNaFaseOuPosterior = stages.indexOf(c.fase) >= stages.indexOf(stage);
           return passouPelaFase || estaNaFaseOuPosterior;
         }).length;
@@ -385,7 +385,6 @@ export function HRRelatorios() {
                       data={reportData.stats.funilData}
                       dataKey="value"
                       nameKey="name"
-                      labelLine={true}
                     >
                       <LabelList position="right" fill="#64748b" stroke="none" dataKey="name" />
                       {reportData.stats.funilData.map((entry, index) => (

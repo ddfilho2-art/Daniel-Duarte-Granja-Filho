@@ -10,6 +10,7 @@ interface UserProfile {
   perfil: string;
   status: string;
   avatar_url?: string;
+  foto_url?: string;
   cargo?: string;
   matricula?: string;
   unidade_negocio_id?: string;

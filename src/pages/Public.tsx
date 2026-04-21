@@ -313,7 +313,7 @@ export function DetalheVaga() {
           .from('vagas')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
         setVaga(data);
@@ -366,7 +366,7 @@ export function DetalheVaga() {
       .from('users')
       .select('resume_data')
       .eq('uid', profile.uid)
-      .single();
+      .maybeSingle();
 
     const resumeData = userDoc?.resume_data;
 
@@ -448,7 +448,7 @@ export function DetalheVaga() {
         .from('vagas')
         .select('status_vaga, titulo')
         .eq('id', id)
-        .single();
+        .maybeSingle();
       
       if (vagaError || !currentVaga) {
         console.error('Erro ao validar vaga:', vagaError);
@@ -504,7 +504,7 @@ export function DetalheVaga() {
         .from('candidaturas')
         .insert(candidaturaData)
         .select()
-        .single();
+        .maybeSingle();
 
       if (insertError) {
         console.error('Erro no insert da candidatura:', insertError);
@@ -532,13 +532,13 @@ export function DetalheVaga() {
           .from('settings')
           .select('*')
           .eq('id', 'email')
-          .single();
+          .maybeSingle();
         
         if (configData) {
           const settings = configData.data || configData;
           if (settings.smtpHost && settings.smtpUser && settings.smtpPass && user?.email) {
             const subject = `Confirmação de Candidatura - ${currentVaga.titulo}`;
-            const body = `Olá ${user?.user_metadata?.nome || 'Candidato'},\n\nSua candidatura para a vaga "${currentVaga.titulo}" foi recebida com sucesso!\n\nFique atento ao seu portal para acompanhar as próximas etapas.\n\nAtenciosamente,\nEquipe de RH`;
+            const body = `Olá ${(user as any)?.user_metadata?.nome || 'Candidato'},\n\nSua candidatura para a vaga "${currentVaga.titulo}" foi recebida com sucesso!\n\nFique atento ao seu portal para acompanhar as próximas etapas.\n\nAtenciosamente,\nEquipe de RH`;
             
             const { data: responseData, ok } = await safeFetch('/api/send-email', {
               method: 'POST',
@@ -803,7 +803,7 @@ export function Cadastro() {
 
   // [EDITABLE_START:public_cadastro_useeffect_redirect]
   useEffect(() => {
-    if (!authLoading && !profileLoading && user && profile && user.email_confirmed_at) {
+    if (!authLoading && !profileLoading && user && profile && (user as any).email_confirmed_at) {
       const p = profile.perfil?.toLowerCase();
       console.log(`➡️ [NAVIGATION] disparada - Redirecionando usuário logado para /${p}`);
       if (p === 'admin') navigate('/admin');

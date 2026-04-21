@@ -133,7 +133,7 @@ export function AdminConfiguracoes() {
         .from('settings')
         .select('*')
         .eq('id', 'email')
-        .single();
+        .maybeSingle();
       
       if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
       

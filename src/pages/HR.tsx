@@ -16,6 +16,187 @@ import { ChatInput } from '../components/ChatInput';
 import { useAuth } from '../contexts/AuthContext';
 import { useVagas } from '../hooks/useVagas';
 
+// --- INÍCIO DA FUNÇÃO GLOBAL E INDEPENDENTE DE AVALIAÇÃO DE IA ---
+if (typeof window !== 'undefined') {
+  window.avaliarCandidatoIA = async (candidatoId, vagaId) => { 
+    try {
+      console.log("Iniciando avaliação", { candidatoId, vagaId });
+
+      // 1. VALIDAÇÃO DE ENTRADA
+      if (!candidatoId || !vagaId) {
+        throw new Error("candidatoId e vagaId são obrigatórios");
+      }
+
+      // 2. VALIDAÇÃO DE TIPO
+      const candidatoIdStr = String(candidatoId);
+      const vagaIdStr = String(vagaId);
+
+      // 3. PREVENÇÃO DE DUPLICIDADE
+      const { data: existente } = await supabase
+        .from('analise_ia_candidato')
+        .select('*')
+        .eq('candidato_id', candidatoIdStr)
+        .eq('vaga_id', vagaIdStr)
+        .maybeSingle();
+
+      if (existente) {
+        console.log('Análise já existente');
+        return existente;
+      }
+
+      // 4. BUSCA DE DADOS - CANDIDATO
+      const { data: candidato, error: erroCandidato } = await supabase
+        .from('candidatos')
+        .select('*')
+        .eq('id', candidatoIdStr)
+        .maybeSingle();
+        
+      if (erroCandidato || !candidato) {
+        throw new Error("Candidato não encontrado");
+      }
+
+      // 5. BUSCA DE DADOS - VAGA
+      const { data: vaga, error: erroVaga } = await supabase
+        .from('vagas')
+        .select('*')
+        .eq('id', vagaIdStr)
+        .maybeSingle();
+        
+      if (erroVaga || !vaga) {
+        throw new Error("Vaga não encontrada");
+      }
+
+      // 6. EXECUÇÃO DA IA (Montar chave do Gemini de forma segura para Vite ou Node)
+      const rawViteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      let apiConfigKey = '';
+      try {
+        apiConfigKey = typeof process !== 'undefined' && (process as any).env ? (process as any).env.GEMINI_API_KEY || '' : '';
+      } catch (e) {}
+      const activeGeminiKey = rawViteKey || apiConfigKey || '';
+
+      if (!activeGeminiKey) {
+        throw new Error("Chave do Gemini não configurada no ambiente.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
+
+      const prompt = `
+        Atue como um recrutador especialista e avalie a aderência entre um candidato e uma vaga.
+
+        ---
+
+        DADOS DA VAGA:
+        ${JSON.stringify({
+          titulo: vaga.titulo || (vaga as any).cargo,
+          departamento: vaga.departamento,
+          descricao: vaga.descricao,
+          requisitos: vaga.requisitos,
+          certificacoes: vaga.certificacoes
+        }, null, 2)}
+
+        ---
+
+        DADOS DO CANDIDATO:
+        ${JSON.stringify(candidato, null, 2)}
+
+        ---
+
+        INSTRUÇÕES:
+
+        1. Avaliar o candidato com base na vaga
+        2. Atribuir notas de 0 a 10 para:
+           - tecnico
+           - experiencia
+           - formacao
+           - soft_skills
+           - ferramentas
+
+        3. Calcular score_total de 0 a 100
+
+        4. Gerar uma justificativa objetiva (máx 3 linhas)
+
+        ---
+
+        REGRAS IMPORTANTES:
+
+        - NÃO inventar informações
+        - NÃO sair do contexto fornecido
+        - NÃO usar linguagem genérica
+        - Ser consistente nas notas
+      `;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              score_total: { type: Type.NUMBER },
+              metricas: {
+                type: Type.OBJECT,
+                properties: {
+                  tecnico: { type: Type.NUMBER },
+                  experiencia: { type: Type.NUMBER },
+                  formacao: { type: Type.NUMBER },
+                  soft_skills: { type: Type.NUMBER },
+                  ferramentas: { type: Type.NUMBER }
+                },
+                required: ["tecnico", "experiencia", "formacao", "soft_skills", "ferramentas"]
+              },
+              justificativa: { type: Type.STRING }
+            },
+            required: ["score_total", "metricas", "justificativa"]
+          }
+        }
+      });
+
+      const text = response.text;
+      if (!text) throw new Error("Resposta vazia do Gemini.");
+      
+      const resultadoIA = JSON.parse(text);
+
+      // 7. SALVAMENTO NO BANCO
+      const { error: rpcError } = await supabase.rpc('upsert_analise_ia', {
+        p_candidato_id: candidatoIdStr,
+        p_vaga_id: vagaIdStr,
+        p_score_total: resultadoIA.score_total,
+        p_tecnico: resultadoIA.metricas.tecnico,
+        p_experiencia: resultadoIA.metricas.experiencia,
+        p_formacao: resultadoIA.metricas.formacao,
+        p_soft_skills: resultadoIA.metricas.soft_skills,
+        p_ferramentas: resultadoIA.metricas.ferramentas,
+        p_justificativa: resultadoIA.justificativa,
+        p_raw_json: resultadoIA
+      });
+
+      if (rpcError) {
+        throw new Error(`Erro ao salvar análise IA via RPC: ${rpcError.message}`);
+      }
+
+      // 8. RETORNO PADRÃO
+      return {
+        candidato_id: candidatoIdStr,
+        vaga_id: vagaIdStr,
+        sucesso: true,
+        resultado: resultadoIA
+      };
+
+    } catch (error: any) {
+      // 9. TRATAMENTO DE ERRO
+      console.error("Erro na avaliação IA:", error);
+      return {
+        candidato_id: candidatoId,
+        vaga_id: vagaId,
+        sucesso: false,
+        erro: error.message
+      };
+    }
+  };
+}
+// --- FIM DA FUNÇÃO GLOBAL ---
+
 const tempoPorEtapaData = [
   { name: 'Triagem', dias: 0 },
   { name: 'Entrevista RH', dias: 0 },
@@ -112,7 +293,7 @@ function CandidateProfileModal({
             .from('candidaturas')
             .select('*')
             .eq('id', candidaturaId)
-            .single();
+            .maybeSingle();
           
           if (!error && data) {
             setCandidatura(data);
@@ -144,7 +325,7 @@ function CandidateProfileModal({
             .from('candidatos')
             .select('*')
             .eq('id', candidatoIdToFetch)
-            .single();
+            .maybeSingle();
           
           if (!fullError && fullData) {
             setFullCandidatoData(fullData);
@@ -452,7 +633,7 @@ function CandidateProfileModal({
         .from('candidaturas')
         .select('*')
         .eq('id', candidaturaId)
-        .single();
+        .maybeSingle();
 
       if (fetchError) throw fetchError;
       
@@ -464,16 +645,16 @@ function CandidateProfileModal({
 
       if (action === 'Aprovar') {
         newFase = getProximaFase(dbCurrentFase);
-        newStatus = 'APROVADO';
+        newStatus = 'APROVADA';
       } else if (action === 'Reprovar') {
         newFase = 'Encerrado';
-        newStatus = 'REPROVADO';
+        newStatus = 'REPROVADA';
       } else if (action === 'Reserva') {
         newFase = 'Banco de Talentos';
         newStatus = 'RESERVA';
       }
 
-      if (newFase === 'Contratado') newStatus = 'APROVADO';
+      if (newFase === 'Contratado') newStatus = 'APROVADA';
 
       const payload = {
         fase: newFase,
@@ -510,7 +691,7 @@ function CandidateProfileModal({
             .from('settings')
             .select('*')
             .eq('id', 'ENVIO_PROVA')
-            .single();
+            .maybeSingle();
           
           const settings = templateData?.data || templateData;
           const provaNome = (vaga?.provas as any)?.nome || vaga?.prova_nome || vaga?.provaNome || 'Prova Técnica';
@@ -850,8 +1031,8 @@ function CandidateProfileModal({
                   eventos.map((evento, idx) => (
                     <div key={evento.id || idx} className="flex gap-4 items-start border-l-2 border-slate-100 pl-4 pb-4 relative">
                       <div className={`absolute -left-[5px] top-1 w-2 h-2 rounded-full ${
-                        evento.tipo === 'APROVADO' ? 'bg-emerald-500' :
-                        evento.tipo === 'REPROVADO' ? 'bg-red-500' :
+                        evento.tipo === 'APROVADA' ? 'bg-emerald-500' :
+                        evento.tipo === 'REPROVADA' ? 'bg-red-500' :
                         evento.tipo === 'RESERVA' ? 'bg-amber-500' :
                         'bg-primary'
                       }`} />
@@ -1171,7 +1352,7 @@ export function HRDashboard() {
         const contratados = candidaturas.filter((c: any) => {
           const status = c.status;
           const fase = c.fase || 'Triagem';
-          return status === 'APROVADO' || fase === 'Contratado';
+          return status === 'APROVADA' || fase === 'Contratado';
         }).length;
         const taxaConversao = totalCandidaturas > 0 ? Math.round((contratados / totalCandidaturas) * 100) : 0;
 
@@ -1179,7 +1360,7 @@ export function HRDashboard() {
 
         const desistentes = candidaturas.filter((c: any) => {
           const status = c.status;
-          return c.motivo_declinio === 'Desistência' || status === 'REPROVADO';
+          return c.motivo_declinio === 'Desistência' || status === 'REPROVADA';
         }).length;
         const taxaDesistencia = totalCandidaturas > 0 ? Math.round((desistentes / totalCandidaturas) * 100) : 0;
 
@@ -1211,22 +1392,22 @@ export function HRDashboard() {
           { name: 'Prova', value: candidaturas.filter((c: any) => {
             const status = c.status;
             const fase = c.fase || 'Triagem';
-            return (!status || status === 'APROVADO') && ['Prova', 'Entrevista RH', 'Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
+            return (!status || status === 'APROVADA') && ['Prova', 'Entrevista RH', 'Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
           }).length },
           { name: 'Entrevista RH', value: candidaturas.filter((c: any) => {
             const status = c.status;
             const fase = c.fase || 'Triagem';
-            return (!status || status === 'APROVADO') && ['Entrevista RH', 'Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
+            return (!status || status === 'APROVADA') && ['Entrevista RH', 'Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
           }).length },
           { name: 'Entrevista Gestor', value: candidaturas.filter((c: any) => {
             const status = c.status;
             const fase = c.fase || 'Triagem';
-            return (!status || status === 'APROVADO') && ['Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
+            return (!status || status === 'APROVADA') && ['Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
           }).length },
           { name: 'Contratados', value: candidaturas.filter((c: any) => {
             const status = c.status;
             const fase = c.fase || 'Triagem';
-            return status === 'APROVADO' || fase === 'Contratado';
+            return status === 'APROVADA' || fase === 'Contratado';
           }).length },
         ];
         setFunilState(funil);
@@ -1551,7 +1732,7 @@ export function HRDashboard() {
 
       const motivosRecusa = (candidaturasRes.data || []).filter(doc => {
         const fase = doc.fase || doc.status || 'Triagem';
-        return fase === 'Reprovado' || doc.status === 'REPROVADO' || doc.status === 'Desistência';
+        return fase === 'Reprovado' || doc.status === 'REPROVADA' || doc.status === 'Desistência';
       }).map(doc => {
         const vagaDoc = (vagasRes.data || []).find(v => v.id === doc.vaga_id);
         return {
@@ -2058,7 +2239,7 @@ export function HRGestaoVagas() {
           .from('settings')
           .select('*')
           .eq('id', 'email')
-          .single();
+          .maybeSingle();
         
         if (data) {
           const settingsData = data.data || data;
@@ -3288,7 +3469,7 @@ export function HRCandidatos() {
           .from('candidaturas')
           .select('*')
           .eq('id', id)
-          .single();
+          .maybeSingle();
         
         if (fetchError || !currentData) return null;
         
@@ -3303,16 +3484,16 @@ export function HRCandidatos() {
           if (currentIndex >= 0 && currentIndex < stages.length - 1) {
             newFase = stages[currentIndex + 1].id;
           }
-          newStatus = 'APROVADO';
+          newStatus = 'APROVADA';
         } else if (action === 'Reprovar') {
           newFase = 'Encerrado';
-          newStatus = 'REPROVADO';
+          newStatus = 'REPROVADA';
         } else if (action === 'Reserva') {
           newFase = 'Banco de Talentos';
           newStatus = 'RESERVA';
         }
 
-        if (newFase === 'Contratado') newStatus = 'APROVADO';
+        if (newFase === 'Contratado') newStatus = 'APROVADA';
 
 
         const payload = {
@@ -3369,7 +3550,7 @@ export function HRCandidatos() {
         .from('candidaturas')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
       
       if (fetchError || !currentData) return;
       
@@ -3382,10 +3563,10 @@ export function HRCandidatos() {
 
       if (action === 'Aprovar') {
         newFase = getProximaFase(currentFase);
-        newStatus = 'APROVADO';
+        newStatus = 'APROVADA';
       } else if (action === 'Reprovar') {
         newFase = 'Reprovado';
-        newStatus = 'REPROVADO';
+        newStatus = 'REPROVADA';
       } else if (action === 'Reserva') {
         newFase = 'Reserva';
         newStatus = 'RESERVA';
@@ -3395,7 +3576,7 @@ export function HRCandidatos() {
 
       if (newFase === currentFase && (newStatus === currentData.status) && action === 'Aprovar') {
         // Se já está na última fase e clicou aprovar, talvez queira apenas marcar como aprovado
-        newStatus = 'APROVADO';
+        newStatus = 'APROVADA';
       }
 
       if (newFase === currentFase && (newStatus === currentData.status)) {
@@ -3771,8 +3952,8 @@ const HistoryModal = ({ isOpen, onClose, nomeCandidato, candidaturaId }: { isOpe
               {eventos.map((item, index) => (
                 <div key={item.id || index} className="relative pl-8">
                   <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 ${
-                    item.tipo === 'APROVADO' ? 'border-emerald-500' :
-                    item.tipo === 'REPROVADO' ? 'border-red-500' :
+                    item.tipo === 'APROVADA' ? 'border-emerald-500' :
+                    item.tipo === 'REPROVADA' ? 'border-red-500' :
                     item.tipo === 'RESERVA' ? 'border-amber-500' :
                     'border-primary'
                   }`} />
@@ -3824,7 +4005,7 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
           .from('candidaturas')
           .select('vaga_id, candidato_id')
           .eq('id', candidaturaId)
-          .single();
+          .maybeSingle();
         
         if (candData) {
           finalVagaId = candData.vaga_id;
@@ -3850,7 +4031,7 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
         .from('settings')
         .select('*')
         .eq('id', 'email')
-        .single();
+        .maybeSingle();
       
       if (configData) {
         const settings = configData.data || configData;
@@ -3859,7 +4040,7 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
           .from('candidaturas')
           .select('vaga_id')
           .eq('id', candidaturaId)
-          .single();
+          .maybeSingle();
         
         let vagaTitulo = 'Vaga';
         if (candData) {
@@ -3867,7 +4048,7 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
             .from('vagas')
             .select('titulo')
             .eq('id', candData.vaga_id)
-            .single();
+            .maybeSingle();
           
           if (vagaData) {
             vagaTitulo = vagaData.titulo;
@@ -3878,7 +4059,7 @@ const SendMessageModal = ({ isOpen, onClose, candidaturaId, candidatoNome, vagaI
           .from('users')
           .select('email')
           .eq('id', finalCandidatoId)
-          .single();
+          .maybeSingle();
         
         const candidatoEmail = userDoc?.email;
 
@@ -4019,7 +4200,7 @@ export function HREntrevistas() {
         const candidaturasNoProcesso = candidaturasDaVaga.filter(c => {
           const fase = c.fase || c.status || 'Triagem';
           const status = c.status || 'ATIVO';
-          return processStages.includes(fase) && (status === 'ATIVO' || status === 'NOVO' || status === 'APROVADO');
+          return processStages.includes(fase) && (status === 'ATIVO' || status === 'NOVO' || status === 'APROVADA');
         });
         
         const eCount = candidaturasNoProcesso.length;
@@ -4060,7 +4241,7 @@ export function HREntrevistas() {
         const candData = candidaturas.filter(c => {
           const fase = c.fase || c.status || 'Triagem';
           const status = c.status || 'ATIVO';
-          return c.vaga_id === selectedVaga && processStages.includes(fase) && (status === 'ATIVO' || status === 'NOVO' || status === 'APROVADO');
+          return c.vaga_id === selectedVaga && processStages.includes(fase) && (status === 'ATIVO' || status === 'NOVO' || status === 'APROVADA');
         });
         const candidatoIds = Array.from(new Set(candData.map(c => c.candidato_id)));
         
@@ -4100,7 +4281,7 @@ export function HREntrevistas() {
         .from('candidaturas')
         .select('*')
         .eq('id', id)
-        .single();
+        .maybeSingle();
       
       if (fetchError || !currentData) return;
       
@@ -4112,17 +4293,17 @@ export function HREntrevistas() {
 
       if (status === 'Aprovado' || status === 'Pular') {
         nextFase = getProximaFase(fase);
-        nextStatus = 'APROVADO';
+        nextStatus = 'APROVADA';
       } else if (status === 'Reprovado') {
         if (['Exame'].includes(fase)) {
           nextFase = 'Entrevista RH';
         } else {
           nextFase = 'Reprovado';
-          nextStatus = 'REPROVADO';
+          nextStatus = 'REPROVADA';
         }
       }
 
-      if (nextFase === 'Contratado') nextStatus = 'APROVADO';
+      if (nextFase === 'Contratado') nextStatus = 'APROVADA';
 
       const payload = {
         fase: nextFase,
@@ -4161,7 +4342,7 @@ export function HREntrevistas() {
       setEntrevistas(prev => prev.map(e => e.id === id ? { 
         ...e, 
         ...payload
-      } : e).filter(e => ETAPAS_PROCESSO.includes(e.fase) && (!e.status || e.status === 'APROVADO')));
+      } : e).filter(e => ETAPAS_PROCESSO.includes(e.fase) && (!e.status || e.status === 'APROVADA')));
       
       // Manually reset DOM elements if moving to a new phase
       if (nextStatus !== fase) {
@@ -4963,7 +5144,7 @@ export function HRMensagens() {
         .from('settings')
         .select('*')
         .eq('id', 'email')
-        .single();
+        .maybeSingle();
 
       if (configData) {
         const settings = configData.data || configData;
@@ -4972,7 +5153,7 @@ export function HRMensagens() {
           .from('candidaturas')
           .select('vaga_id, candidato_id')
           .eq('id', selectedCandidaturaId)
-          .single();
+          .maybeSingle();
 
         let vagaTitulo = 'Vaga';
         let candidatoNome = 'Candidato';
@@ -4981,7 +5162,7 @@ export function HRMensagens() {
             .from('vagas')
             .select('titulo')
             .eq('id', candDoc.vaga_id)
-            .single();
+            .maybeSingle();
           if (vagaDoc) {
             vagaTitulo = vagaDoc.titulo;
           }
@@ -4989,7 +5170,7 @@ export function HRMensagens() {
             .from('users')
             .select('nome, email')
             .eq('id', candDoc.candidato_id)
-            .single();
+            .maybeSingle();
           if (userDoc) {
             candidatoNome = userDoc.nome;
             const candidatoEmail = userDoc.email;
@@ -5504,7 +5685,7 @@ export function HRBancoTalentos() {
       }
       
       // Enviar e-mail real via API se configurado
-      const { data: configData } = await supabase.from('settings').select('*').eq('id', 'email').single();
+      const { data: configData } = await supabase.from('settings').select('*').eq('id', 'email').maybeSingle();
       const settings = configData?.data || configData;
 
       if (settings?.smtpHost && settings?.smtpUser && settings?.smtpPass && talento?.email) {
@@ -6349,7 +6530,7 @@ export function HRProfile() {
             cargo: profile.cargo || '',
             matricula: profile.matricula || '',
             unidade_negocio_id: profile.unidade_negocio_id || '',
-            foto_url: profile.foto_url || profile.avatar_url || ''
+            foto_url: profile.avatar_url || (profile as any).foto_url || ''
           });
         }
       } catch (error) {
@@ -6390,11 +6571,19 @@ export function HRProfile() {
         .from('attachments')
         .getPublicUrl(filePath);
 
-      setFormData(prev => ({ ...prev, foto_url: publicUrl }));
+      const urlComCacheBuster = publicUrl + '?t=' + new Date().getTime();
+
+      setFormData(prev => ({ ...prev, foto_url: urlComCacheBuster }));
+      
+      // Salvar imediatamente no banco para persistir
+      await supabase
+        .from('users')
+        .update({ avatar_url: urlComCacheBuster, foto_url: urlComCacheBuster })
+        .eq('id', user.user.id);
       
       // Injeta a URL pública direto no contexto garantindo a sincronização em tempo real
       if (updateProfile) {
-        updateProfile({ avatar_url: publicUrl });
+        updateProfile({ avatar_url: urlComCacheBuster, foto_url: urlComCacheBuster });
       }
     } catch (error: any) {
       console.error('Erro no upload:', error);
@@ -6406,6 +6595,7 @@ export function HRProfile() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (profile?.perfil !== 'RH' && profile?.perfil !== 'Admin') {
       alert('Apenas usuários do tipo RH ou Admin podem editar este perfil.');
       return;
@@ -6413,6 +6603,9 @@ export function HRProfile() {
 
     setSaving(true);
     try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('Usuário não autenticado');
+      
       const { error } = await supabase
         .from('users')
         .update({
@@ -6420,16 +6613,18 @@ export function HRProfile() {
           cargo: formData.cargo,
           matricula: formData.matricula,
           unidade_negocio_id: formData.unidade_negocio_id || null,
-          foto_url: formData.foto_url,
+          avatar_url: formData.foto_url,
+          foto_url: formData.foto_url, // fallback legacy support
           updated_at: new Date().toISOString()
         })
-        .eq('id', profile.id);
+        .eq('id', user.user.id);
 
       if (error) throw error;
 
       if (updateProfile) {
         updateProfile({ 
-          avatar_url: formData.foto_url,
+          avatar_url: formData.foto_url, // Força o refresh pela chave principal do authcontext
+          foto_url: formData.foto_url,
           nome: formData.nome,
           cargo: formData.cargo,
           matricula: formData.matricula,
@@ -6438,7 +6633,6 @@ export function HRProfile() {
       }
 
       await logAudit('Atualizar Perfil', 'RH', 'Usuário atualizou seus dados de perfil.');
-      await refreshProfile();
       alert('Perfil atualizado com sucesso!');
     } catch (error: any) {
       console.error('Erro ao salvar perfil:', error);

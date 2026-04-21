@@ -201,7 +201,7 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
 
       // [INÍCIO DO BLOCO DE INSPEÇÃO]
       console.log('[DEBUG-QUERY] 2. A QUERY (Verificação de Sincronização): select owner_nome where id =', vaga.id);
-      const { data: verify, error: verifyError } = await supabase.from('vagas').select('owner_nome').eq('id', vaga.id).single();
+      const { data: verify, error: verifyError } = await supabase.from('vagas').select('owner_nome').eq('id', vaga.id).maybeSingle();
       
       if (verifyError) {
         console.error('[ERRO-REAL] Falha na Verificação:', verifyError);

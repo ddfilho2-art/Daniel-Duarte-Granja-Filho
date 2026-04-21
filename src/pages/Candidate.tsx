@@ -24,7 +24,7 @@ export function CandidateDashboard() {
           .from('users')
           .select('resume_data')
           .eq('uid', profile.uid)
-          .single();
+          .maybeSingle();
 
         const isCurriculoCompleto = (data: any) => {
           if (!data) return false;
@@ -54,7 +54,7 @@ export function CandidateDashboard() {
 
         const active = candidaturas.filter(c => {
           const status = c.status;
-          return !status || status === 'APROVADO';
+          return !status || status === 'APROVADA';
         }).length;
         const tests = candidaturas.filter(c => {
           const fase = c.fase || c.status || 'Triagem';
@@ -221,7 +221,7 @@ export function CandidateResume() {
           .from('users')
           .select('*')
           .eq('uid', profile.uid)
-          .single();
+          .maybeSingle();
 
         // [EDITABLE_START:curriculo_init_form]
         if (userDoc && userDoc.resume_data) {
@@ -519,7 +519,7 @@ export function CandidateResume() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Gênero</label>
-                <select name="genero" value={formData.genero || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                <select required name="genero" value={formData.genero || ''} onChange={handleChange} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                   <option value="">Selecione</option>
                   <option value="Feminino">Feminino</option>
                   <option value="Masculino">Masculino</option>
@@ -698,11 +698,11 @@ export function CandidateResume() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Ano Início</label>
-                        <input required type="number" min="1950" max="2030" value={edu.anoInicio} onChange={(e) => handleEducationChange(edu.id, 'anoInicio', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: 2015" />
+                        <input required type="number" min="1950" max="2030" value={edu.anoInicio || ''} onChange={(e) => handleEducationChange(edu.id, 'anoInicio', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: 2015" />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Ano Fim</label>
-                        <input type="number" min="1950" max="2030" value={edu.anoFim} onChange={(e) => handleEducationChange(edu.id, 'anoFim', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: 2019" />
+                        <input type="number" min="1950" max="2030" value={edu.anoFim || ''} onChange={(e) => handleEducationChange(edu.id, 'anoFim', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: 2019" />
                       </div>
                     </div>
                   </div>
@@ -725,11 +725,11 @@ export function CandidateResume() {
                 <div key={lang.id} className="flex items-end gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50 relative">
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Idioma</label>
-                    <input required type="text" value={lang.idioma} onChange={(e) => handleLanguageChange(lang.id, 'idioma', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: Inglês, Espanhol" />
+                    <input required type="text" value={lang.idioma || ''} onChange={(e) => handleLanguageChange(lang.id, 'idioma', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: Inglês, Espanhol" />
                   </div>
                   <div className="flex-1">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nível</label>
-                    <select required value={lang.nivel} onChange={(e) => handleLanguageChange(lang.id, 'nivel', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                    <select required value={lang.nivel || ''} onChange={(e) => handleLanguageChange(lang.id, 'nivel', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                       <option value="Conhecimento Básico">Conhecimento Básico</option>
                       <option value="Intermediário">Intermediário</option>
                       <option value="Avançado">Avançado</option>
@@ -761,7 +761,7 @@ export function CandidateResume() {
                 <div key={cert.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50 relative">
                   <div className="md:col-span-5">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Certificação/Curso</label>
-                    <select required value={cert.nome} onChange={(e) => handleCertificationChange(cert.id, 'nome', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
+                    <select required value={cert.nome || ''} onChange={(e) => handleCertificationChange(cert.id, 'nome', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white">
                       <option value="">Selecione uma certificação</option>
                       {certificacoesOpcoes.map((opcao, idx) => (
                         <option key={idx} value={opcao}>{opcao}</option>
@@ -782,11 +782,11 @@ export function CandidateResume() {
                   </div>
                   <div className="md:col-span-4">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Instituição Emissora</label>
-                    <input required type="text" value={cert.instituicao} onChange={(e) => handleCertificationChange(cert.id, 'instituicao', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
+                    <input required type="text" value={cert.instituicao || ''} onChange={(e) => handleCertificationChange(cert.id, 'instituicao', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" />
                   </div>
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-slate-700 mb-1">Ano</label>
-                    <input required type="number" min="1950" max="2030" value={cert.ano} onChange={(e) => handleCertificationChange(cert.id, 'ano', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: 2023" />
+                    <input required type="number" min="1950" max="2030" value={cert.ano || ''} onChange={(e) => handleCertificationChange(cert.id, 'ano', e.target.value)} className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white" placeholder="Ex: 2023" />
                   </div>
                   <div className="md:col-span-1 flex items-end justify-end pb-2">
                     <button type="button" onClick={() => removeCertification(cert.id)} className="text-slate-400 hover:text-red-500">
@@ -900,7 +900,7 @@ export function CandidateVagas() {
           .from('provas')
           .select('*')
           .eq('id', selectedVaga.prova_id)
-          .single();
+          .maybeSingle();
 
         if (error) throw error;
         setProvaVersao(data);
@@ -948,7 +948,7 @@ export function CandidateVagas() {
       .from('users')
       .select('resume_data')
       .eq('uid', profile.uid)
-      .single();
+      .maybeSingle();
 
     const resumeData = userDoc?.resume_data;
 
@@ -1502,7 +1502,7 @@ export function CandidateCandidaturas() {
 
         const candidaturasData = (data || []).map(d => {
           const s = (d.status || '').toUpperCase();
-          const isClosed = ['REPROVADO', 'DESISTENTE', 'REJEITADO', 'APROVADO', 'CONTRATADO', 'DECLINADO', 'DESISTÊNCIA', 'DESISTENCIA'].includes(s);
+          const isClosed = ['REPROVADA', 'DESISTENTE', 'REJEITADO', 'APROVADA', 'CONTRATADO', 'DECLINADO', 'DESISTÊNCIA', 'DESISTENCIA'].includes(s);
           
           return {
             ...d,
@@ -1540,8 +1540,8 @@ export function CandidateCandidaturas() {
   const getStatusCandidato = (status: string, fase?: string) => {
     const s = status || 'ATIVO';
     const f = fase || '';
-    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADO') return 'Aprovado';
-    if (s === 'REPROVADO' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
+    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADA') return 'Aprovado';
+    if (s === 'REPROVADA' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
     if (s === 'RESERVA' || s === 'Reserva' || f === 'Reserva') return 'Reserva';
     return 'Em processo';
   };
@@ -1879,8 +1879,8 @@ export function CandidateMensagens() {
   const getStatusCandidato = (status: string, fase?: string) => {
     const s = status || 'ATIVO';
     const f = fase || '';
-    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADO') return 'Aprovado';
-    if (s === 'REPROVADO' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
+    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADA') return 'Aprovado';
+    if (s === 'REPROVADA' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
     if (s === 'RESERVA' || s === 'Reserva' || f === 'Reserva') return 'Reserva';
     return 'Em processo';
   };
@@ -2224,8 +2224,8 @@ export function CandidateProvas() {
   const getStatusCandidato = (status: string, fase?: string) => {
     const s = status || 'ATIVO';
     const f = fase || '';
-    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADO') return 'Aprovado';
-    if (s === 'REPROVADO' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
+    if (s === 'CONTRATADO' || s === 'Contratado' || s === 'Aprovado' || s === 'APROVADA') return 'Aprovado';
+    if (s === 'REPROVADA' || s === 'Reprovado' || s === 'Declinado' || s === 'Desistência' || s === 'DECLINADO' || s === 'DESISTENCIA') return 'Reprovado';
     if (s === 'RESERVA' || s === 'Reserva' || f === 'Reserva') return 'Reserva';
     return 'Em processo';
   };

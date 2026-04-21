@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export type EventoTipo = 'APROVADO' | 'REPROVADO' | 'RESERVA' | 'MENSAGEM' | 'PROVA' | 'FASE' | 'STATUS' | 'COMENTARIO';
+export type EventoTipo = 'APROVADA' | 'REPROVADA' | 'RESERVA' | 'MENSAGEM' | 'PROVA' | 'FASE' | 'STATUS' | 'COMENTARIO';
 
 export async function logCandidaturaEvento(
   candidaturaId: string,

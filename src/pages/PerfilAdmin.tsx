@@ -22,6 +22,7 @@ export function PerfilAdmin() {
   const [cargo, setCargo] = useState('');
 
   const isLoaded = useRef(false);
+  const isSaving = useRef(false);
 
   useEffect(() => {
     if (isLoaded.current) return;
@@ -64,6 +65,9 @@ export function PerfilAdmin() {
     if (e) e.preventDefault();
     if (!user) return;
 
+    if (isSaving.current) return;
+    isSaving.current = true;
+
     setSaving(true);
 
     try {
@@ -95,7 +99,7 @@ export function PerfilAdmin() {
 
       // 🔥 Atualiza contexto
       if (updateProfile) {
-        updateProfile(payload);
+        updateProfile({ ...payload, avatar_url: avatarUrl });
       }
 
       console.log("♻️ [CONTEXT ATUALIZADO]");
@@ -103,15 +107,24 @@ export function PerfilAdmin() {
       // 🔥 Refetch (garantia)
       const { data: refetch } = await supabase
         .from('users')
-        .select('nome, cargo')
+        .select('nome, cargo, foto_url')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       console.log("🔁 [REFETCH]:", refetch);
 
       if (refetch) {
         setNome(refetch.nome || '');
         setCargo(refetch.cargo || '');
+        
+        if (updateProfile) {
+          updateProfile({ 
+            nome: refetch.nome, 
+            cargo: refetch.cargo, 
+            foto_url: refetch.foto_url, 
+            avatar_url: refetch.foto_url 
+          });
+        }
       }
 
       console.log("✅ [SUCESSO]");
@@ -122,6 +135,7 @@ export function PerfilAdmin() {
       alert("Erro ao salvar.");
     } finally {
       setSaving(false);
+      isSaving.current = false;
     }
   };
 
@@ -143,6 +157,9 @@ export function PerfilAdmin() {
       const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
 
       setAvatarUrl(data.publicUrl);
+      if (updateProfile) {
+        updateProfile({ avatar_url: data.publicUrl });
+      }
 
       console.log("📸 [FOTO OK] URL:", data.publicUrl);
 
