@@ -1,15 +1,7 @@
-import nodemailer from 'nodemailer';
-
 type EmailPayload = {
   to?: string;
   subject?: string;
   body?: string;
-  smtpConfig?: {
-    smtpHost?: string;
-    smtpPort?: number | string;
-    smtpUser?: string;
-    smtpPass?: string;
-  };
 };
 
 function setCors(res: any) {
@@ -41,13 +33,6 @@ export default async function handler(req: any, res: any) {
   const { to, subject, body } = payload;
   const timestamp = new Date().toISOString();
 
-  const smtpConfig = {
-    smtpHost: payload.smtpConfig?.smtpHost || process.env.SMTP_HOST || '',
-    smtpPort: payload.smtpConfig?.smtpPort || process.env.SMTP_PORT || '',
-    smtpUser: payload.smtpConfig?.smtpUser || process.env.SMTP_USER || '',
-    smtpPass: payload.smtpConfig?.smtpPass || process.env.SMTP_PASS || '',
-  };
-
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   if (!to || !emailRegex.test(to)) {
@@ -74,115 +59,62 @@ export default async function handler(req: any, res: any) {
     });
   }
 
-  if (
-    !smtpConfig.smtpHost ||
-    !smtpConfig.smtpPort ||
-    !smtpConfig.smtpUser ||
-    !smtpConfig.smtpPass
-  ) {
-    return res.status(400).json({
+  // Usar a variável de ambiente para a chave de API externa
+  const resendApiKey = process.env.RESEND_API_KEY;
+
+  if (!resendApiKey) {
+    console.error('RESEND_API_KEY ausente ou não configurada no ambiente.');
+    return res.status(500).json({
       success: false,
-      error_type: 'INVALID_DATA',
-      message: 'Configurações SMTP incompletas.',
+      error_type: 'CONFIG_ERROR',
+      message: 'Configurações de envio de e-mail (API Key) incompletas no servidor.',
     });
   }
-
-  const { smtpHost, smtpPort, smtpUser, smtpPass } = smtpConfig;
 
   try {
     console.log(
       JSON.stringify({
         type: 'EMAIL_ATTEMPT',
         timestamp,
-        context: { to, subject, host: smtpHost, user: smtpUser },
+        context: { to, subject, provider: 'Resend' },
       }),
     );
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: Number(smtpPort),
-      secure: Number(smtpPort) === 465,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
+    // Usa a API REST do Resend (compatível com edge/serverless, sem nodemailer ou bloqueio SMTP)
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${resendApiKey}`,
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 5000,
-      socketTimeout: 15000,
+      body: JSON.stringify({
+        from: process.env.EMAIL_FROM || 'DFL RH <onboarding@resend.dev>',
+        to,
+        subject,
+        html: body.replace(/\n/g, '<br>'),
+        text: body,
+      }),
     });
 
-    try {
-      await transporter.verify();
-    } catch (verifyError: any) {
-      let errorType = 'CONNECTION_ERROR';
-      let friendlyMsg = 'Não foi possível conectar ao servidor de e-mail.';
-
-      if (
-        verifyError?.code === 'EAUTH' ||
-        String(verifyError?.message || '').includes('Invalid login')
-      ) {
-        errorType = 'AUTH_ERROR';
-        friendlyMsg = 'Falha na autenticação. Verifique usuário e senha.';
-        if (smtpHost.includes('gmail.com')) {
-          friendlyMsg += ' No Gmail, use uma "Senha de Aplicativo".';
-        }
-      } else if (verifyError?.code === 'ETIMEDOUT') {
-        errorType = 'TIMEOUT';
-        friendlyMsg = 'A conexão com o servidor SMTP expirou.';
-      }
-
-      console.error(
-        JSON.stringify({
-          type: 'EMAIL_VERIFY_ERROR',
-          timestamp: new Date().toISOString(),
-          error_type: errorType,
-          message: verifyError?.message,
-          code: verifyError?.code,
-        }),
-      );
-
-      return res.status(401).json({
-        success: false,
-        error_type: errorType,
-        message: friendlyMsg,
-        error: friendlyMsg,
-        details: verifyError?.message,
-      });
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `Erro HTTP ${response.status} na API externa`);
     }
 
-    let info: any;
-    let attempts = 0;
-    const maxRetries = 2;
-
-    while (attempts <= maxRetries) {
-      try {
-        info = await transporter.sendMail({
-          from: `"DFL RH" <${smtpUser}>`,
-          to,
-          subject,
-          text: body,
-          html: body.replace(/\n/g, '<br>'),
-        });
-        break;
-      } catch (sendErr: any) {
-        attempts++;
-        if (attempts > maxRetries) throw sendErr;
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempts));
-      }
-    }
+    const data = await response.json();
 
     console.log(
       JSON.stringify({
         type: 'EMAIL_SUCCESS',
         timestamp: new Date().toISOString(),
-        messageId: info?.messageId,
+        messageId: data.id,
         recipient: to,
       }),
     );
 
     return res.status(200).json({
       success: true,
-      messageId: info?.messageId,
+      messageId: data.id,
       message: 'E-mail enviado com sucesso.',
     });
   } catch (error: any) {
@@ -191,7 +123,6 @@ export default async function handler(req: any, res: any) {
         type: 'EMAIL_FATAL_ERROR',
         timestamp: new Date().toISOString(),
         error: error?.message,
-        code: error?.code,
         stack: error?.stack,
       }),
     );
@@ -200,7 +131,6 @@ export default async function handler(req: any, res: any) {
       success: false,
       error_type: 'SEND_ERROR',
       message: 'Erro interno ao processar o envio de e-mail.',
-      error: 'Erro interno ao processar o envio de e-mail.',
       details: error?.message,
     });
   }
