@@ -1050,7 +1050,6 @@ export function Login() {
     try {
       await login(loginInput, password);
     } catch (err: any) {
-      console.error('[LOGIN] 💥 Erro geral:', err);
       setError(err.message || 'Erro inesperado.');
     } finally {
       setLoading(false);

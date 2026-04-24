@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Briefcase, Users, FileText, MessageSquare, CheckSquare, 
+import { Outlet, Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import {
+  Briefcase, Users, FileText, MessageSquare, CheckSquare,
   Settings, LogOut, Home, Search, User, FileCheck, Shield, BarChart, KeyRound, X, Activity, Repeat
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useUI } from '../contexts/UIContext';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/audit';
 
@@ -55,7 +56,7 @@ export function PublicLayout() {
       </main>
       <footer className="bg-slate-900 text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-800 text-sm text-center">
-          &copy; {new Date().getFullYear()} DFL. Todos os direitos reservados.
+          © {new Date().getFullYear()} DFL. Todos os direitos reservados.
         </div>
       </footer>
     </div>
@@ -64,11 +65,12 @@ export function PublicLayout() {
 
 function SidebarItem({ to, icon: Icon, label, badge }: { to: string, icon: any, label: string, badge?: number }) {
   const location = useLocation();
-  const isActive = location.pathname === to || location.pathname.startsWith(to + '/');
-  
+  const isDashboardRoot = to === '/rh' || to === '/admin' || to === '/candidato';
+  const isActive = isDashboardRoot ? location.pathname === to : (location.pathname === to || location.pathname.startsWith(to + '/'));
+
   return (
-    <Link 
-      to={to} 
+    <Link
+      to={to}
       className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
         isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
       }`}
@@ -77,20 +79,16 @@ function SidebarItem({ to, icon: Icon, label, badge }: { to: string, icon: any, 
         <Icon className="w-5 h-5" />
         {label}
       </div>
-      {badge !== undefined && badge > 0 && (
-        <span className="flex items-center justify-center w-5 h-5 bg-orange-500 text-white text-[10px] font-bold rounded-full">
-          {badge}
-        </span>
-      )}
     </Link>
   );
 }
 
-function DashboardLayout({ children, menuItems }: { children: React.ReactNode, menuItems: { to: string, icon: any, label: string, badge?: number }[] }) {
+function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, menuItems: { to: string, icon: any, label: string, badge?: number }[] }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, profile, authLoading, profileLoading, isAuthenticated, signOut } = useAuth();
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const { showPasswordModal, closeChangePassword } = useUI();
+
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -104,19 +102,13 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
     }
   }, [isAuthenticated, authLoading, profileLoading, navigate]);
 
-  // Reset do erro ao trocar de foto para garantir que a nova tentativa ocorra
-  // ANTES
-  // React.useEffect(() => {
-  //   setImgLoadError(false);
-  // }, [profile?.avatar_url, (profile as any)?.foto_url]);
-  // DEPOIS
   React.useEffect(() => {
     setImgLoadError(false);
   }, [profile?.avatar_url, profile?.foto_url]);
 
   const handleLogout = async () => {
     try {
-      await logAudit('Logout', 'Autenticação', `Usuário encerrou a sessão.`);
+      await logAudit('Logout', 'Autenticação', 'Usuário encerrou a sessão.');
       await signOut();
       navigate('/login');
     } catch (error) {
@@ -126,7 +118,10 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newPassword !== confirmPassword) { setPasswordError('As senhas não coincidem.'); return; }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('As senhas não coincidem.');
+      return;
+    }
     setIsChangingPassword(true);
     setPasswordError('');
     try {
@@ -134,24 +129,26 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
       if (error) throw error;
       setPasswordSuccess('Senha alterada com sucesso!');
       setTimeout(() => {
-        setShowPasswordModal(false);
+        closeChangePassword();
         setPasswordSuccess('');
         setNewPassword('');
         setConfirmPassword('');
       }, 2000);
-    } catch (err: any) { 
+    } catch (err: any) {
       setPasswordError(err.message || 'Erro ao alterar senha.');
-    } finally { 
-      setIsChangingPassword(false); 
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
-  const userName = profile?.nome || 'Usuário';
-  const userAvatar = profile?.avatar_url || (profile as any)?.foto_url;
-  
-  // Memoização simples para evitar reverse() desnecessário
-  const currentMenuItem = React.useMemo(() => 
-    [...menuItems].reverse().find(item => location.pathname.startsWith(item.to)),
+  const userName = (profile as any)?.resume_data?.nome || profile?.nome || 'Usuário';
+  const userAvatar = profile?.avatar_url ?? (profile as unknown as Record<string, string | undefined>)?.foto_url ?? (profile as any)?.resume_data?.foto;
+
+  const currentMenuItem = React.useMemo(() =>
+    [...menuItems].reverse().find(item => {
+      const isDashboardRoot = item.to === '/rh' || item.to === '/admin' || item.to === '/candidato';
+      return isDashboardRoot ? location.pathname === item.to : (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
+    }),
     [location.pathname, menuItems]
   );
 
@@ -169,54 +166,49 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
         <div className="h-16 flex items-center px-6 border-b border-slate-200">
           <Link to="/"><Logo /></Link>
         </div>
-        
-        <div className="p-4 border-b border-slate-200">
+
+        <div className="p-4 border-t border-slate-200">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold overflow-hidden shrink-0 border border-slate-100">
-              {/* Key dinâmica força o re-render da imagem se a URL mudar */}
-              {userAvatar && !imgLoadError ? (
-                <img 
-                  // ANTES
-                  // key={`${profile?.avatar_url || ''}_${(profile as any)?.foto_url || ''}`}
-                  // DEPOIS
-                  key={`${profile?.avatar_url || ''}_${profile?.foto_url || ''}`}
-                  src={userAvatar} 
-                  alt={userName} 
-                  className="w-full h-full object-cover" 
-                  referrerPolicy="no-referrer"
-                  onError={() => setImgLoadError(true)}
-                />
-              ) : (
-                <span className="text-lg">{userName.charAt(0).toUpperCase()}</span>
+            
+            {/* Avatar */}
+            {userAvatar && !imgLoadError ? (
+              <img
+                key={userAvatar}
+                src={userAvatar}
+                alt="Avatar"
+                className="w-10 h-10 rounded-full object-cover"
+                onError={() => setImgLoadError(true)}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-slate-300 flex items-center justify-center text-white font-semibold">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+            )}
+
+            {/* Nome + Link */}
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-slate-700">
+                {userName}
+              </span>
+              {profile?.perfil !== 'Candidato' && (
+                <Link
+                  to={`/${location.pathname.split('/')[1] || 'rh'}/perfil`}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  Meu Perfil
+                </Link>
               )}
             </div>
-            <div className="flex flex-col min-w-0">
-              <p className="text-sm font-medium text-slate-900 truncate">{userName}</p>
-              <Link 
-                to={profile?.perfil?.toLowerCase() === 'admin' ? '/admin/perfil' : '/rh/perfil'} 
-                className="text-[10px] font-bold text-primary hover:underline uppercase tracking-widest"
-              >
-                Meu Perfil
-              </Link>
-            </div>
+
           </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item, index) => <SidebarItem key={index} {...item} />)}
+          {menuItems.map((item) => <SidebarItem key={item.to} {...item} />)}
         </nav>
 
         <div className="p-4 border-t border-slate-200 space-y-2">
-          <button 
-            onClick={() => setShowPasswordModal(true)} 
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            <KeyRound className="w-5 h-5" />Senha
-          </button>
-          <button 
-            onClick={handleLogout} 
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-          >
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
             <LogOut className="w-5 h-5" />Sair
           </button>
         </div>
@@ -228,69 +220,80 @@ function DashboardLayout({ children, menuItems }: { children: React.ReactNode, m
             {currentMenuItem?.label || 'Dashboard'}
           </h1>
         </header>
-        <div className="flex-1 p-8"><Outlet /></div>
+
+        <div className="flex-1 p-8">
+          {children || <Outlet />}
+        </div>
       </main>
 
-      {/* Modal de Senha com Correções de UI */}
       {showPasswordModal && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-slate-900">Segurança da Conta</h3>
-              <button onClick={() => setShowPasswordModal(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-[#0054A6]" />
+                <h3 className="font-bold text-slate-900">Alterar Senha</h3>
+              </div>
+              <button onClick={closeChangePassword} className="text-slate-400 hover:text-slate-600">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-6">
+            
+            <form onSubmit={handleChangePassword} className="p-6 space-y-4">
               {passwordError && (
-                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100">
+                <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="w-1 h-1 bg-red-700 rounded-full" />
                   {passwordError}
                 </div>
               )}
               {passwordSuccess && (
-                <div className="mb-4 p-3 bg-emerald-50 text-emerald-700 rounded-lg text-sm border border-emerald-100">
-                  {passwordSuccess}
+                <div className="p-3 bg-emerald-50 text-emerald-700 text-sm rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200 text-center justify-center font-medium">
+                   ✅ {passwordSuccess}
                 </div>
               )}
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Nova Senha</label>
-                  <input 
-                    type="password" 
-                    required 
-                    value={newPassword} 
-                    onChange={(e) => setNewPassword(e.target.value)} 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Confirmar Senha</label>
-                  <input 
-                    type="password" 
-                    required 
-                    value={confirmPassword} 
-                    onChange={(e) => setConfirmPassword(e.target.value)} 
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none" 
-                  />
-                </div>
-                <div className="pt-4 flex justify-end gap-3">
-                  <button 
-                    type="button" 
-                    onClick={() => setShowPasswordModal(false)} 
-                    className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit" 
-                    disabled={isChangingPassword} 
-                    className="px-4 py-2 text-sm font-medium bg-primary text-white rounded-lg disabled:opacity-50 hover:bg-primary-dark transition-colors"
-                  >
-                    {isChangingPassword ? 'Processando...' : 'Salvar Nova Senha'}
-                  </button>
-                </div>
-              </form>
-            </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Nova Senha</label>
+                <input
+                  required
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#0054A6]/20 outline-none transition-all"
+                  placeholder="Mínimo 6 caracteres"
+                  minLength={6}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">Confirmar Nova Senha</label>
+                <input
+                  required
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#0054A6]/20 outline-none transition-all"
+                  placeholder="Repita a nova senha"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
+                <button
+                  type="button"
+                  onClick={closeChangePassword}
+                  className="px-6 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  className="px-6 py-2 text-sm font-bold bg-[#0054A6] text-white rounded-lg hover:bg-[#004080] transition-colors disabled:opacity-50 min-w-[120px]"
+                >
+                  {isChangingPassword ? 'Alterando...' : 'Salvar Senha'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -307,40 +310,59 @@ export function CandidateLayout() {
     { to: '/candidato/mensagens', icon: MessageSquare, label: 'Mensagens' },
     { to: '/candidato/provas', icon: CheckSquare, label: 'Provas' },
   ];
-  return <DashboardLayout menuItems={menuItems}><Outlet /></DashboardLayout>;
+  return <DashboardLayout menuItems={menuItems} />;
 }
 
 export function HRLayout() {
   const [badges, setBadges] = useState({ triagem: 0, entrevistas: 0, mensagens: 0 });
+
   React.useEffect(() => {
     const fetchBadges = async () => {
-      const { data } = await supabase.from('candidaturas').select('*');
+      const { data, error } = await supabase.from('candidaturas').select('*');
+
+      if (error) {
+        console.error('Erro ao buscar badges:', error);
+        return;
+      }
+
       if (!data) return;
+
       let t = 0, e = 0, m = 0;
+
       data.forEach(d => {
         const fase = d.fase || 'Triagem';
         if (!d.visualizado && !d.status && (fase === 'Triagem' || fase === 'Prova')) t++;
         if (!d.visualizado && !d.status && ['Entrevista RH', 'Entrevista Gestor', 'Exame'].includes(fase)) e++;
         if (d.unread_messages_by_hr > 0) m += d.unread_messages_by_hr;
       });
+
       setBadges({ triagem: t, entrevistas: e, mensagens: m });
     };
+
     fetchBadges();
-    const sub = supabase.channel('candidaturas_changes').on('postgres_changes', { event: '*', schema: 'public', table: 'candidaturas' }, fetchBadges).subscribe();
-    return () => { sub.unsubscribe(); };
+
+    const sub = supabase
+      .channel('candidaturas_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidaturas' }, fetchBadges)
+      .subscribe();
+
+    return () => {
+      sub.unsubscribe();
+    };
   }, []);
 
   const menuItems = [
     { to: '/rh', icon: Home, label: 'Dashboard RH' },
     { to: '/rh/vagas', icon: Briefcase, label: 'Gestão de Vagas' },
-    { to: '/rh/candidatos', icon: Users, label: 'Candidatos', badge: badges.triagem },
-    { to: '/rh/entrevistas', icon: Users, label: 'Entrevistas', badge: badges.entrevistas },
+    { to: '/rh/candidatos', icon: Users, label: 'Triagem', badge: badges.triagem },
+    { to: '/rh/entrevistas', icon: Users, label: 'Processo de Recrut / Selec.', badge: badges.entrevistas },
     { to: '/rh/mensagens', icon: MessageSquare, label: 'Mensagens', badge: badges.mensagens },
     { to: '/rh/provas', icon: CheckSquare, label: 'Provas' },
     { to: '/rh/talentos', icon: FileCheck, label: 'Banco de Talentos' },
     { to: '/rh/relatorios', icon: BarChart, label: 'Relatórios' },
   ];
-  return <DashboardLayout menuItems={menuItems}><Outlet /></DashboardLayout>;
+
+  return <DashboardLayout menuItems={menuItems} />;
 }
 
 export function AdminLayout() {
@@ -352,5 +374,6 @@ export function AdminLayout() {
     { to: '/admin/performance', icon: Activity, label: 'SRE' },
     { to: '/admin/configuracoes', icon: Settings, label: 'Configurações' },
   ];
-  return <DashboardLayout menuItems={menuItems}><Outlet /></DashboardLayout>;
+
+  return <DashboardLayout menuItems={menuItems} />;
 }

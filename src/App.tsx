@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { UIProvider } from './contexts/UIContext';
 
 // Public Pages
 import { Login, Home, ListaVagas, DetalheVaga, Cadastro, SobreNos } from './pages/Public';
@@ -81,59 +82,62 @@ const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNo
 const App = () => {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route element={<PublicLayout />}>
-            <Route path="/" element={<Home />} />
-            <Route path="/vagas" element={<ListaVagas />} />
-            <Route path="/vagas/:id" element={<DetalheVaga />} />
-            <Route path="/cadastro" element={<Cadastro />} />
-            <Route path="/sobre" element={<SobreNos />} />
-            <Route path="/login" element={<Login />} />
-          </Route>
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<ProtectedRoute allowedProfiles={['Admin']}><AdminLayout /></ProtectedRoute>}>
-            <Route index element={<AdminDashboard />} />
-            <Route path="users" element={<AdminGestaoUsuarios />} />
-            <Route path="transferencias" element={<AdminTransferencias />} />
-            <Route path="auditoria" element={<AdminAuditoria />} />
-            <Route path="performance" element={<AdminPerformance />} />
-            <Route path="configuracoes" element={<AdminConfiguracoes />} />
-            <Route path="perfil" element={<HRProfile />} />
-          </Route>
+      <UIProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route element={<PublicLayout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/vagas" element={<ListaVagas />} />
+              <Route path="/vagas/:id" element={<DetalheVaga />} />
+              <Route path="/cadastro" element={<Cadastro />} />
+              <Route path="/sobre" element={<SobreNos />} />
+              <Route path="/login" element={<Login />} />
+            </Route>
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute allowedProfiles={['Admin']}><AdminLayout /></ProtectedRoute>}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="users" element={<AdminGestaoUsuarios />} />
+              <Route path="transferencias" element={<AdminTransferencias />} />
+              <Route path="auditoria" element={<AdminAuditoria />} />
+              <Route path="performance" element={<AdminPerformance />} />
+              <Route path="configuracoes" element={<AdminConfiguracoes />} />
+              <Route path="perfil" element={<PerfilAdmin />} />
+            </Route>
 
-          {/* RH Routes */}
-          <Route path="/rh" element={<ProtectedRoute allowedProfiles={['RH']}><HRLayout /></ProtectedRoute>}>
-            <Route index element={<HRDashboard />} />
-            <Route path="vagas" element={<HRGestaoVagas />} />
-            <Route path="vagas/nova" element={<HRNovaVaga />} />
-            <Route path="vagas/:id" element={<HRDetalheVaga />} />
-            <Route path="candidatos" element={<HRCandidatos />} />
-            <Route path="entrevistas" element={<HREntrevistas />} />
-            <Route path="mensagens" element={<HRMensagens />} />
-            <Route path="provas" element={<HRProvas />} />
-            <Route path="talentos" element={<HRBancoTalentos />} />
-            <Route path="relatorios" element={<HRRelatorios />} />
-            <Route path="perfil" element={<HRProfile />} />
-          </Route>
+            {/* RH Routes */}
+            <Route path="/rh" element={<ProtectedRoute allowedProfiles={['RH']}><HRLayout /></ProtectedRoute>}>
+              <Route index element={<HRDashboard />} />
+              <Route path="vagas" element={<HRGestaoVagas />} />
+              <Route path="vagas/nova" element={<HRNovaVaga />} />
+              <Route path="vagas/:id" element={<HRDetalheVaga />} />
+              <Route path="candidatos" element={<HRCandidatos />} />
+              <Route path="entrevistas" element={<HREntrevistas />} />
+              <Route path="mensagens" element={<HRMensagens />} />
+              <Route path="provas" element={<HRProvas />} />
+              <Route path="talentos" element={<HRBancoTalentos />} />
+              <Route path="relatorios" element={<HRRelatorios />} />
+              <Route path="perfil" element={<HRProfile />} />
+            </Route>
 
-          {/* Candidate Routes */}
-          <Route path="/candidato" element={<ProtectedRoute allowedProfiles={['Candidato']}><CandidateLayout /></ProtectedRoute>}>
-            <Route index element={<CandidateDashboard />} />
-            <Route path="curriculo" element={<CandidateResume />} />
-            <Route path="vagas" element={<CandidateVagas />} />
-            <Route path="vagas/:id" element={<DetalheVaga />} />
-            <Route path="candidaturas" element={<CandidateCandidaturas />} />
-            <Route path="mensagens" element={<CandidateMensagens />} />
-            <Route path="provas" element={<CandidateProvas />} />
-          </Route>
+            {/* Candidate Routes */}
+            <Route path="/candidato" element={<ProtectedRoute allowedProfiles={['Candidato']}><CandidateLayout /></ProtectedRoute>}>
+              <Route index element={<CandidateDashboard />} />
+              <Route path="curriculo" element={<CandidateResume />} />
+              <Route path="vagas" element={<CandidateVagas />} />
+              <Route path="vagas/:id" element={<DetalheVaga />} />
+              <Route path="candidaturas" element={<CandidateCandidaturas />} />
+              <Route path="mensagens" element={<CandidateMensagens />} />
+              <Route path="provas" element={<CandidateProvas />} />
+              <Route path="perfil" element={<Navigate to="curriculo" replace />} />
+            </Route>
 
-          {/* Fallback - Colocado como última opção para evitar falsos positivos */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
+            {/* Fallback - Colocado como última opção para evitar falsos positivos */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </UIProvider>
     </AuthProvider>
   );
 };

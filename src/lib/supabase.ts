@@ -10,25 +10,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // 🔥 CLIENT PRINCIPAL (USAR SEMPRE NO FRONT)
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
-// Mock auth methods for compatibility with other parts of the system
-supabase.auth.getUser = async () => {
-  const sessionStr = localStorage.getItem('session');
-  if (sessionStr) {
-    try {
-      const session = JSON.parse(sessionStr);
-      return { data: { user: session }, error: null } as any;
-    } catch (e) {
-      return { data: { user: null }, error: new Error('Invalid session') } as any;
-    }
-  }
-  return { data: { user: null }, error: new Error('No session') } as any;
-};
-
-supabase.auth.signOut = async () => {
-  localStorage.removeItem('session');
-  return { error: null };
-};
-
 // 🔥 EXPÕE NO WINDOW PRA DEBUG
 if (typeof window !== 'undefined') {
   (window as any).supabase = supabase;

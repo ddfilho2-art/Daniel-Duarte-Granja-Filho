@@ -8,7 +8,7 @@ import { logAudit } from '../lib/audit';
 import { logCandidaturaEvento } from '../lib/events';
 
 export function CandidateDashboard() {
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const [stats, setStats] = useState({ active: 0, tests: 0, interviews: 0 });
   const [recentApplications, setRecentApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -185,7 +185,7 @@ export function CandidateResume() {
     return () => console.log('🔴 [FORM] DESMONTADO');
   }, []);
 
-  const { profile } = useAuth();
+  const { profile, updateProfile } = useAuth();
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -343,8 +343,37 @@ export function CandidateResume() {
       const reader = new FileReader();
       reader.onloadend = () => {
         console.log('✅ [UPLOAD] sucesso (foto lida localmente)');
-        setFormData({ ...formData, foto: reader.result as string });
-        setIsSaved(false);
+        
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 300;
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > MAX_SIZE) {
+              height *= MAX_SIZE / width;
+              width = MAX_SIZE;
+            }
+          } else {
+            if (height > MAX_SIZE) {
+              width *= MAX_SIZE / height;
+              height = MAX_SIZE;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            setFormData({ ...formData, foto: dataUrl });
+          } else {
+            setFormData({ ...formData, foto: reader.result as string });
+          }
+          setIsSaved(false);
+        };
+        img.src = reader.result as string;
       };
       reader.onerror = (error) => {
         console.error('💥 [UPLOAD ERROR] (foto)', error);
@@ -424,7 +453,7 @@ export function CandidateResume() {
     };
 
     const isFullyCompleted = calculateCompletion() === 100;
-    localStorage.setItem('candidateResumeStructured', JSON.stringify(processedFormData));
+    
     localStorage.setItem('resumeCompleted', isFullyCompleted ? 'true' : 'false');
     
     if (profile?.uid) {
@@ -439,6 +468,10 @@ export function CandidateResume() {
           .eq('uid', profile.uid);
 
         if (error) throw error;
+
+        if (updateProfile) {
+          updateProfile({ nome: processedFormData.nome } as any);
+        }
       } catch (error) {
         console.error("Erro ao salvar currículo no Supabase:", error);
       }

@@ -109,6 +109,17 @@ const ListItem: React.FC<ListItemProps> = ({ item, index, listName, onUpdate, on
   );
 };
 
+// Sanitize function to strictly enforce payload
+function sanitizeDepartamentos(input: any[]) {
+  return input
+    .filter(d => d && typeof d.nome === 'string' && d.nome.trim() !== '')
+    .map(d => ({
+      id: typeof d.id === 'string' && !d.id.startsWith('temp-') ? d.id : undefined,
+      nome: d.nome.trim(),
+      _temp_id: typeof d.id === 'string' && d.id.startsWith('temp-') ? d.id : undefined
+    }));
+}
+
 export function AdminConfiguracoes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -238,26 +249,64 @@ export function AdminConfiguracoes() {
       console.log('--- SAVING DEPARTAMENTOS ---');
       if (departamentos) {
         if (departamentos.length > 0) {
-          const payload = departamentos.map((d: any) => {
-            const isTemp = typeof d.id === 'string' && d.id.startsWith('temp-');
-            return {
-              ...(isTemp ? {} : { id: d.id }),
-              nome: d.nome
-            };
-          });
+          const sanitizedDepts = sanitizeDepartamentos(departamentos);
+
+          const updatePayload = sanitizedDepts
+            .filter(d => d.id)
+            .map(({ _temp_id, ...d }) => d);
+
+          const insertPayload = sanitizedDepts
+            .filter(d => !d.id)
+            .map(({ id, _temp_id, ...d }) => d);
+
+          let savedDepts: any[] = [];
+
+          if (updatePayload.length > 0) {
+            console.log('UPDATE PAYLOAD DEPT:', updatePayload);
+            const { data, error } = await supabase
+              .from('departamentos')
+              .upsert(updatePayload, { onConflict: 'id' })
+              .select();
+            if (error) throw error;
+            if (data) savedDepts = [...savedDepts, ...data];
+          }
+
+          if (insertPayload.length > 0) {
+            console.log('INSERT PAYLOAD DEPT:', insertPayload);
+            const { data, error } = await supabase
+              .from('departamentos')
+              .insert(insertPayload)
+              .select();
+            if (error) throw error;
+            if (data) savedDepts = [...savedDepts, ...data];
+          }
           
-          console.log('PAYLOAD:', payload);
-          const { data: savedDepts, error: upsertDeptError } = await supabase
-            .from('departamentos')
-            .upsert(payload, { onConflict: 'id' })
-            .select();
+          setConfig(prev => {
+            const currentList = prev.departamentos || [];
+            const savedMap = new Map(savedDepts.map((d: any) => [d.id, d]));
             
-          console.log('RESPONSE:', savedDepts);
-          console.log('ERROR:', upsertDeptError);
-          
-          if (upsertDeptError) throw upsertDeptError;
-          
-          setConfig(prev => ({ ...prev, departamentos: savedDepts || [] }));
+            // Map the inserted back to temp by exact index order for correlation
+            const newlyInsertedDepts = savedDepts.filter((d: any) => 
+               !updatePayload.some(u => u.id === d.id)
+            );
+            const tempItems = currentList.filter((d: any) => typeof d.id === 'string' && d.id.startsWith('temp-'));
+            
+            const mergedList = currentList.map((item: any) => {
+              if (typeof item.id === 'string' && item.id.startsWith('temp-')) {
+                const tempIndex = tempItems.findIndex((t: any) => t.id === item.id);
+                if (tempIndex >= 0 && tempIndex < newlyInsertedDepts.length) {
+                  return { ...newlyInsertedDepts[tempIndex] };
+                }
+                return item;
+              }
+              return savedMap.has(item.id) ? savedMap.get(item.id) : item;
+            });
+
+            const mergedIds = new Set(mergedList.map((i: any) => i.id));
+            const extraItems = savedDepts.filter((d: any) => !mergedIds.has(d.id));
+
+            return { ...prev, departamentos: [...mergedList, ...extraItems] };
+          });
         } else {
           setConfig(prev => ({ ...prev, departamentos: [] }));
         }
@@ -266,26 +315,64 @@ export function AdminConfiguracoes() {
       console.log('--- SAVING CERTIFICACOES ---');
       if (certificacoes) {
         if (certificacoes.length > 0) {
-          const payload = certificacoes.map((c: any) => {
-            const isTemp = typeof c.id === 'string' && c.id.startsWith('temp-');
-            return {
-              ...(isTemp ? {} : { id: c.id }),
-              nome: c.nome
-            };
-          });
+          const sanitizedCerts = sanitizeDepartamentos(certificacoes);
+
+          const updatePayload = sanitizedCerts
+            .filter(c => c.id)
+            .map(({ _temp_id, ...c }) => c);
+
+          const insertPayload = sanitizedCerts
+            .filter(c => !c.id)
+            .map(({ id, _temp_id, ...c }) => c);
+
+          let savedCerts: any[] = [];
+
+          if (updatePayload.length > 0) {
+            console.log('UPDATE PAYLOAD CERT:', updatePayload);
+            const { data, error } = await supabase
+              .from('certificacoes')
+              .upsert(updatePayload, { onConflict: 'id' })
+              .select();
+            if (error) throw error;
+            if (data) savedCerts = [...savedCerts, ...data];
+          }
+
+          if (insertPayload.length > 0) {
+            console.log('INSERT PAYLOAD CERT:', insertPayload);
+            const { data, error } = await supabase
+              .from('certificacoes')
+              .insert(insertPayload)
+              .select();
+            if (error) throw error;
+            if (data) savedCerts = [...savedCerts, ...data];
+          }
           
-          console.log('PAYLOAD:', payload);
-          const { data: savedCerts, error: upsertCertError } = await supabase
-            .from('certificacoes')
-            .upsert(payload, { onConflict: 'id' })
-            .select();
+          setConfig(prev => {
+            const currentList = prev.certificacoes || [];
+            const savedMap = new Map(savedCerts.map((c: any) => [c.id, c]));
             
-          console.log('RESPONSE:', savedCerts);
-          console.log('ERROR:', upsertCertError);
-          
-          if (upsertCertError) throw upsertCertError;
-          
-          setConfig(prev => ({ ...prev, certificacoes: savedCerts || [] }));
+            // Map the inserted back to temp by exact index order for correlation
+            const newlyInsertedCerts = savedCerts.filter((c: any) => 
+               !updatePayload.some(u => u.id === c.id)
+            );
+            const tempItems = currentList.filter((c: any) => typeof c.id === 'string' && c.id.startsWith('temp-'));
+
+            const mergedList = currentList.map((item: any) => {
+              if (typeof item.id === 'string' && item.id.startsWith('temp-')) {
+                const tempIndex = tempItems.findIndex((t: any) => t.id === item.id);
+                if (tempIndex >= 0 && tempIndex < newlyInsertedCerts.length) {
+                  return { ...newlyInsertedCerts[tempIndex] };
+                }
+                return item;
+              }
+              return savedMap.has(item.id) ? savedMap.get(item.id) : item;
+            });
+
+            const mergedIds = new Set(mergedList.map((i: any) => i.id));
+            const extraItems = savedCerts.filter((c: any) => !mergedIds.has(c.id));
+
+            return { ...prev, certificacoes: [...mergedList, ...extraItems] };
+          });
         } else {
           setConfig(prev => ({ ...prev, certificacoes: [] }));
         }

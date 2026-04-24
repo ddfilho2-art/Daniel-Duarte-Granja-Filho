@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 import { loginWithLogin } from '../lib/authService';
 
 interface UserProfile {
@@ -48,15 +49,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem('session');
-    if (stored) {
-      try {
-        setProfile(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse session', e);
+    const initSession = async () => {
+      const stored = localStorage.getItem('session');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setProfile(parsed);
+          
+          // Tenta garantir que o Supabase também tenha a sessão
+          const { data: { session } } = await supabase.auth.getSession();
+          console.log('[AUTH_INIT] Sessão Supabase:', session ? 'Ativa' : 'Ausente');
+        } catch (e) {
+          console.error('Failed to parse session', e);
+        }
       }
-    }
-    setAuthLoading(false);
+      setAuthLoading(false);
+    };
+
+    initSession();
   }, []);
 
   const login = async (loginInput: string, passwordInput?: string) => {
@@ -74,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('session');
     setProfile(null);
   };

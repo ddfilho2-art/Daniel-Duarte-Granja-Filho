@@ -2597,7 +2597,7 @@ export function HRGestaoVagas() {
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredVagas.map((vaga) => (
-                <tr key={vaga.id} className={`hover:bg-slate-50 transition-colors ${candidaturasStats[vaga.id]?.novidades > 0 ? 'bg-orange-50/50' : ''}`}>
+                <tr key={vaga.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 font-mono text-xs text-slate-500">{vaga.codigo_vaga || '-'}</td>
                   <td className="px-6 py-4 font-medium text-slate-900">
                     <div className="flex flex-col gap-1">
@@ -2605,11 +2605,6 @@ export function HRGestaoVagas() {
                         <Link to={`/rh/vagas/${vaga.id}`} className="hover:text-primary transition-colors">
                           {vaga.titulo}
                         </Link>
-                        {candidaturasStats[vaga.id]?.novidades > 0 && (
-                          <span className="flex items-center justify-center w-5 h-5 bg-orange-500 text-white text-[10px] font-bold rounded-full">
-                            {candidaturasStats[vaga.id]?.novidades > 99 ? '99+' : candidaturasStats[vaga.id]?.novidades}
-                          </span>
-                        )}
                       </div>
                       {vaga.owner_id === profile?.uid && (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 w-fit">
@@ -6554,22 +6549,34 @@ export function HRProfile() {
 
     setUploading(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Usuário não autenticado');
+      // Sincronização obrigatória de sessão
+      await supabase.auth.refreshSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Fallback para o ID do perfil caso a sessão do Supabase ainda esteja nula
+      // Isso evita o erro impeditivo, embora o upload possa falhar na RLS se o JWT não for enviado
+      const activeUserId = session?.user?.id || profile?.id || profile?.uid;
+
+      if (!activeUserId) {
+        throw new Error('Sessão não encontrada no momento do upload');
+      }
+      
+      const activeUser = session?.user || { id: activeUserId };
 
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.user.id}_${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const fileName = `${activeUserId}_${Date.now()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('attachments')
-        .upload(filePath, file);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      console.log('UPLOAD_RESULT (HR):', { data: uploadData, error: uploadError });
 
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('attachments')
-        .getPublicUrl(filePath);
+        .from('avatars')
+        .getPublicUrl(fileName);
 
       const urlComCacheBuster = publicUrl + '?t=' + new Date().getTime();
 
@@ -6579,7 +6586,7 @@ export function HRProfile() {
       await supabase
         .from('users')
         .update({ avatar_url: urlComCacheBuster, foto_url: urlComCacheBuster })
-        .eq('id', user.user.id);
+        .eq('id', activeUserId);
       
       // Injeta a URL pública direto no contexto garantindo a sincronização em tempo real
       if (updateProfile) {
@@ -6603,8 +6610,13 @@ export function HRProfile() {
 
     setSaving(true);
     try {
-      const { data: user } = await supabase.auth.getUser();
-      if (!user.user) throw new Error('Usuário não autenticado');
+      // Tenta sincronizar a sessão antes de salvar
+      await supabase.auth.refreshSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const userId = session?.user?.id || profile?.id || profile?.uid;
+      
+      if (!userId) throw new Error('Usuário não autenticado');
       
       const { error } = await supabase
         .from('users')
@@ -6617,7 +6629,7 @@ export function HRProfile() {
           foto_url: formData.foto_url, // fallback legacy support
           updated_at: new Date().toISOString()
         })
-        .eq('id', user.user.id);
+        .eq('id', userId);
 
       if (error) throw error;
 

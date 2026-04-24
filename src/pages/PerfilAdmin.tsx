@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { Camera, Save, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useUI } from '../contexts/UIContext';
 
 console.log("✅ [LOAD] PerfilAdmin carregado");
 
@@ -11,13 +12,13 @@ export function PerfilAdmin() {
 
   const { user, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const { openChangePassword } = useUI();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
   const [email, setEmail] = useState('');
 
-  // 🔥 AGORA CONTROLADO
   const [nome, setNome] = useState('');
   const [cargo, setCargo] = useState('');
 
@@ -29,16 +30,10 @@ export function PerfilAdmin() {
     isLoaded.current = true;
 
     const fetchProfile = async () => {
-      console.log("🔍 [1] Buscando usuário logado...");
-
       const { data: { user: supabaseUser } } = await supabase.auth.getUser();
-
-      console.log("🧪 [USER SUPABASE]:", supabaseUser);
 
       if (supabaseUser) {
         setEmail(supabaseUser.email || '');
-
-        console.log("🔍 [2] Lendo tabela 'users' para ID:", supabaseUser.id);
 
         const { data: userData, error } = await supabase
           .from('users')
@@ -49,8 +44,6 @@ export function PerfilAdmin() {
         if (error) {
           console.error("❌ [ERRO LEITURA]:", error.message);
         } else if (userData) {
-          console.log("✅ [DADOS ENCONTRADOS]:", userData);
-
           setAvatarUrl(userData.foto_url || '');
           setNome(userData.nome || '');
           setCargo(userData.cargo || '');
@@ -71,8 +64,6 @@ export function PerfilAdmin() {
     setSaving(true);
 
     try {
-      console.log("💾 [CLIQUE SAVE] Iniciando gravação...");
-
       const payload = {
         nome,
         cargo,
@@ -80,16 +71,10 @@ export function PerfilAdmin() {
         updated_at: new Date().toISOString(),
       };
 
-      console.log("📤 [ENVIANDO PAYLOAD]:", payload);
-
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('users')
         .update(payload)
-        .eq('id', user.id)
-        .select();
-
-      console.log("🧪 [RESULTADO BANCO]:", data);
-      console.log("⚠️ [ERRO BANCO]:", error);
+        .eq('id', user.id);
 
       if (error) {
         console.error("❌ Erro ao atualizar:", error);
@@ -97,21 +82,15 @@ export function PerfilAdmin() {
         return;
       }
 
-      // 🔥 Atualiza contexto
       if (updateProfile) {
         updateProfile({ ...payload, avatar_url: avatarUrl });
       }
 
-      console.log("♻️ [CONTEXT ATUALIZADO]");
-
-      // 🔥 Refetch (garantia)
       const { data: refetch } = await supabase
         .from('users')
         .select('nome, cargo, foto_url')
         .eq('id', user.id)
         .maybeSingle();
-
-      console.log("🔁 [REFETCH]:", refetch);
 
       if (refetch) {
         setNome(refetch.nome || '');
@@ -127,7 +106,6 @@ export function PerfilAdmin() {
         }
       }
 
-      console.log("✅ [SUCESSO]");
       alert("✅ Perfil atualizado com sucesso!");
 
     } catch (err) {
@@ -146,22 +124,31 @@ export function PerfilAdmin() {
       const file = e.target.files?.[0];
       if (!file) return;
 
-      const fileName = `admin-${Date.now()}`;
+      await supabase.auth.refreshSession();
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const activeUserId = session?.user?.id || user?.id || user?.uid;
+
+      if (!activeUserId) {
+        throw new Error('Usuário não autenticado');
+      }
+
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${activeUserId}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(fileName, file);
+        .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      const urlWithCache = publicUrl + '?t=' + new Date().getTime();
 
-      setAvatarUrl(data.publicUrl);
+      setAvatarUrl(urlWithCache);
       if (updateProfile) {
-        updateProfile({ avatar_url: data.publicUrl });
+        updateProfile({ avatar_url: urlWithCache, foto_url: urlWithCache });
       }
-
-      console.log("📸 [FOTO OK] URL:", data.publicUrl);
 
     } catch (error: any) {
       console.error("❌ [FOTO ERRO]:", error);
@@ -174,7 +161,6 @@ export function PerfilAdmin() {
   return (
     <div className="max-w-3xl mx-auto space-y-6 p-4">
 
-      {/* 🔥 VOLTAR */}
       <button
         onClick={() => navigate(-1)}
         className="flex items-center gap-2 text-sm text-slate-600 hover:text-[#0054A6]"
@@ -186,7 +172,7 @@ export function PerfilAdmin() {
       <div className="flex items-center gap-3 mb-6">
         <UserIcon className="w-8 h-8 text-[#0054A6]" />
         <h2 className="text-2xl font-bold text-slate-900">
-          Configurações de Perfil (DIAGNÓSTICO)
+          Meu Perfil Profissional
         </h2>
       </div>
 
@@ -259,13 +245,21 @@ export function PerfilAdmin() {
 
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end items-center gap-4 pt-6 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={openChangePassword}
+              className="px-6 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+            >
+              Trocar Senha
+            </button>
+
             <button
               type="submit"
               disabled={saving || loading}
               className="bg-[#0054A6] text-white px-10 py-3 rounded-lg font-bold"
             >
-              {saving ? "Salvando..." : "Salvar"}
+              {saving ? "Salvando..." : "Salvar Alterações"}
             </button>
           </div>
         </form>

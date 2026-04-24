@@ -23,7 +23,8 @@ interface AuditLog {
   acao: string;
   modulo: string;
   detalhes: string;
-  user_id: string;
+  user_id?: string;
+  usuario_id?: string;
   executor_login?: string;
   metadata?: {
     ip?: string;
@@ -82,7 +83,7 @@ export function AuditTrail() {
 
       const normalized = (data || []).map(log => ({
         ...log,
-        executor_login: map[String(log.user_id)] || 'SISTEMA',
+        executor_login: map[String(log.user_id || log.usuario_id)] || 'SISTEMA',
         severidade: log.metadata?.severidade || (
           log.acao.toLowerCase().includes('cancelado') || 
           log.acao.toLowerCase().includes('congelado') ||
@@ -125,7 +126,7 @@ export function AuditTrail() {
           setLogs(prev => {
             const normalized = {
               ...newLog,
-              executor_login: mapToUse[String(newLog.user_id)] || 'SISTEMA',
+              executor_login: mapToUse[String(newLog.user_id || newLog.usuario_id)] || 'SISTEMA',
               severidade: newLog.metadata?.severidade || (
                 newLog.acao.toLowerCase().includes('cancelado') || 
                 newLog.acao.toLowerCase().includes('congelado') ? 'Crítico' : 'Info'
