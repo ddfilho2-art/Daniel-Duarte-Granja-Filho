@@ -1,8 +1,52 @@
-type EmailPayload = {
-  to?: string;
-  subject?: string;
-  body?: string;
-};
+import { createClient } from '@supabase/supabase-js';
+
+const MAX_RETRIES = 3;
+const TIMEOUT_MS = 4000;
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+// We only initialize the client if we have the credentials, otherwise some operations might fail normally.
+const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
+
+async function fetchWithRetry(url: string, options: any, onRetry?: (attempt: number) => Promise<void>) {
+  let attempt = 0;
+
+  while (attempt < MAX_RETRIES) {
+    if (attempt > 0 && onRetry) {
+      await onRetry(attempt).catch(e => console.error("Error checking retry log:", e));
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        return response;
+      }
+
+      // Retry apenas em erros transitórios
+      if (![429, 500, 502, 503].includes(response.status)) {
+        throw new Error(`Non-retryable error: ${response.status}`);
+      }
+
+    } catch (err) {
+      clearTimeout(timeout);
+      if (attempt === MAX_RETRIES - 1) throw err;
+    }
+
+    attempt++;
+    await new Promise(r => setTimeout(r, 300 * attempt)); // backoff simples
+  }
+  
+  throw new Error("Max retries reached");
+}
 
 function setCors(res: any) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -19,119 +63,157 @@ export default async function handler(req: any, res: any) {
     return;
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({
-      success: false,
-      error_type: 'METHOD_NOT_ALLOWED',
-      message: 'Método não permitido. Use POST.',
-    });
-  }
-
-  const payload: EmailPayload =
-    typeof req.body === 'object' && req.body !== null ? req.body : {};
-
-  const { to, subject, body } = payload;
-  const timestamp = new Date().toISOString();
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!to || !emailRegex.test(to)) {
-    return res.status(400).json({
-      success: false,
-      error_type: 'INVALID_DATA',
-      message: 'E-mail do destinatário inválido ou ausente.',
-    });
-  }
-
-  if (!subject || subject.trim().length < 3) {
-    return res.status(400).json({
-      success: false,
-      error_type: 'INVALID_DATA',
-      message: 'Assunto do e-mail é muito curto ou ausente.',
-    });
-  }
-
-  if (!body || body.trim().length < 5) {
-    return res.status(400).json({
-      success: false,
-      error_type: 'INVALID_DATA',
-      message: 'Conteúdo do e-mail é muito curto ou ausente.',
-    });
-  }
-
-  // Usar a variável de ambiente para a chave de API externa
-  const resendApiKey = process.env.RESEND_API_KEY;
-
-  if (!resendApiKey) {
-    console.error('RESEND_API_KEY ausente ou não configurada no ambiente.');
-    return res.status(500).json({
-      success: false,
-      error_type: 'CONFIG_ERROR',
-      message: 'Configurações de envio de e-mail (API Key) incompletas no servidor.',
-    });
-  }
+  const requestId = typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : Date.now().toString(36) + Math.random().toString(36).substring(2);
+    
+  const start = Date.now();
+  let logId: string | null = null;
 
   try {
-    console.log(
-      JSON.stringify({
-        type: 'EMAIL_ATTEMPT',
-        timestamp,
-        context: { to, subject, provider: 'Resend' },
-      }),
-    );
-
-    // Usa a API REST do Resend (compatível com edge/serverless, sem nodemailer ou bloqueio SMTP)
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${resendApiKey}`,
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM || 'DFL RH <onboarding@resend.dev>',
-        to,
-        subject,
-        html: body.replace(/\n/g, '<br>'),
-        text: body,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `Erro HTTP ${response.status} na API externa`);
+    if (req.method !== 'POST') {
+      return res.status(405).json({
+        success: false,
+        code: "METHOD_NOT_ALLOWED",
+        requestId
+      });
     }
 
-    const data = await response.json();
+    const payload = typeof req.body === 'object' && req.body !== null ? req.body : {};
+    const { to, subject, html, body } = payload;
 
-    console.log(
-      JSON.stringify({
-        type: 'EMAIL_SUCCESS',
-        timestamp: new Date().toISOString(),
-        messageId: data.id,
-        recipient: to,
-      }),
-    );
+    const emailContent = html || (body ? body.replace(/\n/g, '<br>') : null);
+    const textContent = body || '';
+
+    if (!to || !subject || !emailContent) {
+      return res.status(400).json({
+        success: false,
+        code: "INVALID_INPUT",
+        requestId
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      return res.status(400).json({
+        success: false,
+        code: "INVALID_EMAIL",
+        requestId
+      });
+    }
+
+    const resendApiKey = process.env.RESEND_API_KEY;
+    if (!resendApiKey) {
+      console.error(JSON.stringify({
+        level: "error",
+        event: "email_config_missing",
+        requestId,
+        duration: Date.now() - start
+      }));
+      return res.status(500).json({
+        success: false,
+        code: "CONFIG_ERROR",
+        requestId
+      });
+    }
+
+    let queueItem: any = null;
+    
+    if (supabase) {
+      try {
+        const { data, error: insertError } = await supabase
+          .from('email_queue')
+          .insert({
+            payload,
+            status: 'pending',
+            attempts: 0
+          })
+          .select()
+          .single();
+          
+        if (insertError) {
+           console.error("Supabase insert error for email_queue:", insertError);
+        } else {
+           queueItem = data;
+        }
+      } catch (e) {
+        console.error("Failed to insert email queue", e);
+      }
+    }
+
+    let finalStatus = 'sent';
+    let errorMessage: string | null = null;
+
+    try {
+      const response = await fetchWithRetry(
+        "https://api.resend.com/emails",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${resendApiKey}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            from: process.env.EMAIL_FROM || "onboarding@resend.dev",
+            to,
+            subject,
+            html: emailContent,
+            text: textContent
+          })
+        },
+        async (attempt: number) => {
+           if (supabase && queueItem) {
+              await supabase
+                .from('email_queue')
+                .update({
+                  attempts: (queueItem.attempts || 0) + attempt,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', queueItem.id);
+           }
+        }
+      );
+    } catch (error: any) {
+      finalStatus = 'failed';
+      errorMessage = error.message || String(error);
+    }
+
+    if (supabase && queueItem) {
+       await supabase.from('email_queue').update({
+          status: finalStatus,
+          error: errorMessage,
+          attempts: (queueItem.attempts || 0) + 1,
+          updated_at: new Date().toISOString()
+       }).eq('id', queueItem.id);
+    }
+
+    console.log(JSON.stringify({
+      level: finalStatus === 'sent' ? "info" : "error",
+      event: finalStatus === 'sent' ? "email_sent" : "email_failed",
+      requestId: queueItem?.id || requestId,
+      error: errorMessage,
+      duration: Date.now() - start
+    }));
 
     return res.status(200).json({
       success: true,
-      messageId: data.id,
-      message: 'E-mail enviado com sucesso.',
+      code: finalStatus === 'sent' ? 'EMAIL_SENT' : 'EMAIL_QUEUED',
+      requestId: queueItem?.id || requestId
     });
+
   } catch (error: any) {
-    console.error(
-      JSON.stringify({
-        type: 'EMAIL_FATAL_ERROR',
-        timestamp: new Date().toISOString(),
-        error: error?.message,
-        stack: error?.stack,
-      }),
-    );
+    console.error(JSON.stringify({
+      level: "error",
+      event: "email_failed",
+      requestId,
+      duration: Date.now() - start,
+      error: error.message || String(error)
+    }));
 
     return res.status(500).json({
       success: false,
-      error_type: 'SEND_ERROR',
-      message: 'Erro interno ao processar o envio de e-mail.',
-      details: error?.message,
+      code: "EMAIL_FAILED",
+      requestId
     });
   }
 }

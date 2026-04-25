@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Mail, Server, Key, User, FileText, Settings, Plus, Trash2, Edit2, GripVertical, Check, X, Briefcase, ChevronUp, ChevronDown } from 'lucide-react';
+import { Save, Mail, Server, Key, User, FileText, Settings, Plus, Trash2, Edit2, GripVertical, Check, X, Briefcase, ChevronUp, ChevronDown, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { safeFetch } from '../lib/api';
 
@@ -123,6 +123,7 @@ function sanitizeDepartamentos(input: any[]) {
 export function AdminConfiguracoes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
   const [config, setConfig] = useState<Record<string, any>>({
     smtpHost: '',
     smtpPort: '',
@@ -737,6 +738,7 @@ export function AdminConfiguracoes() {
               </div>
             </div>
           )}
+
         </div>
 
         <div className="flex justify-end pt-6 border-t border-slate-200">
@@ -750,6 +752,7 @@ export function AdminConfiguracoes() {
           </button>
         </div>
       </form>
+
     </div>
   );
 }

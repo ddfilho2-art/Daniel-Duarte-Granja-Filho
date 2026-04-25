@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Users,
   Briefcase,
-  AlertCircle
+  AlertCircle,
+  Mail
 } from 'lucide-react';
 import { 
   XAxis, 
@@ -27,6 +28,7 @@ import {
   Area
 } from 'recharts';
 import { supabase } from '../lib/supabase';
+import { safeFetch } from '../lib/api';
 
 // --- DATA STRUCTURES ---
 interface SREMetrics {
@@ -59,7 +61,8 @@ const TABS = [
   { id: 'critical', label: 'Pontos Críticos', icon: AlertTriangle },
   { id: 'database', label: 'Banco de Dados', icon: Database },
   { id: 'observability', label: 'Observabilidade', icon: Layers },
-  { id: 'slos', label: 'Alertas & SLOs', icon: Bell }
+  { id: 'slos', label: 'Alertas & SLOs', icon: Bell },
+  { id: 'emails', label: 'E-mails', icon: Mail }
 ];
 
 // --- SKELETON (DFL STYLE) ---
@@ -438,6 +441,123 @@ const SlosTab = ({ data, loading }: { data: SREMetrics | null, loading: boolean 
   );
 };
 
+function EmailMonitor() {
+  const [emailQueue, setEmailQueue] = useState<any[]>([]);
+  const [loadingEmails, setLoadingEmails] = useState(false);
+
+  async function fetchEmailQueue() {
+    try {
+      setLoadingEmails(true);
+      const { data, error } = await supabase
+        .from('email_queue')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      if (error) throw error;
+      setEmailQueue(data || []);
+    } catch (err) {
+      console.error('Erro ao buscar fila de e-mails:', err);
+    } finally {
+      setLoadingEmails(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchEmailQueue();
+  }, []);
+
+  async function handleRetry() {
+    try {
+      await safeFetch('/api/retry-emails', { method: 'POST' });
+      await fetchEmailQueue();
+      alert('Reprocessado com sucesso.');
+    } catch(e) {
+      alert('Erro ao reprocessar');
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mt-6 animate-in slide-in-from-right-4 duration-400">
+      <div className="p-6 border-b border-slate-200 bg-slate-50">
+        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+          <Activity className="w-5 h-5 text-primary" />
+          Monitoramento de E-mails
+        </h2>
+        <p className="text-sm text-slate-500 mt-1">Acompanhe e reprocesse e-mails parados ou falhos na fila.</p>
+      </div>
+      
+      <div className="p-6">
+        <div className="flex gap-4 mb-6">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex-1">
+            <div className="text-amber-800 text-sm font-medium">Pendentes</div>
+            <div className="text-2xl font-bold text-amber-600">
+              {emailQueue.filter((e: any) => e.status === 'pending').length}
+            </div>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex-1">
+            <div className="text-emerald-800 text-sm font-medium">Enviados</div>
+            <div className="text-2xl font-bold text-emerald-600">
+              {emailQueue.filter((e: any) => e.status === 'sent').length}
+            </div>
+          </div>
+          <div className="bg-rose-50 border border-rose-200 rounded-lg p-4 flex-1">
+            <div className="text-rose-800 text-sm font-medium">Falhas</div>
+            <div className="text-2xl font-bold text-rose-600">
+              {emailQueue.filter((e: any) => e.status === 'failed').length}
+            </div>
+          </div>
+        </div>
+
+        <button 
+          type="button"
+          onClick={handleRetry}
+          className="mb-6 flex flex-row items-center gap-2 bg-[#0054A6] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#004080] transition-colors shadow-sm"
+        >
+          Reprocessar agora
+        </button>
+
+        {loadingEmails ? (
+          <p className="text-sm text-slate-500">Carregando...</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm whitespace-nowrap">
+              <thead className="bg-slate-50 text-slate-600 font-medium">
+                <tr>
+                  <th className="px-4 py-3 rounded-tl-lg">ID</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3 text-center">Tentativas</th>
+                  <th className="px-4 py-3 rounded-tr-lg">Data</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {emailQueue.map((item: any) => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-slate-500 font-mono text-xs">{item.id.slice(0, 8)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        item.status === 'sent' ? 'bg-emerald-100 text-emerald-800' :
+                        item.status === 'failed' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-slate-600">{item.attempts}</td>
+                    <td className="px-4 py-3 text-slate-500">{new Date(item.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+                {emailQueue.length === 0 && (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">Nenhum registro.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // --- COMPONENTE PRINCIPAL ---
 
 export function PerformanceSRE() {
@@ -548,6 +668,7 @@ export function PerformanceSRE() {
         {activeTab === 'database' && <DatabaseTab data={metrics} loading={loading} />}
         {activeTab === 'observability' && <ObservabilityTab data={metrics} loading={loading} />}
         {activeTab === 'slos' && <SlosTab data={metrics} loading={loading} />}
+        {activeTab === 'emails' && <EmailMonitor />}
       </div>
 
       {/* FOOTER DFL STRUCTURAL */}

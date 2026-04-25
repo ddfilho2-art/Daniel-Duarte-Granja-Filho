@@ -18,7 +18,7 @@ import { useVagas } from '../hooks/useVagas';
 
 // --- INÍCIO DA FUNÇÃO GLOBAL E INDEPENDENTE DE AVALIAÇÃO DE IA ---
 if (typeof window !== 'undefined') {
-  window.avaliarCandidatoIA = async (candidatoId, vagaId) => { 
+  (window as any).avaliarCandidatoIA = async (candidatoId: string, vagaId: string) => { 
     try {
       console.log("Iniciando avaliação", { candidatoId, vagaId });
 
@@ -2664,12 +2664,12 @@ export function HRGestaoVagas() {
                             {(profile?.perfil === 'Admin' || vaga.owner_id === profile?.uid) ? (
                               <>
                                 {(status === 'Aberta') && (
-                                  <button onClick={() => handleUpdateStatus(vaga, 'Pausada')} className="text-amber-500 hover:text-amber-700" title="Pausar">
+                                  <button onClick={() => handleUpdateStatus(vaga as any, 'Pausada')} className="text-amber-500 hover:text-amber-700" title="Pausar">
                                     <PauseCircle className="w-5 h-5" />
                                   </button>
                                 )}
                                 {status === 'Pausada' && (
-                                  <button onClick={() => handleUpdateStatus(vaga, 'Aberta')} className="text-emerald-500 hover:text-emerald-700" title="Retornar">
+                                  <button onClick={() => handleUpdateStatus(vaga as any, 'Aberta')} className="text-emerald-500 hover:text-emerald-700" title="Retornar">
                                     <PlayCircle className="w-5 h-5" />
                                   </button>
                                 )}
