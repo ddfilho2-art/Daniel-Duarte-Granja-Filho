@@ -30,7 +30,6 @@ export const supabaseAdmin: SupabaseClient | null = supabaseServiceRoleKey
 if (typeof window !== "undefined" && import.meta.env.DEV) {
   (window as any).supabase = supabase;
   (window as any).supabaseAdmin = supabaseAdmin;
-  console.log("[DEBUG] Supabase clients expostos no window ✅");
 }
 
 /*

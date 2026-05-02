@@ -30,23 +30,7 @@ import {
   RefreshCw,
   ChevronRight,
 } from "lucide-react";
-import { supabase } from "../lib/supabase";
-import { createClient } from "@supabase/supabase-js";
-
-// Admin client para bypass RLS
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-
-const supabaseAdmin = createClient(
-  supabaseUrl || "",
-  supabaseServiceRoleKey || "",
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  },
-);
+import { supabase, supabaseAdmin } from "../lib/supabase";
 import {
   BarChart as ReBarChart,
   Bar,
@@ -397,32 +381,74 @@ export function AdminDashboard() {
           <h2 className="text-lg font-bold text-slate-900 mb-4">
             Carga de Trabalho por Recrutador (Vagas Abertas)
           </h2>
-          <div style={{ width: "100%", height: 300 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <ReBarChart
-                data={cargaTrabalhoState}
-                margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+          <div
+            style={{
+              width: "100%",
+              height: 400,
+              minHeight: 400,
+              minWidth: 0,
+            }}
+            className="relative"
+          >
+            {cargaTrabalhoState.length > 0 ? (
+              <div
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  minHeight: 400,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="name" fontSize={12} />
-                <YAxis />
-                <Tooltip cursor={{ fill: "#f1f5f9" }} />
-                <Bar dataKey="vagas" radius={[4, 4, 0, 0]} barSize={40}>
-                  {cargaTrabalhoState.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
-                    />
-                  ))}
-                  <LabelList
-                    dataKey="vagas"
-                    position="top"
-                    fill="#64748b"
-                    fontSize={12}
+                <ReBarChart
+                  width={800}
+                  height={400}
+                  layout="vertical"
+                  data={cargaTrabalhoState}
+                  margin={{ top: 20, right: 60, left: 100, bottom: 20 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={true}
+                    vertical={false}
                   />
-                </Bar>
-              </ReBarChart>
-            </ResponsiveContainer>
+                  <XAxis type="number" />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={90}
+                    tick={{ fontSize: 11 }}
+                    interval={0}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "#f1f5f9" }}
+                    formatter={(value: number) => [
+                      `${value} vagas`,
+                      "Quantidade",
+                    ]}
+                    labelFormatter={(label: string) => `Recrutador: ${label}`}
+                  />
+                  <Bar dataKey="vagas" radius={[0, 4, 4, 0]} barSize={40}>
+                    {cargaTrabalhoState.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
+                      />
+                    ))}
+                    <LabelList
+                      dataKey="vagas"
+                      position="right"
+                      fill="#64748b"
+                      fontSize={12}
+                    />
+                  </Bar>
+                </ReBarChart>
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 text-slate-500">
+                Nenhuma vaga aberta no momento.
+              </div>
+            )}
           </div>
         </div>
 
@@ -504,34 +530,20 @@ export function AdminTransferencias() {
   const fetchVagas = useCallback(async () => {
     try {
       setLoading(true);
-      console.log(
-        "[DEBUG-QUERY] 2. A QUERY (Fetch Vagas): select * from vagas order by created_at desc",
-      );
       const { data, error } = await supabase
         .from("vagas")
         .select("*")
         .order("created_at", { ascending: false });
 
-      console.log("[DEBUG-DB] 3. RESPOSTA DO SERVIDOR (Fetch):", {
-        count: data?.length,
-        error,
-      });
-
       if (error) {
-        console.error("[DEBUG-DB] FRACASSO NA BUSCA:", error);
         throw error;
       }
 
       const vagasData = data || [];
-      console.log(
-        "[DEBUG-STATE] 5. O ESTADO (Updating vagas state):",
-        vagasData.length,
-        "records",
-      );
       setVagas(vagasData);
       checkExpiredTransfers(vagasData);
     } catch (error) {
-      console.error("[DEBUG-UI] Erro ao buscar vagas:", error);
+      console.error("Erro ao buscar vagas:", error);
     } finally {
       setLoading(false);
     }
@@ -622,16 +634,6 @@ export function AdminTransferencias() {
 
     return matchesSearch;
   });
-
-  console.log(
-    "[DEBUG-UI] 4. REGRA DE NEGÓCIO PARA RENDERIZAÇÃO (filteredVagas):",
-    {
-      total: vagas.length,
-      filtered: filteredVagas.length,
-      loading,
-      hasData: filteredVagas.length > 0,
-    },
-  );
 
   return (
     <div className="space-y-6">

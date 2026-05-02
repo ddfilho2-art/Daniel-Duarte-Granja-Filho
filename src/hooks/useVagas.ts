@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
+import { useState, useEffect, useCallback } from "react";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 export interface Vaga {
   id: string;
@@ -30,20 +30,20 @@ export function useVagas() {
     setLoading(true);
     try {
       const { data: vRes, error: vErr } = await supabase
-        .from('vagas')
-        .select('*')
-        .order('created_at', { ascending: false });
+        .from("vagas")
+        .select("*")
+        .order("created_at", { ascending: false });
 
       if (vErr) throw vErr;
 
       const vagasData = (vRes || []).map((vData) => {
         // Extrai o nome real confirmado no banco de dados
-        const nomeResponsavel = vData.owner_nome || 'Sem proprietário';
-        
+        const nomeResponsavel = vData.owner_nome || "Sem proprietário";
+
         return {
           ...vData,
           cargo: vData.titulo,
-          criadaEm: vData.created_at || '',
+          criadaEm: vData.created_at || "",
           // Mapeamento redundante para garantir que a tabela de Administração leia:
           proprietario: nomeResponsavel,
           owner_nome: nomeResponsavel,
@@ -51,13 +51,12 @@ export function useVagas() {
           owner: {
             id: vData.owner_id,
             nome: nomeResponsavel,
-            full_name: nomeResponsavel
-          }
+            full_name: nomeResponsavel,
+          },
         };
       });
 
       setVagas(vagasData);
-      console.log('[DEBUG] Vagas prontas para renderização:', vagasData.length);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -66,21 +65,28 @@ export function useVagas() {
   }, []);
 
   useEffect(() => {
-    // Dispara o fetch inicial. 
+    // Dispara o fetch inicial.
     // Não dependemos de profile aqui para evitar bloqueios se o profile demorar a carregar.
     fetchVagas();
 
     // Inscrição em tempo real para manter a lista atualizada
     const channel = supabase
-      .channel('vagas-sync')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'vagas' 
-      }, (payload) => {
-        console.log('[VAGAS] 🔄 Alteração detectada via Realtime:', payload.eventType);
-        fetchVagas();
-      })
+      .channel("vagas-sync")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "vagas",
+        },
+        (payload) => {
+          console.log(
+            "[VAGAS] 🔄 Alteração detectada via Realtime:",
+            payload.eventType,
+          );
+          fetchVagas();
+        },
+      )
       .subscribe();
 
     return () => {
@@ -88,17 +94,17 @@ export function useVagas() {
     };
   }, [fetchVagas]);
 
-  return { 
-    vagas, 
+  return {
+    vagas,
     setVagas,
-    loading, 
-    error, 
+    loading,
+    error,
     refresh: fetchVagas,
     count: vagas.length,
-    vagasAbertas: vagas.filter(v => {
-      const status = (v.status || '').toUpperCase();
-      const statusVaga = (v.status_vaga || '').toUpperCase();
-      return status === 'ABERTA' || statusVaga === 'ABERTA';
-    }).length
+    vagasAbertas: vagas.filter((v) => {
+      const status = (v.status || "").toUpperCase();
+      const statusVaga = (v.status_vaga || "").toUpperCase();
+      return status === "ABERTA" || statusVaga === "ABERTA";
+    }).length,
   };
 }

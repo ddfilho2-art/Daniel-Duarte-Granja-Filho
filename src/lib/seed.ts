@@ -45,7 +45,6 @@ export async function ensureAdminUser() {
         });
 
       let uid = authData.user?.id;
-
       if (authError) {
         // Se falhou (provavelmente já existe), tenta descobrir o UID
         // 1. Tenta buscar na tabela de usuários
@@ -110,7 +109,6 @@ export async function seedDatabase() {
   }
 
   console.log("Iniciando limpeza de dados (vagas, candidaturas, mensagens)...");
-
   try {
     // 1. Clear tables
     const tablesToClear = ["candidaturas", "mensagens", "vagas"];
@@ -130,7 +128,6 @@ export async function seedDatabase() {
     await ensureAdminUser();
 
     console.log("Criando 15 vagas...");
-
     const departamentos = [
       "Tecnologia",
       "Engenharia",
@@ -212,7 +209,7 @@ export async function seedDatabase() {
     }
 
     try {
-      const { error: insertVagasError } = await supabase
+      const { error: insertVagasError } = await supabaseAdmin
         .from("vagas")
         .insert(vagasToInsert);
       if (insertVagasError) {
@@ -225,7 +222,6 @@ export async function seedDatabase() {
     }
 
     console.log("Criando 5 candidatos...");
-
     const novosCandidatos = [];
     for (let i = 0; i < 5; i++) {
       try {
@@ -238,7 +234,6 @@ export async function seedDatabase() {
           .toLowerCase()
           .substring(0, 49);
         const senha = "Teste@123";
-
         const finalEmail = email;
 
         // Using admin client for candidates to ensure confirmed email
@@ -251,7 +246,6 @@ export async function seedDatabase() {
           });
 
         let uid = authData.user?.id;
-
         if (authError) {
           if (
             authError.message.includes("already registered") ||
@@ -263,7 +257,6 @@ export async function seedDatabase() {
               .select("id")
               .eq("email", finalEmail)
               .maybeSingle();
-
             if (existingUser) {
               uid = existingUser.id;
               await supabaseAdmin.auth.admin.updateUserById(uid, {
@@ -364,6 +357,7 @@ export async function seedDatabase() {
             certificacoesList,
             faker.number.int({ min: 0, max: 2 }),
           );
+
           const resumeData = {
             nome,
             email: finalEmail,
@@ -390,6 +384,7 @@ export async function seedDatabase() {
               portfolio: "",
             },
           };
+
           const userDoc = {
             id: uid,
             uid: uid,
@@ -411,7 +406,6 @@ export async function seedDatabase() {
           const { error: userInsertError } = await supabaseAdmin
             .from("users")
             .upsert(userDoc);
-
           if (userInsertError) {
             console.warn(
               `Erro ao inserir perfil do usuário ${finalEmail}:`,

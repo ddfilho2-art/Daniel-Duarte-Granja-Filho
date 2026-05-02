@@ -9,24 +9,11 @@ import { useUI } from '../contexts/UIContext';
 import { supabase } from '../lib/supabase';
 import { logAudit } from '../lib/audit';
 
+import DFLlogo from '../assets/DFLlogo.svg';
+
 const Logo = () => (
   <div className="flex items-center gap-2">
-    <svg viewBox="0 0 600 100" className="h-10 w-auto" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="gradAI" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#00b4d8" />
-          <stop offset="100%" stopColor="#001b54" />
-        </linearGradient>
-      </defs>
-      <g transform="translate(10, 15) scale(0.85)">
-        <path d="M 25 20 L 5 50 L 15 75 L 35 45 Z" fill="#24306e" />
-        <path d="M 30 15 L 65 50 L 15 100 L 40 85 Z" fill="#00a7d0" />
-      </g>
-      <text x="85" y="70" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="56" fill="#24306e" letterSpacing="-2">DFL</text>
-      <line x1="225" y1="20" x2="210" y2="80" stroke="#00b4d8" strokeWidth="4" />
-      <text x="235" y="70" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="56" fill="#001b54" letterSpacing="-1">Recruta</text>
-      <text x="465" y="70" fontFamily="Arial, sans-serif" fontWeight="900" fontStyle="italic" fontSize="56" fill="url(#gradAI)" letterSpacing="-2">AI</text>
-    </svg>
+    <img src={DFLlogo} alt="DFL Logo" className="h-10 w-auto object-contain" />
   </div>
 );
 
@@ -54,7 +41,7 @@ export function PublicLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
-      <footer className="bg-slate-900 text-slate-400 py-12">
+      <footer className="bg-[#27336D] text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-800 text-sm text-center">
           © {new Date().getFullYear()} DFL. Todos os direitos reservados.
         </div>

@@ -132,7 +132,7 @@ export function HRRelatorios() {
         const status = (c.status || 'EM_PROCESSO').toUpperCase();
         statusCounts[status] = (statusCounts[status] || 0) + 1;
         
-        const fase = c.fase || 'Triagem';
+        const fase = c.fase ?? "Triagem";
         faseCounts[fase] = (faseCounts[fase] || 0) + 1;
 
         if (c.nota_teste !== null && c.nota_teste !== undefined) {
@@ -147,8 +147,23 @@ export function HRRelatorios() {
       });
 
       // Funil de Vendas (Recrutamento)
-      const stages = ['Triagem', 'Prova', 'Entrevista RH', 'Entrevista Gestor', 'Proposta', 'Contratado'];
+      const stages = [
+        "Triagem",
+        "Entrevista RH",
+        "Prova",
+        "Entrevista Gestor",
+        "Proposta",
+        "Entrega de documentação",
+        "Exame Médico",
+        "Contrato"
+      ];
+
       const funilData = stages.map(stage => {
+        const exigeProva = vaga.exige_prova === true || vaga.exige_prova === "Sim";
+        if (stage === 'Prova' && !exigeProva) {
+          return null;
+        }
+
         // Contar quantos passaram por essa fase (usando o histórico se disponível, ou a fase atual se for posterior)
         const count = candidaturas.filter(c => {
           const candEvents = (eventos || []).filter(e => e.candidatura_id === c.id);
@@ -157,7 +172,7 @@ export function HRRelatorios() {
           return passouPelaFase || estaNaFaseOuPosterior;
         }).length;
         return { name: stage, value: count };
-      });
+      }).filter(Boolean) as { name: string, value: number }[];
 
       // Tempo Médio por Etapa (Estimativa baseada no histórico)
       const tempoEtapas: { [key: string]: number[] } = {};

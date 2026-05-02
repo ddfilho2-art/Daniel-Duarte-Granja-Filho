@@ -1,0 +1,50 @@
+49:        .from('candidatos')
+309:        // tentamos buscar na tabela candidatos pelo user_id
+312:            .from('candidatos')
+325:            .from('candidatos')
+1150:    candidatosTotal: 0,
+1151:    candidatosVariacao: 0,
+1169:  const [candidatosVagaState, setCandidatosVagaState] = useState<any[]>([]);
+1254:          candidatosMesRes, 
+1259:          candidatosTableRes
+1265:          supabase.from('candidatos').select('*', { count: 'exact', head: true }).gte('criado_em', startOfThisMonth),
+1274:          supabase.from('candidatos').select('id, criado_em, created_at, genero, raca, pcd, resume_data')
+1282:        const candidatos = candidatosTableRes.data || [];
+1302:        const candidatosTotal = candidatos.length;
+1305:        const candidatosEsteMes = candidatosMesRes.count || 0;
+1306:        const candidatosMesPassado = candidatos.filter((c: any) => {
+1310:        const candidatosVariacao = candidatosMesPassado > 0
+1311:          ? Math.round(((candidatosEsteMes - candidatosMesPassado) * 100) / candidatosMesPassado)
+1312:          : (candidatosEsteMes > 0 ? 100 : 0);
+1424:        const triagemCandidatos = candidatos.filter((c: any) => triagemCandidatosIds.has(c.id));
+1425:        const contratadosCandidatos = candidatos.filter((c: any) => contratadosCandidatosIds.has(c.id));
+1506:        // Candidatos por Vaga (Top 5 vagas com mais candidatos)
+1507:        const candidatosPorVagaMap: { [key: string]: number } = {};
+1512:            candidatosPorVagaMap[titulo] = (candidatosPorVagaMap[titulo] || 0) + 1;
+1515:        const candidatosPorVagaData = Object.keys(candidatosPorVagaMap)
+1516:          .map(key => ({ name: key, candidatos: candidatosPorVagaMap[key] }))
+1517:          .sort((a, b) => b.candidatos - a.candidatos)
+1519:        setCandidatosVagaState(candidatosPorVagaData);
+1561:          candidatosTotal,
+1562:          candidatosVariacao,
+1629:      const [vagasRes, candidatosRes, candidaturasRes, eventosRes] = await Promise.all([
+1636:      const candidatos = (candidatosRes.data || []).map(doc => ({
+1753:      const diversidade = (candidatosRes.data || []).map(doc => ({
+1765:      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(candidatos), "Candidatos");
+1853:          <h3 className="text-2xl font-bold text-slate-900">{loading ? '...' : stats.candidatosTotal}</h3>
+1854:          <p className={`text-xs mt-1 flex items-center gap-1 ${stats.candidatosVariacao >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+1855:            {stats.candidatosVariacao >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+1856:            {stats.candidatosVariacao >= 0 ? '+' : ''}{stats.candidatosVariacao}% vs último mês
+2101:              <BarChart data={candidatosVagaState} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+2106:                <Bar dataKey="candidatos" radius={[0, 4, 4, 0]} barSize={24}>
+2107:                  {candidatosVagaState.map((entry, index) => (
+2110:                  <LabelList dataKey="candidatos" position="right" fill="#64748b" fontSize={12} />
+3217:  const [candidatos, setCandidatos] = useState<any[]>([]);
+3269:      const candidatosData = candidaturasTriagem.map((cData) => {
+3311:      setCandidatos(candidatosData);
+3428:    ? candidatos.filter(c => c.vagaId === selectedVaga && (filterEducation === 'Todos' || c.formacao === filterEducation))
+3517:      setCandidatos(candidatos.filter(c => !validUpdates.find(u => u?.id === c.id)));
+3521:        await logAudit('Ação em Massa', 'Candidatos', `Ação ${action} aplicada a ${validUpdates.length} candidatos.`);
+3525:      alert(`Ação aplicada a ${validUpdates.length} candidatos.`);
+3600:      setCandidatos(candidatos.filter(c => c.id !== id));
+3633:              Debug: Dados brutos encontrados para esta vaga: {candidatos.filter(c => c.vagaId === selectedVaga).length} registros 

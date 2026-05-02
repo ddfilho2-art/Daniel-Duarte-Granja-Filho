@@ -1,6 +1,12 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
-import { loginWithLogin } from '../lib/authService';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from "react";
+import { supabase } from "../lib/supabase";
+import { loginWithLogin } from "../lib/authService";
 
 interface UserProfile {
   id: string;
@@ -28,7 +34,7 @@ interface AuthContextType {
   login: (loginInput: string, passwordInput?: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  updateProfile: (data: Partial<UserProfile>) => void; // 🔥 NOVO
+  updateProfile: (data: Partial<UserProfile>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -41,7 +47,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   signOut: async () => {},
   refreshProfile: async () => {},
-  updateProfile: () => {}, // 🔥 NOVO
+  updateProfile: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -50,22 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const initSession = async () => {
-      const stored = localStorage.getItem('session');
+      const stored = localStorage.getItem("session");
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
           setProfile(parsed);
-          
-          // Tenta garantir que o Supabase também tenha a sessão
-          const { data: { session } } = await supabase.auth.getSession();
-          console.log('[AUTH_INIT] Sessão Supabase:', session ? 'Ativa' : 'Ausente');
         } catch (e) {
-          console.error('Failed to parse session', e);
+          console.error("Failed to parse session", e);
+          localStorage.removeItem("session");
         }
       }
       setAuthLoading(false);
     };
-
     initSession();
   }, []);
 
@@ -74,10 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const session = await loginWithLogin(loginInput, passwordInput);
       setProfile(session as UserProfile);
-
-      // 🔥 salva sessão
-      localStorage.setItem('session', JSON.stringify(session));
-
+      localStorage.setItem("session", JSON.stringify(session));
+    } catch (error) {
+      console.error("[AUTH] Erro no login:", error);
+      setProfile(null);
+      localStorage.removeItem("session");
+      throw error;
     } finally {
       setAuthLoading(false);
     }
@@ -85,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem('session');
+    localStorage.removeItem("session");
     setProfile(null);
   };
 
@@ -94,31 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const session = await loginWithLogin(profile.login);
         setProfile(session as UserProfile);
-
-        // 🔥 atualiza storage
-        localStorage.setItem('session', JSON.stringify(session));
-
+        localStorage.setItem("session", JSON.stringify(session));
       } catch (e) {
-        console.error('Failed to refresh profile', e);
+        console.error("Failed to refresh profile", e);
       }
     }
   };
 
-  // 🔥🔥🔥 AQUI ESTÁ A CORREÇÃO PRINCIPAL
   const updateProfile = (data: Partial<UserProfile>) => {
     console.log("♻️ [UPDATE PROFILE CONTEXT]:", data);
-
     setProfile((prev) => {
       if (!prev) return prev;
-
-      const updated = {
-        ...prev,
-        ...data, // 🔥 merge correto
-      };
-
-      // 🔥 mantém sincronizado com localStorage
-      localStorage.setItem('session', JSON.stringify(updated));
-
+      const updated = { ...prev, ...data };
+      localStorage.setItem("session", JSON.stringify(updated));
       return updated;
     });
   };
@@ -137,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         signOut,
         refreshProfile,
-        updateProfile // 🔥 EXPORTANDO
+        updateProfile,
       }}
     >
       {children}
