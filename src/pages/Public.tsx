@@ -18,7 +18,6 @@ import {
   Eye,
   EyeOff,
   DollarSign,
-  Database,
   Trash2,
   Plus,
   XCircle,
@@ -28,7 +27,6 @@ import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
 import { useAuth } from "../contexts/AuthContext";
 import { useVagas } from "../hooks/useVagas";
-import { seedDatabase } from "../lib/seed";
 import { safeFetch } from "../lib/api";
 
 export function Home() {
@@ -1406,8 +1404,6 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [isSeeding, setIsSeeding] = useState(false);
-  const [seedMsg, setSeedMsg] = useState("");
   const navigate = useNavigate();
   const { user, profile, authLoading, profileLoading, login } = useAuth();
   // [EDITABLE_END:public_login_state]
@@ -1522,48 +1518,6 @@ export function Login() {
               </button>
             </div>
           </form>
-
-          <div className="mt-6">
-            <div className="relative mt-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-slate-500">
-                  Desenvolvimento
-                </span>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={async () => {
-                setIsSeeding(true);
-                setSeedMsg("Populando banco de dados...");
-                try {
-                  await seedDatabase();
-                  setSeedMsg("Banco de dados populado! Tente logar agora.");
-                } catch (err: any) {
-                  console.error("Erro no seed:", err);
-                  setSeedMsg(
-                    `Erro ao popular banco: ${err.message || "Erro desconhecido"}`,
-                  );
-                } finally {
-                  setIsSeeding(false);
-                }
-              }}
-              disabled={isSeeding}
-              className="mt-4 w-full flex items-center justify-center gap-3 bg-slate-100 text-slate-700 py-2.5 rounded-lg font-medium hover:bg-slate-200 transition-colors disabled:opacity-50"
-            >
-              <Database className="w-5 h-5" />
-              {isSeeding ? "Populando..." : "Popular Banco de Dados (Seed)"}
-            </button>
-            {seedMsg && (
-              <p className="text-center text-[10px] mt-2 text-primary font-medium">
-                {seedMsg}
-              </p>
-            )}
-          </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
             Não tem uma conta?{" "}
