@@ -83,7 +83,7 @@ import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
 import { ChatInput } from "../components/ChatInput";
 import { useAuth } from "../contexts/AuthContext";
-import { useVagas } from "../hooks/useVagas";
+import { useVagas } from "../lib/useVagas";
 
 const tempoPorEtapaData = [
   { name: "Triagem", dias: 0 },
@@ -1666,7 +1666,6 @@ export function HRDashboard() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      console.log("[DASHBOARD] 🔍 BUSCANDO ESTATÍSTICAS...");
       try {
         setLoading(true);
 
@@ -1704,11 +1703,11 @@ export function HRDashboard() {
         ] = await Promise.all([
           supabase
             .from("vagas")
-            .select("*", { count: "exact", head: true })
+            .select("id")
             .or("status.eq.Aberta,status_vaga.eq.ABERTA"),
           supabase
             .from("candidatos")
-            .select("*", { count: "exact", head: true })
+            .select("id, criado_em, created_at")
             .gte("criado_em", startOfThisMonth),
           supabase.from("candidaturas").select("fase"),
           supabase
@@ -1769,28 +1768,6 @@ export function HRDashboard() {
           };
         });
 
-        console.log("🧪 USERS RAW:", usersRaw.slice(0, 5));
-        console.log(
-          "🧪 RESUME_DATA FINAL:",
-          candidaturas.map((c) => c.resume_data).slice(0, 5),
-        );
-        console.log(
-          "🧪 GENERO FINAL:",
-          candidaturas.map((c) => c.genero),
-        );
-        console.log(
-          "🧪 RACA FINAL:",
-          candidaturas.map((c) => c.raca),
-        );
-        console.log(
-          "🧪 PCD FINAL:",
-          candidaturas.map((c) => c.pcd),
-        );
-        console.log("🧪 NORMALIZADAS:", candidaturas.slice(0, 5));
-
-        console.log("🧪 candidaturas carregadas:", candidaturas.length);
-        console.log("🧪 exemplo candidatura:", candidaturas[0]);
-
         if (vagasAbertasRes.error) throw vagasAbertasRes.error;
         if (vagasRes.error) throw vagasRes.error;
         if (candidatosMesRes.error) throw candidatosMesRes.error;
@@ -1804,14 +1781,8 @@ export function HRDashboard() {
         const rhUsers = rhUsersRes.data || [];
         const tempoFasesRaw = tempoFasesRes.data || [];
 
-        console.log("🧪 TEMPO POR FASE RAW:", tempoFasesRaw);
-
-        console.log(
-          `[DASHBOARD] 📊 DADOS CARREGADOS: ${vagas.length} vagas, ${candidaturas.length} candidaturas`,
-        );
-
-        // 1. Vagas Abertas (Usando count do banco)
-        const vagasAbertas = vagasAbertasRes.count || 0;
+        // 1. Vagas Abertas
+        const vagasAbertas = (vagasAbertasRes.data || []).length;
 
         // 2. Variação Vagas vs Mês Anterior
         const vagasCriadasEsteMes = vagas.filter(
@@ -1838,8 +1809,8 @@ export function HRDashboard() {
         // 3. Total de Candidatos
         const candidatosTotal = candidatos.length;
 
-        // 4. Candidatos do Mês (Usando count do banco)
-        const candidatosEsteMes = candidatosMesRes.count || 0;
+        // 4. Candidatos do Mês
+        const candidatosEsteMes = (candidatosMesRes.data || []).length;
         const candidatosMesPassado = candidatos.filter((c: any) => {
           const createdAt = new Date(c.criado_em || c.created_at);
           return (
@@ -1966,13 +1937,6 @@ export function HRDashboard() {
             ordemFasesTempo.indexOf(a.fase) - ordemFasesTempo.indexOf(b.fase),
         );
 
-        console.log(
-          "🧪 FASES CANDIDATOS:",
-          candidaturas.map((c: any) => c.fase),
-        );
-        console.log("🧪 FUNIL FINAL:", funilOrdenado);
-        console.log("🧪 TEMPO CHART FINAL:", tempoChartData);
-
         setFunilState(funilOrdenado);
         setTempoState(tempoChartData);
 
@@ -2059,19 +2023,6 @@ export function HRDashboard() {
         */
 
         // Calculate Diversity Stats
-        console.log(
-          "🧪 GENERO RAW:",
-          candidaturas.map((c: any) => c.genero),
-        );
-        console.log(
-          "🧪 RACA RAW:",
-          candidaturas.map((c: any) => c.raca),
-        );
-        console.log(
-          "🧪 PCD RAW:",
-          candidaturas.map((c: any) => c.pcd),
-        );
-
         const getGenero = (c: any) => (c.genero || "").trim();
         const isMulher = (c: any) => getGenero(c) === "Feminino";
 
@@ -2118,11 +2069,6 @@ export function HRDashboard() {
         const pcdContratado = candidaturas.filter(
           (c: any) => isContratado(c.status, c.fase) && isPcd(c),
         ).length;
-
-        console.log("🧪 TOTAL TRIAGEM:", totalTriagem);
-        console.log("🧪 MULHERES TRIAGEM:", mulheresTriagem);
-        console.log("🧪 TOTAL CONTRATADO:", totalContratado);
-        console.log("🧪 MULHERES CONTRATADO:", mulheresContratado);
 
         setDiversidadeState({
           genero: {
@@ -2286,19 +2232,6 @@ export function HRDashboard() {
           (v: any) => v.status === "Aberta" || v.status_vaga === "ABERTA",
         );
 
-        console.log("🧪 TOTAL VAGAS:", vagas.length);
-        console.log("🧪 VAGAS ABERTAS:", listaVagasAbertas.length);
-        console.log("🧪 vagas:", vagas);
-        console.log("🧪 vagas abertas array:", listaVagasAbertas);
-
-        vagas.forEach((v: any) => {
-          console.log("🧪 STATUS CHECK:", {
-            status: v.status,
-            status_vaga: v.status_vaga,
-            owner_nome: v.owner_nome,
-          });
-        });
-
         const cargaTrabalhoMap = listaVagasAbertas.reduce(
           (acc: any, vaga: any) => {
             const nome = vaga.owner_nome || "Sem responsável";
@@ -2313,16 +2246,12 @@ export function HRDashboard() {
           {},
         );
 
-        console.log("🧪 cargaTrabalhoMap:", cargaTrabalhoMap);
-
         const cargaPorRecrutador = Object.values(cargaTrabalhoMap) as any[];
-        console.log("🧪 cargaArray FINAL:", cargaPorRecrutador);
 
-        const cargaTrabalhoData = cargaPorRecrutador
-          .filter((item: any) => item.vagasAbertas > 0)
-          .sort((a: any, b: any) => b.vagasAbertas - a.vagasAbertas);
+        const cargaTrabalhoData = cargaPorRecrutador.sort(
+          (a: any, b: any) => b.vagasAbertas - a.vagasAbertas,
+        );
 
-        console.log("🧪 dados enviados para gráfico:", cargaTrabalhoData);
         setCargaTrabalhoState(cargaTrabalhoData);
 
         // Vagas Progress
@@ -2393,51 +2322,11 @@ export function HRDashboard() {
           });
         setVagasProgress(progressData);
 
-        // 🔍 DIAGNÓSTICO DO GRÁFICO: Progresso de Preenchimento
-        console.log("🧪 DADOS DO GRÁFICO (RAW):", progressData);
-        console.log(
-          "🧪 ESTRUTURA:",
-          progressData.map((item: any) => {
-            const v = vagas.find((vg: any) => vg.id === item.id);
-            return {
-              nome: item.titulo,
-              valor: item.percentual,
-              data: v?.created_at,
-            };
-          }),
-        );
-        console.log(
-          "🧪 DATAS:",
-          progressData.map((item: any) => {
-            const v = vagas.find((vg: any) => vg.id === item.id);
-            return v?.created_at;
-          }),
-        );
-        console.log(
-          "🧪 VALORES:",
-          progressData.map((item: any) => item.percentual),
-        );
-        console.log(
-          "🧪 CANDIDATOS POR VAGA:",
-          candidaturas.map((c: any) => ({
-            vaga_id: c.vaga_id,
-            fase: c.fase,
-            status: c.status,
-          })),
-        );
         const eventosAvanco = candidaturas.filter(
           (c: any) =>
             c.status === "APROVADA" ||
             (c.fase || "").trim() === "Contratado" ||
             (c.fase || "").trim() === "Contrato",
-        );
-        console.log("🧪 EVENTOS DE AVANÇO:", eventosAvanco);
-        console.log(
-          "🧪 VAGAS (DATA CRIAÇÃO):",
-          vagas.map((v: any) => ({
-            id: v.id,
-            created_at: v.created_at,
-          })),
         );
 
         setStats({
@@ -3046,40 +2935,46 @@ export function HRDashboard() {
               Qualidade: Funil de Seleção
             </h2>
             {funilState.length > 0 && (
-              <div style={{ width: "100%", height: 300, minHeight: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={funilState}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis
-                      dataKey="name"
-                      fontSize={10}
-                      interval={0}
-                      angle={-25}
-                      textAnchor="end"
-                    />
-                    <YAxis
-                      domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]}
-                    />
-                    <Tooltip cursor={{ fill: "#f1f5f9" }} />
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
-                      {funilState.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={COLORS[index % COLORS.length]}
-                        />
-                      ))}
-                      <LabelList
-                        dataKey="value"
-                        position="top"
-                        fill="#64748b"
-                        fontSize={12}
+              <div
+                style={{
+                  width: "100%",
+                  height: 300,
+                  minHeight: 300,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <BarChart
+                  width={760}
+                  height={300}
+                  data={funilState}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    fontSize={10}
+                    interval={0}
+                    angle={-25}
+                    textAnchor="end"
+                  />
+                  <YAxis domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
+                  <Tooltip cursor={{ fill: "#f1f5f9" }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                    {funilState.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
                       />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      fill="#64748b"
+                      fontSize={12}
+                    />
+                  </Bar>
+                </BarChart>
               </div>
             )}
           </div>
@@ -3090,39 +2985,47 @@ export function HRDashboard() {
               Volume de Contratações (Últimos 6 meses)
             </h2>
             {volumeState.length > 0 && (
-              <div style={{ width: "100%", height: 300, minHeight: 300 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={volumeState}
-                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+              <div
+                style={{
+                  width: "100%",
+                  height: 300,
+                  minHeight: 300,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <LineChart
+                  width={760}
+                  height={300}
+                  data={volumeState}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} />
+                  <YAxis />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="contratacoes"
+                    stroke="#0ea5e9"
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: "#0ea5e9",
+                      strokeWidth: 2,
+                      stroke: "#fff",
+                    }}
+                    activeDot={{ r: 6 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                    <XAxis dataKey="name" fontSize={12} />
-                    <YAxis />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
+                    <LabelList
                       dataKey="contratacoes"
-                      stroke="#0ea5e9"
-                      strokeWidth={3}
-                      dot={{
-                        r: 4,
-                        fill: "#0ea5e9",
-                        strokeWidth: 2,
-                        stroke: "#fff",
-                      }}
-                      activeDot={{ r: 6 }}
-                    >
-                      <LabelList
-                        dataKey="contratacoes"
-                        position="top"
-                        fill="#64748b"
-                        fontSize={12}
-                        offset={10}
-                      />
-                    </Line>
-                  </LineChart>
-                </ResponsiveContainer>
+                      position="top"
+                      fill="#64748b"
+                      fontSize={12}
+                      offset={10}
+                    />
+                  </Line>
+                </LineChart>
               </div>
             )}
           </div>
@@ -3134,54 +3037,60 @@ export function HRDashboard() {
                 Fonte de Origem
               </h2>
               {fonteState.length > 0 && (
-                <div style={{ width: "100%", height: 300, minHeight: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={fonteState}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={40}
-                        outerRadius={70}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({
-                          cx,
-                          cy,
-                          midAngle,
-                          innerRadius,
-                          outerRadius,
-                          percent,
-                        }) => {
-                          const RADIAN = Math.PI / 180;
-                          const radius = outerRadius * 1.2;
-                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                          return (
-                            <text
-                              x={x}
-                              y={y}
-                              fill="#64748b"
-                              textAnchor={x > cx ? "start" : "end"}
-                              dominantBaseline="central"
-                              fontSize="10"
-                            >
-                              {`${(percent * 100).toFixed(0)}%`}
-                            </text>
-                          );
-                        }}
-                        labelLine={false}
-                      >
-                        {fonteState.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
+                <div
+                  style={{
+                    width: "100%",
+                    height: 300,
+                    minHeight: 300,
+                    minWidth: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  <PieChart width={320} height={300}>
+                    <Pie
+                      data={fonteState}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({
+                        cx,
+                        cy,
+                        midAngle,
+                        innerRadius,
+                        outerRadius,
+                        percent,
+                      }) => {
+                        const RADIAN = Math.PI / 180;
+                        const radius = outerRadius * 1.2;
+                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            fill="#64748b"
+                            textAnchor={x > cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            fontSize="10"
+                          >
+                            {`${(percent * 100).toFixed(0)}%`}
+                          </text>
+                        );
+                      }}
+                      labelLine={false}
+                    >
+                      {fonteState.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
                 </div>
               )}
               <div className="flex flex-wrap justify-center gap-2 mt-2">

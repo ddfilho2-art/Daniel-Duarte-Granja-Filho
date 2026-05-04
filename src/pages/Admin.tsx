@@ -30,7 +30,8 @@ import {
   RefreshCw,
   ChevronRight,
 } from "lucide-react";
-import { supabase, supabaseAdmin } from "../lib/supabase";
+import { supabase } from "../lib/supabase";
+import { safeFetch } from "../lib/api";
 import {
   BarChart as ReBarChart,
   Bar,
@@ -68,53 +69,53 @@ export function AdminDashboard() {
     const fetchMetrics = async () => {
       try {
         const fetchTotalTalentos = async () => {
-          const { count, error } = await supabase
+          const { data, error } = await supabase
             .from("users")
-            .select("*", { count: "exact", head: true })
+            .select("id")
             .eq("perfil", "Candidato");
           if (error) throw error;
-          return count || 0;
+          return (data || []).length;
         };
 
         const fetchVagasAtivas = async () => {
-          const { count, error } = await supabase
+          const { data, error } = await supabase
             .from("vagas")
-            .select("*", { count: "exact", head: true })
+            .select("id")
             .eq("status", "Aberta");
           if (error) throw error;
-          return count || 0;
+          return (data || []).length;
         };
 
         const fetchCandidaturasMes = async () => {
           const trintaDiasAtras = new Date();
           trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
-          const { count, error } = await supabase
+          const { data, error } = await supabase
             .from("candidaturas")
-            .select("*", { count: "exact", head: true })
+            .select("id")
             .gte("data_candidatura", trintaDiasAtras.toISOString());
           if (error) throw error;
-          return count || 0;
+          return (data || []).length;
         };
 
         const fetchUsuariosTotais = async () => {
-          const { count, error } = await supabase
+          const { data, error } = await supabase
             .from("users")
-            .select("*", { count: "exact", head: true })
+            .select("id")
             .in("perfil", ["RH", "Candidato"]);
           if (error) throw error;
-          return count || 0;
+          return (data || []).length;
         };
 
         const fetchNovosCandidatos24h = async () => {
           const vinteQuatroHorasAtras = new Date();
           vinteQuatroHorasAtras.setHours(vinteQuatroHorasAtras.getHours() - 24);
-          const { count, error } = await supabase
+          const { data, error } = await supabase
             .from("users")
-            .select("*", { count: "exact", head: true })
+            .select("id")
             .eq("perfil", "Candidato")
             .gte("created_at", vinteQuatroHorasAtras.toISOString());
           if (error) throw error;
-          return count || 0;
+          return (data || []).length;
         };
 
         const fetchCargaTrabalho = async () => {
@@ -865,47 +866,35 @@ export function AdminGestaoUsuarios() {
     setError("");
 
     try {
-      // 1. Check if login exists
-      const { data: existing } = await supabase
-        .from("users")
-        .select("id")
-        .eq("login_lower", formData.login.toLowerCase())
-        .maybeSingle();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      if (existing) throw new Error("Este login já está em uso.");
+      if (!session?.access_token) {
+        throw new Error("Sessão inválida ou expirada. Faça login novamente.");
+      }
 
-      // 2. Create in Auth (Admin)
-      const { data: authData, error: authError } =
-        await supabaseAdmin.auth.admin.createUser({
+      const response = await safeFetch("/api/admin-create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          nome: formData.nome,
           email: formData.email,
-          password: formData.senha,
-          email_confirm: true,
-          user_metadata: {
-            nome: formData.nome,
-            perfil: "RH",
-          },
-        });
-
-      if (authError) throw authError;
-
-      // 3. Create in users table
-      const { error: dbError } = await supabase.from("users").insert({
-        id: authData.user.id,
-        uid: authData.user.id,
-        nome: formData.nome,
-        email: formData.email,
-        login: formData.login,
-        login_lower: formData.login.toLowerCase(),
-        perfil: "RH",
-        status: "Ativo",
+          login: formData.login,
+          senha: formData.senha,
+        }),
       });
 
-      if (dbError) throw dbError;
+      if (!response.ok || !response.data?.success) {
+        throw new Error(response.data?.message || "Erro ao criar usuário.");
+      }
 
-      // Sucesso imediato na UI
       setIsCreateModalOpen(false);
       setFormData({ nome: "", email: "", login: "", senha: "" });
-      fetchUsers();
+      await fetchUsers();
     } catch (err: any) {
       setError(err.message || "Erro ao criar usuário.");
     } finally {
@@ -919,28 +908,58 @@ export function AdminGestaoUsuarios() {
     setError("");
 
     try {
+      if (!selectedUser?.id) {
+        throw new Error("Usuário selecionado inválido.");
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error("Sessão inválida ou expirada. Faça login novamente.");
+      }
+
+      const emailChanged =
+        String(formData.email || "")
+          .trim()
+          .toLowerCase() !==
+        String(selectedUser.email || "")
+          .trim()
+          .toLowerCase();
+
       const { error: dbError } = await supabase
         .from("users")
         .update({
           nome: formData.nome,
-          email: formData.email,
+          updated_at: new Date().toISOString(),
         })
         .eq("id", selectedUser.id);
 
       if (dbError) throw dbError;
 
-      // Update Auth Email if changed
-      if (formData.email !== selectedUser.email) {
-        const { error: authError } =
-          await supabaseAdmin.auth.admin.updateUserById(selectedUser.id, {
+      if (emailChanged) {
+        const response = await safeFetch("/api/admin-update-user-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            userId: selectedUser.id,
             email: formData.email,
-          });
-        if (authError) throw authError;
+          }),
+        });
+
+        if (!response.ok || !response.data?.success) {
+          throw new Error(
+            response.data?.message || "Erro ao atualizar e-mail do usuário.",
+          );
+        }
       }
 
-      // Sucesso imediato na UI
       setIsEditModalOpen(false);
-      fetchUsers();
+      await fetchUsers();
     } catch (err: any) {
       setError(err.message || "Erro ao editar usuário.");
     } finally {
@@ -954,14 +973,34 @@ export function AdminGestaoUsuarios() {
     setError("");
 
     try {
-      const { error: authError } =
-        await supabaseAdmin.auth.admin.updateUserById(selectedUser.id, {
-          password: formData.senha,
-        });
+      if (!selectedUser?.id) {
+        throw new Error("Usuário selecionado inválido.");
+      }
 
-      if (authError) throw authError;
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
 
-      // Sucesso imediato na UI
+      if (!session?.access_token) {
+        throw new Error("Sessão inválida ou expirada. Faça login novamente.");
+      }
+
+      const response = await safeFetch("/api/admin-reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          senha: formData.senha,
+        }),
+      });
+
+      if (!response.ok || !response.data?.success) {
+        throw new Error(response.data?.message || "Erro ao resetar senha.");
+      }
+
       setIsResetModalOpen(false);
       setFormData((prev) => ({ ...prev, senha: "" }));
     } catch (err: any) {

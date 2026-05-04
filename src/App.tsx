@@ -52,7 +52,6 @@ import {
   CandidateMensagens,
   CandidateResume,
   CandidateVagas,
-  CandidateProvas,
 } from "./pages/Candidate";
 
 // Layouts
@@ -197,7 +196,6 @@ const App = () => {
               <Route path="vagas/:id" element={<DetalheVaga />} />
               <Route path="candidaturas" element={<CandidateCandidaturas />} />
               <Route path="mensagens" element={<CandidateMensagens />} />
-              <Route path="provas" element={<CandidateProvas />} />
               <Route
                 path="perfil"
                 element={<Navigate to="curriculo" replace />}

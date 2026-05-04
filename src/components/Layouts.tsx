@@ -1,15 +1,36 @@
-import React, { useState } from 'react';
-import { Outlet, Link, useLocation, useNavigate, useOutlet } from 'react-router-dom';
+import React, { useState } from "react";
 import {
-  Briefcase, Users, FileText, MessageSquare, CheckSquare,
-  Settings, LogOut, Home, Search, User, FileCheck, Shield, BarChart, KeyRound, X, Activity, Repeat
-} from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useUI } from '../contexts/UIContext';
-import { supabase } from '../lib/supabase';
-import { logAudit } from '../lib/audit';
+  Outlet,
+  Link,
+  useLocation,
+  useNavigate,
+  useOutlet,
+} from "react-router-dom";
+import {
+  Briefcase,
+  Users,
+  FileText,
+  MessageSquare,
+  CheckSquare,
+  Settings,
+  LogOut,
+  Home,
+  Search,
+  User,
+  FileCheck,
+  Shield,
+  BarChart,
+  KeyRound,
+  X,
+  Activity,
+  Repeat,
+} from "lucide-react";
+import { useAuth } from "../contexts/AuthContext";
+import { useUI } from "../contexts/UIContext";
+import { supabase } from "../lib/supabase";
+import { logAudit } from "../lib/audit";
 
-import DFLlogo from '../assets/DFLlogo.svg';
+import DFLlogo from "../assets/DFLlogo.svg";
 
 const Logo = () => (
   <div className="flex items-center gap-2">
@@ -26,13 +47,27 @@ export function PublicLayout() {
             <Logo />
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-            <Link to="/" className="hover:text-primary transition-colors">Home</Link>
-            <Link to="/vagas" className="hover:text-primary transition-colors">Vagas</Link>
-            <Link to="/sobre" className="hover:text-primary transition-colors">Sobre Nós</Link>
+            <Link to="/" className="hover:text-primary transition-colors">
+              Home
+            </Link>
+            <Link to="/vagas" className="hover:text-primary transition-colors">
+              Vagas
+            </Link>
+            <Link to="/sobre" className="hover:text-primary transition-colors">
+              Sobre Nós
+            </Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Link to="/login" className="text-sm font-medium text-slate-600 hover:text-primary transition-colors">Login</Link>
-            <Link to="/cadastro" className="text-sm font-medium bg-primary text-white px-4 py-2 rounded-lg hover:bg-accent transition-colors">
+            <Link
+              to="/login"
+              className="text-sm font-medium text-slate-600 hover:text-primary transition-colors"
+            >
+              Login
+            </Link>
+            <Link
+              to="/cadastro"
+              className="text-sm font-medium bg-primary text-white px-4 py-2 rounded-lg hover:bg-accent transition-colors"
+            >
               Cadastre-se
             </Link>
           </div>
@@ -50,16 +85,31 @@ export function PublicLayout() {
   );
 }
 
-function SidebarItem({ to, icon: Icon, label, badge }: { to: string, icon: any, label: string, badge?: number }) {
+function SidebarItem({
+  to,
+  icon: Icon,
+  label,
+  badge,
+}: {
+  to: string;
+  icon: any;
+  label: string;
+  badge?: number;
+}) {
   const location = useLocation();
-  const isDashboardRoot = to === '/rh' || to === '/admin' || to === '/candidato';
-  const isActive = isDashboardRoot ? location.pathname === to : (location.pathname === to || location.pathname.startsWith(to + '/'));
+  const isDashboardRoot =
+    to === "/rh" || to === "/admin" || to === "/candidato";
+  const isActive = isDashboardRoot
+    ? location.pathname === to
+    : location.pathname === to || location.pathname.startsWith(to + "/");
 
   return (
     <Link
       to={to}
       className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        isActive ? 'bg-primary/10 text-primary' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+        isActive
+          ? "bg-primary/10 text-primary"
+          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -70,22 +120,35 @@ function SidebarItem({ to, icon: Icon, label, badge }: { to: string, icon: any, 
   );
 }
 
-function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, menuItems: { to: string, icon: any, label: string, badge?: number }[] }) {
+function DashboardLayout({
+  children,
+  menuItems,
+}: {
+  children?: React.ReactNode;
+  menuItems: { to: string; icon: any; label: string; badge?: number }[];
+}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, profile, authLoading, profileLoading, isAuthenticated, signOut } = useAuth();
+  const {
+    user,
+    profile,
+    authLoading,
+    profileLoading,
+    isAuthenticated,
+    signOut,
+  } = useAuth();
   const { showPasswordModal, closeChangePassword } = useUI();
 
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordSuccess, setPasswordSuccess] = useState("");
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [imgLoadError, setImgLoadError] = useState(false);
 
   React.useEffect(() => {
     if (!authLoading && !profileLoading && !isAuthenticated) {
-      navigate('/login');
+      navigate("/login");
     }
   }, [isAuthenticated, authLoading, profileLoading, navigate]);
 
@@ -95,9 +158,9 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
 
   const handleLogout = async () => {
     try {
-      await logAudit('Logout', 'Autenticação', 'Usuário encerrou a sessão.');
+      await logAudit("Logout", "Autenticação", "Usuário encerrou a sessão.");
       await signOut();
-      navigate('/login');
+      navigate("/login");
     } catch (error) {
       console.error("Error logging out:", error);
     }
@@ -106,44 +169,56 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      setPasswordError('As senhas não coincidem.');
+      setPasswordError("As senhas não coincidem.");
       return;
     }
     setIsChangingPassword(true);
-    setPasswordError('');
+    setPasswordError("");
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
       if (error) throw error;
-      setPasswordSuccess('Senha alterada com sucesso!');
+      setPasswordSuccess("Senha alterada com sucesso!");
       setTimeout(() => {
         closeChangePassword();
-        setPasswordSuccess('');
-        setNewPassword('');
-        setConfirmPassword('');
+        setPasswordSuccess("");
+        setNewPassword("");
+        setConfirmPassword("");
       }, 2000);
     } catch (err: any) {
-      setPasswordError(err.message || 'Erro ao alterar senha.');
+      setPasswordError(err.message || "Erro ao alterar senha.");
     } finally {
       setIsChangingPassword(false);
     }
   };
 
-  const userName = (profile as any)?.resume_data?.nome || profile?.nome || 'Usuário';
-  const userAvatar = profile?.avatar_url ?? (profile as unknown as Record<string, string | undefined>)?.foto_url ?? (profile as any)?.resume_data?.foto;
+  const userName =
+    (profile as any)?.resume_data?.nome || profile?.nome || "Usuário";
+  const userAvatar =
+    profile?.avatar_url ??
+    (profile as unknown as Record<string, string | undefined>)?.foto_url ??
+    (profile as any)?.resume_data?.foto;
 
-  const currentMenuItem = React.useMemo(() =>
-    [...menuItems].reverse().find(item => {
-      const isDashboardRoot = item.to === '/rh' || item.to === '/admin' || item.to === '/candidato';
-      return isDashboardRoot ? location.pathname === item.to : (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
-    }),
-    [location.pathname, menuItems]
+  const currentMenuItem = React.useMemo(
+    () =>
+      [...menuItems].reverse().find((item) => {
+        const isDashboardRoot =
+          item.to === "/rh" || item.to === "/admin" || item.to === "/candidato";
+        return isDashboardRoot
+          ? location.pathname === item.to
+          : location.pathname === item.to ||
+              location.pathname.startsWith(item.to + "/");
+      }),
+    [location.pathname, menuItems],
   );
 
-  if (authLoading || profileLoading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-    </div>
-  );
+  if (authLoading || profileLoading)
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
 
   if (!user) return null;
 
@@ -151,12 +226,13 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
     <div className="min-h-screen bg-slate-50 flex">
       <aside className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-10">
         <div className="h-16 flex items-center px-6 border-b border-slate-200">
-          <Link to="/"><Logo /></Link>
+          <Link to="/">
+            <Logo />
+          </Link>
         </div>
 
         <div className="p-4 border-t border-slate-200">
           <div className="flex items-center gap-3">
-            
             {/* Avatar */}
             {userAvatar && !imgLoadError ? (
               <img
@@ -177,26 +253,31 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
               <span className="text-sm font-medium text-slate-700">
                 {userName}
               </span>
-              {profile?.perfil !== 'Candidato' && (
+              {profile?.perfil !== "Candidato" && (
                 <Link
-                  to={`/${location.pathname.split('/')[1] || 'rh'}/perfil`}
+                  to={`/${location.pathname.split("/")[1] || "rh"}/perfil`}
                   className="text-xs text-blue-600 hover:underline"
                 >
                   Meu Perfil
                 </Link>
               )}
             </div>
-
           </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {menuItems.map((item) => <SidebarItem key={item.to} {...item} />)}
+          {menuItems.map((item) => (
+            <SidebarItem key={item.to} {...item} />
+          ))}
         </nav>
 
         <div className="p-4 border-t border-slate-200 space-y-2">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
-            <LogOut className="w-5 h-5" />Sair
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <LogOut className="w-5 h-5" />
+            Sair
           </button>
         </div>
       </aside>
@@ -204,13 +285,11 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
       <main className="flex-1 ml-64 flex flex-col min-h-screen">
         <header className="h-16 bg-white border-b border-slate-200 flex items-center px-8 sticky top-0 z-10">
           <h1 className="text-lg font-medium text-slate-900">
-            {currentMenuItem?.label || 'Dashboard'}
+            {currentMenuItem?.label || "Dashboard"}
           </h1>
         </header>
 
-        <div className="flex-1 p-8">
-          {children || <Outlet />}
-        </div>
+        <div className="flex-1 p-8">{children || <Outlet />}</div>
       </main>
 
       {showPasswordModal && (
@@ -221,11 +300,14 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
                 <KeyRound className="w-5 h-5 text-[#0054A6]" />
                 <h3 className="font-bold text-slate-900">Alterar Senha</h3>
               </div>
-              <button onClick={closeChangePassword} className="text-slate-400 hover:text-slate-600">
+              <button
+                onClick={closeChangePassword}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleChangePassword} className="p-6 space-y-4">
               {passwordError && (
                 <div className="p-3 bg-red-50 text-red-700 text-sm rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -235,12 +317,14 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
               )}
               {passwordSuccess && (
                 <div className="p-3 bg-emerald-50 text-emerald-700 text-sm rounded-lg flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-200 text-center justify-center font-medium">
-                   ✅ {passwordSuccess}
+                  ✅ {passwordSuccess}
                 </div>
               )}
 
               <div className="space-y-1">
-                <label className="text-sm font-semibold text-slate-700">Nova Senha</label>
+                <label className="text-sm font-semibold text-slate-700">
+                  Nova Senha
+                </label>
                 <input
                   required
                   type="password"
@@ -253,7 +337,9 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
               </div>
 
               <div className="space-y-1">
-                <label className="text-sm font-semibold text-slate-700">Confirmar Nova Senha</label>
+                <label className="text-sm font-semibold text-slate-700">
+                  Confirmar Nova Senha
+                </label>
                 <input
                   required
                   type="password"
@@ -277,7 +363,7 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
                   disabled={isChangingPassword}
                   className="px-6 py-2 text-sm font-bold bg-[#0054A6] text-white rounded-lg hover:bg-[#004080] transition-colors disabled:opacity-50 min-w-[120px]"
                 >
-                  {isChangingPassword ? 'Alterando...' : 'Salvar Senha'}
+                  {isChangingPassword ? "Alterando..." : "Salvar Senha"}
                 </button>
               </div>
             </form>
@@ -290,36 +376,55 @@ function DashboardLayout({ children, menuItems }: { children?: React.ReactNode, 
 
 export function CandidateLayout() {
   const menuItems = [
-    { to: '/candidato', icon: Home, label: 'Dashboard' },
-    { to: '/candidato/curriculo', icon: User, label: 'Meu Currículo' },
-    { to: '/candidato/vagas', icon: Search, label: 'Buscar Vagas' },
-    { to: '/candidato/candidaturas', icon: Briefcase, label: 'Minhas Candidaturas' },
-    { to: '/candidato/mensagens', icon: MessageSquare, label: 'Mensagens' },
-    { to: '/candidato/provas', icon: CheckSquare, label: 'Provas' },
+    { to: "/candidato", icon: Home, label: "Dashboard" },
+    { to: "/candidato/curriculo", icon: User, label: "Meu Currículo" },
+    { to: "/candidato/vagas", icon: Search, label: "Buscar Vagas" },
+    {
+      to: "/candidato/candidaturas",
+      icon: Briefcase,
+      label: "Minhas Candidaturas",
+    },
+    { to: "/candidato/mensagens", icon: MessageSquare, label: "Mensagens" },
   ];
   return <DashboardLayout menuItems={menuItems} />;
 }
 
 export function HRLayout() {
-  const [badges, setBadges] = useState({ triagem: 0, entrevistas: 0, mensagens: 0 });
+  const [badges, setBadges] = useState({
+    triagem: 0,
+    entrevistas: 0,
+    mensagens: 0,
+  });
 
   React.useEffect(() => {
     const fetchBadges = async () => {
-      const { data, error } = await supabase.from('candidaturas').select('*');
+      const { data, error } = await supabase.from("candidaturas").select("*");
 
       if (error) {
-        console.error('Erro ao buscar badges:', error);
+        console.error("Erro ao buscar badges:", error);
         return;
       }
 
       if (!data) return;
 
-      let t = 0, e = 0, m = 0;
+      let t = 0,
+        e = 0,
+        m = 0;
 
-      data.forEach(d => {
-        const fase = d.fase || 'Triagem';
-        if (!d.visualizado && !d.status && (fase === 'Triagem' || fase === 'Prova')) t++;
-        if (!d.visualizado && !d.status && ['Entrevista RH', 'Entrevista Gestor', 'Exame'].includes(fase)) e++;
+      data.forEach((d) => {
+        const fase = d.fase || "Triagem";
+        if (
+          !d.visualizado &&
+          !d.status &&
+          (fase === "Triagem" || fase === "Prova")
+        )
+          t++;
+        if (
+          !d.visualizado &&
+          !d.status &&
+          ["Entrevista RH", "Entrevista Gestor", "Exame"].includes(fase)
+        )
+          e++;
         if (d.unread_messages_by_hr > 0) m += d.unread_messages_by_hr;
       });
 
@@ -329,8 +434,12 @@ export function HRLayout() {
     fetchBadges();
 
     const sub = supabase
-      .channel('candidaturas_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'candidaturas' }, fetchBadges)
+      .channel("candidaturas_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "candidaturas" },
+        fetchBadges,
+      )
       .subscribe();
 
     return () => {
@@ -339,14 +448,29 @@ export function HRLayout() {
   }, []);
 
   const menuItems = [
-    { to: '/rh', icon: Home, label: 'Dashboard RH' },
-    { to: '/rh/vagas', icon: Briefcase, label: 'Gestão de Vagas' },
-    { to: '/rh/candidatos', icon: Users, label: 'Triagem', badge: badges.triagem },
-    { to: '/rh/entrevistas', icon: Users, label: 'Processo de Recrut / Selec.', badge: badges.entrevistas },
-    { to: '/rh/mensagens', icon: MessageSquare, label: 'Mensagens', badge: badges.mensagens },
-    { to: '/rh/provas', icon: CheckSquare, label: 'Provas' },
-    { to: '/rh/talentos', icon: FileCheck, label: 'Banco de Talentos' },
-    { to: '/rh/relatorios', icon: BarChart, label: 'Relatórios' },
+    { to: "/rh", icon: Home, label: "Dashboard RH" },
+    { to: "/rh/vagas", icon: Briefcase, label: "Gestão de Vagas" },
+    {
+      to: "/rh/candidatos",
+      icon: Users,
+      label: "Triagem",
+      badge: badges.triagem,
+    },
+    {
+      to: "/rh/entrevistas",
+      icon: Users,
+      label: "Processo de Recrut / Selec.",
+      badge: badges.entrevistas,
+    },
+    {
+      to: "/rh/mensagens",
+      icon: MessageSquare,
+      label: "Mensagens",
+      badge: badges.mensagens,
+    },
+    { to: "/rh/provas", icon: CheckSquare, label: "Provas" },
+    { to: "/rh/talentos", icon: FileCheck, label: "Banco de Talentos" },
+    { to: "/rh/relatorios", icon: BarChart, label: "Relatórios" },
   ];
 
   return <DashboardLayout menuItems={menuItems} />;
@@ -354,12 +478,12 @@ export function HRLayout() {
 
 export function AdminLayout() {
   const menuItems = [
-    { to: '/admin', icon: Home, label: 'Dashboard Admin' },
-    { to: '/admin/users', icon: Users, label: 'Gestão de Usuários' },
-    { to: '/admin/transferencias', icon: Repeat, label: 'Transferências' },
-    { to: '/admin/auditoria', icon: Shield, label: 'Auditoria' },
-    { to: '/admin/performance', icon: Activity, label: 'SRE' },
-    { to: '/admin/configuracoes', icon: Settings, label: 'Configurações' },
+    { to: "/admin", icon: Home, label: "Dashboard Admin" },
+    { to: "/admin/users", icon: Users, label: "Gestão de Usuários" },
+    { to: "/admin/transferencias", icon: Repeat, label: "Transferências" },
+    { to: "/admin/auditoria", icon: Shield, label: "Auditoria" },
+    { to: "/admin/performance", icon: Activity, label: "SRE" },
+    { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
   ];
 
   return <DashboardLayout menuItems={menuItems} />;

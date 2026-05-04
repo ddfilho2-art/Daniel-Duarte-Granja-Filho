@@ -26,7 +26,7 @@ import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
 import { useAuth } from "../contexts/AuthContext";
-import { useVagas } from "../hooks/useVagas";
+import { useVagas } from "../lib/useVagas";
 import { safeFetch } from "../lib/api";
 
 export function Home() {
