@@ -1591,9 +1591,10 @@ export function HRDashboard() {
   const [candidatosVagaState, setCandidatosVagaState] = useState<any[]>([]);
   const [cargaTrabalhoState, setCargaTrabalhoState] = useState<any[]>([]);
   const [diversidadeState, setDiversidadeState] = useState({
-    genero: { triagem: 0, contratado: 0 },
-    raca: { triagem: 0, contratado: 0 },
-    pcd: { triagem: 0, contratado: 0 },
+    genero: { triagem: 0, contratado: 0, triagemCount: 0, contratadoCount: 0 },
+    raca: { triagem: 0, contratado: 0, triagemCount: 0, contratadoCount: 0 },
+    pcd: { triagem: 0, contratado: 0, triagemCount: 0, contratadoCount: 0 },
+    bases: { triagem: 0, contratado: 0 },
   });
   const [vagasProgress, setVagasProgress] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -2032,14 +2033,28 @@ export function HRDashboard() {
 
         const isPcd = (c: any) => c.pcd === true;
 
+        const normalizarFaseDiversidade = (fase: string) => {
+          const f = (fase || "").trim().toLowerCase();
+          if (f.includes("triagem")) return "Triagem";
+          if (f.includes("rh")) return "Entrevista RH";
+          if (f.includes("contratado") || f.includes("contrato"))
+            return "Contratado";
+          if (f.includes("encerrado")) return "Encerrado";
+          return fase || "";
+        };
+
         const isTriagem = (fase: string) => {
-          return (fase || "").trim() !== "Encerrado";
+          return normalizarFaseDiversidade(fase) === "Entrevista RH";
         };
 
         const isContratado = (status: string, fase: string) => {
           const s = (status || "").toUpperCase();
-          const f = (fase || "").trim();
-          return s === "APROVADA" || f === "Contratado" || f === "Contrato";
+          const f = normalizarFaseDiversidade(fase);
+          return (
+            f === "Contratado" ||
+            (f === "Contratado" && s === "APROVADA") ||
+            s === "CONTRATADO"
+          );
         };
 
         const totalTriagem = candidaturas.filter((c: any) =>
@@ -2080,6 +2095,8 @@ export function HRDashboard() {
               totalContratado > 0
                 ? Math.round((mulheresContratado / totalContratado) * 100)
                 : 0,
+            triagemCount: mulheresTriagem,
+            contratadoCount: mulheresContratado,
           },
           raca: {
             triagem:
@@ -2090,6 +2107,8 @@ export function HRDashboard() {
               totalContratado > 0
                 ? Math.round((racasContratado / totalContratado) * 100)
                 : 0,
+            triagemCount: racasTriagem,
+            contratadoCount: racasContratado,
           },
           pcd: {
             triagem:
@@ -2100,6 +2119,12 @@ export function HRDashboard() {
               totalContratado > 0
                 ? Math.round((pcdContratado / totalContratado) * 100)
                 : 0,
+            triagemCount: pcdTriagem,
+            contratadoCount: pcdContratado,
+          },
+          bases: {
+            triagem: totalTriagem,
+            contratado: totalContratado,
           },
         });
 
@@ -3311,61 +3336,159 @@ export function HRDashboard() {
         {/* Diversidade */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-slate-900">
-              Diversidade no Funil (Geral)
-            </h2>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Diversidade no Funil (Geral)
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Comparação entre candidatos atualmente na fase Entrevista RH e
+                contratações finais.
+              </p>
+            </div>
             <Award className="w-5 h-5 text-slate-400" />
           </div>
+
+          <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-600">
+              Base Entrevista RH:{" "}
+              <span className="font-semibold text-slate-900">
+                {diversidadeState.bases.triagem}
+              </span>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-600">
+              Base Contratado:{" "}
+              <span className="font-semibold text-slate-900">
+                {diversidadeState.bases.contratado}
+              </span>
+            </div>
+          </div>
+
           <div className="space-y-6">
             <div>
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-sm mb-2 gap-3">
                 <span className="font-medium text-slate-700">
                   Gênero (Mulheres)
                 </span>
-                <span className="text-slate-500">
-                  {diversidadeState.genero.triagem}% na triagem /{" "}
-                  {diversidadeState.genero.contratado}% contratadas
+                <span className="text-slate-500 text-right">
+                  Entrevista RH: {diversidadeState.genero.triagem}% (
+                  {diversidadeState.genero.triagemCount} de{" "}
+                  {diversidadeState.bases.triagem}) / Contratado:{" "}
+                  {diversidadeState.genero.contratado}% (
+                  {diversidadeState.genero.contratadoCount} de{" "}
+                  {diversidadeState.bases.contratado})
                 </span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div
-                  className="bg-indigo-500 h-2.5 rounded-full"
-                  style={{ width: `${diversidadeState.genero.contratado}%` }}
-                ></div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Entrevista RH</span>
+                    <span>{diversidadeState.genero.triagem}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-sky-500 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.genero.triagem}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Contratado</span>
+                    <span>{diversidadeState.genero.contratado}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-indigo-500 h-2.5 rounded-full"
+                      style={{
+                        width: `${diversidadeState.genero.contratado}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
+
             <div>
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-sm mb-2 gap-3">
                 <span className="font-medium text-slate-700">
                   Raça/Etnia (Pretos e Pardos)
                 </span>
-                <span className="text-slate-500">
-                  {diversidadeState.raca.triagem}% na triagem /{" "}
-                  {diversidadeState.raca.contratado}% contratados
+                <span className="text-slate-500 text-right">
+                  Entrevista RH: {diversidadeState.raca.triagem}% (
+                  {diversidadeState.raca.triagemCount} de{" "}
+                  {diversidadeState.bases.triagem}) / Contratado:{" "}
+                  {diversidadeState.raca.contratado}% (
+                  {diversidadeState.raca.contratadoCount} de{" "}
+                  {diversidadeState.bases.contratado})
                 </span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div
-                  className="bg-emerald-500 h-2.5 rounded-full"
-                  style={{ width: `${diversidadeState.raca.contratado}%` }}
-                ></div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Entrevista RH</span>
+                    <span>{diversidadeState.raca.triagem}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-teal-500 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.raca.triagem}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Contratado</span>
+                    <span>{diversidadeState.raca.contratado}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-emerald-500 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.raca.contratado}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
+
             <div>
-              <div className="flex justify-between text-sm mb-1">
+              <div className="flex justify-between text-sm mb-2 gap-3">
                 <span className="font-medium text-slate-700">
                   Pessoas com Deficiência (PcD)
                 </span>
-                <span className="text-slate-500">
-                  {diversidadeState.pcd.triagem}% na triagem /{" "}
-                  {diversidadeState.pcd.contratado}% contratados
+                <span className="text-slate-500 text-right">
+                  Entrevista RH: {diversidadeState.pcd.triagem}% (
+                  {diversidadeState.pcd.triagemCount} de{" "}
+                  {diversidadeState.bases.triagem}) / Contratado:{" "}
+                  {diversidadeState.pcd.contratado}% (
+                  {diversidadeState.pcd.contratadoCount} de{" "}
+                  {diversidadeState.bases.contratado})
                 </span>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div
-                  className="bg-amber-500 h-2.5 rounded-full"
-                  style={{ width: `${diversidadeState.pcd.contratado}%` }}
-                ></div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Entrevista RH</span>
+                    <span>{diversidadeState.pcd.triagem}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-amber-400 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.pcd.triagem}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Contratado</span>
+                    <span>{diversidadeState.pcd.contratado}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-amber-600 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.pcd.contratado}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
