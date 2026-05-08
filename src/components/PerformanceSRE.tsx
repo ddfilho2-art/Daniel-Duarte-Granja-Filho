@@ -720,7 +720,7 @@ function EmailMonitor() {
       const response = await safeFetch("/api/retry-emails", { method: "POST" });
       const result = await response.data;
       alert(
-        `✅ ${result?.processed || 0} e-mails processados. Sucesso: ${result?.successCount || 0}, Falhas: ${result?.failCount || 0}`,
+        `✅ ${result?.processed || 0} e-mails processados. Sucesso: ${result?.sent || 0}, Falhas: ${result?.failed || 0}`,
       );
       await fetchEmailQueue();
     } catch (e: any) {
