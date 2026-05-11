@@ -690,9 +690,11 @@ function CandidateProfileModal({
       const activeGeminiKey = rawViteKey || apiConfigKey || "";
 
       if (!activeGeminiKey) {
-        throw new Error(
-          "Chave do Gemini não configurada no ambiente Frontend do sistema.",
+        console.warn(
+          "⚠️ Chave do Gemini não configurada. Avaliação por IA indisponível neste ambiente.",
         );
+        setIsEvaluatingAI(false);
+        return;
       }
 
       const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
@@ -731,7 +733,7 @@ DADOS DO CANDIDATO:
 ${JSON.stringify(fullCandidatoData || candidato, null, 2)}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -5119,7 +5121,7 @@ DADOS DO CANDIDATO:
 ${JSON.stringify(candidatoData, null, 2)}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",

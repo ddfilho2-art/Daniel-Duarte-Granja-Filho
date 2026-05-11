@@ -678,7 +678,7 @@ DADOS DO CANDIDATO:
 ${JSON.stringify({ nome: candidato.nome, email: candidato.email, resume_data: candidato.resume_data })}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-2.5-flash",
             contents: prompt,
             config: {
               responseMimeType: "application/json",

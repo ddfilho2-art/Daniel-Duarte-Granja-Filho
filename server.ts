@@ -16,13 +16,11 @@ async function startServer() {
 
   app.use(express.json());
 
-  const supabaseUrl =
-    process.env.VITE_SUPABASE_URL ||
-    "https://recrutaai-db.supabase-fluxos.cloud";
+  const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
   const supabaseKey =
     process.env.VITE_SUPABASE_SERVICE_ROLE_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY ||
-    "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc3ODE1NzA2MCwiZXhwIjo0OTMzODMwNjYwLCJyb2xlIjoic2VydmljZV9yb2xlIn0.zBZkc8wdEPPDmJo9ILgrTBJlZ4mzMoDUlIVzhnGsmy8";
+    "";
   const supabase =
     supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
