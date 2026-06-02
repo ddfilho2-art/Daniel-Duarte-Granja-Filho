@@ -28,6 +28,7 @@ import { logCandidaturaEvento } from "../lib/events";
 import { useAuth } from "../contexts/AuthContext";
 import { useVagas } from "../lib/useVagas";
 import { safeFetch } from "../lib/api";
+import { sendVerificationCode } from "../lib/email-verification";
 
 export function Home() {
   // [EDITABLE_START:public_home_state]
@@ -1147,7 +1148,7 @@ export function Cadastro() {
             login: formData.login,
             perfil: "Candidato",
           },
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: `${window.location.origin}/verify-email`,
         },
       });
 
@@ -1197,6 +1198,7 @@ export function Cadastro() {
           perfil: "Candidato",
           status: "Ativo",
           resume_completed: false,
+          email_verified: false,
         });
 
         if (userError) {
@@ -1213,18 +1215,7 @@ export function Cadastro() {
         }
       }
 
-      if (!authData.session) {
-        console.log("Tentando login automático...");
-
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.senha,
-        });
-
-        if (loginError) {
-          console.warn("Login automático falhou:", loginError.message);
-        }
-      }
+      await supabase.auth.signOut();
 
       await logAudit(
         "Cadastro",
@@ -1232,16 +1223,21 @@ export function Cadastro() {
         `Novo candidato cadastrado: ${formData.nome}.`,
       );
 
-      setSuccessMsg(
-        "Cadastro realizado com sucesso! Você já pode acessar o sistema.",
-      );
+      sessionStorage.setItem("pending_verify_email", formData.email);
+      sessionStorage.setItem("pending_verify_name", formData.nome);
 
-      setFormData({
-        nome: "",
-        login: "",
-        email: "",
-        senha: "",
-        confirmarSenha: "",
+      try {
+        await sendVerificationCode(formData.email, formData.nome);
+      } catch (verificationError) {
+        console.warn(
+          "Falha ao enviar código de confirmação. Usuário poderá reenviar na tela de verificação.",
+          verificationError,
+        );
+      }
+
+      navigate("/verify-email", {
+        replace: true,
+        state: { email: formData.email, name: formData.nome },
       });
     } catch (err: any) {
       console.error(err);
@@ -1441,6 +1437,20 @@ export function Login() {
     try {
       await login(loginInput, password);
     } catch (err: any) {
+      if (err.message?.startsWith("EMAIL_NOT_VERIFIED")) {
+        const [, pendingEmail, pendingName] = err.message.split(":");
+        const emailToVerify = pendingEmail || loginInput;
+        const nameToVerify = pendingName || "";
+        sessionStorage.setItem("pending_verify_email", emailToVerify);
+        sessionStorage.setItem("pending_verify_name", nameToVerify);
+        navigate("/verify-email", {
+          replace: true,
+          state: { email: emailToVerify, name: nameToVerify },
+        });
+        setError("Confirme seu e-mail antes de entrar.");
+        return;
+      }
+
       setError(err.message || "Erro inesperado.");
     } finally {
       setLoading(false);
