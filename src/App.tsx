@@ -18,6 +18,7 @@ import {
   Cadastro,
   SobreNos,
 } from "./pages/Public";
+import { VerifyEmail } from "./pages/VerifyEmail";
 
 // Admin Pages
 import {
@@ -137,6 +138,7 @@ const App = () => {
               <Route path="/vagas" element={<ListaVagas />} />
               <Route path="/vagas/:id" element={<DetalheVaga />} />
               <Route path="/cadastro" element={<Cadastro />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/sobre" element={<SobreNos />} />
               <Route path="/login" element={<Login />} />
             </Route>
