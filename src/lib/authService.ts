@@ -35,6 +35,11 @@ export async function loginWithLogin(
       throw new Error("Email ou senha inválidos.");
     }
 
+    if (data.email_verified === false) {
+      await supabase.auth.signOut();
+      throw new Error(`EMAIL_NOT_VERIFIED:${data.email}:${data.nome || ""}`);
+    }
+
     // Validação obrigatória de sessão para garantir o JWT
     const {
       data: { session: supabaseSession },
@@ -76,6 +81,7 @@ export async function loginWithLogin(
     matricula: data.matricula,
     unidade_negocio_id: data.unidade_negocio_id,
     resume_completed: data.resume_completed,
+    email_verified: data.email_verified,
   };
 
   // Sincronização opcional do UID na tabela caso esteja desatualizado (importante para RLS)

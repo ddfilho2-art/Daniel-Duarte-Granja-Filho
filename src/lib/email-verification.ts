@@ -1,11 +1,6 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "./supabase";
 
 const N8N_WEBHOOK = "https://n8n.fluxos.online/webhook/enviar_confirmacao";
-
-export interface VerifyEmailCodeResult {
-  success: boolean;
-  error?: string;
-}
 
 export async function sendVerificationCode(
   email: string,
@@ -28,7 +23,7 @@ export async function sendVerificationCode(
     });
 
     if (!response.ok) {
-      throw new Error(`Webhook retornou HTTP ${response.status}`);
+      throw new Error(`Webhook retornou status ${response.status}`);
     }
   } catch (err) {
     console.error("[verify] webhook error", err);
@@ -39,7 +34,7 @@ export async function sendVerificationCode(
 export async function verifyEmailCode(
   email: string,
   code: string,
-): Promise<VerifyEmailCodeResult> {
+): Promise<{ success: boolean; error?: string }> {
   const { data, error } = await (supabase as any).rpc("verify_email_code", {
     p_email: email,
     p_code: code,
@@ -47,5 +42,5 @@ export async function verifyEmailCode(
 
   if (error) return { success: false, error: error.message };
 
-  return data as VerifyEmailCodeResult;
+  return data as { success: boolean; error?: string };
 }
