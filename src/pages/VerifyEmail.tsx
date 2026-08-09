@@ -31,8 +31,11 @@ function mapVerificationError(error?: string) {
   if (normalized.includes("expired")) {
     return "Código expirado. Reenvie um novo código.";
   }
-  if (normalized.includes("invalid_code")) {
-    return "Código incorreto. Verifique e tente novamente.";
+  if (
+    normalized.includes("invalid_code") ||
+    normalized.includes("invalid_or_expired_code")
+  ) {
+    return "Código incorreto ou expirado. Reenvie o código se necessário.";
   }
   if (normalized.includes("too_many_attempts")) {
     return "Muitas tentativas. Reenvie um novo código.";

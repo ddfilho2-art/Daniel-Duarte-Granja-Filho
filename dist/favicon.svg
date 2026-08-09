@@ -1,0 +1,18 @@
+<svg width="512" height="512" viewBox="0 0 680 680" xmlns="http://www.w3.org/2000/svg">
+  <title>DFL Recruta Ai</title>
+  <rect x="20" y="20" width="640" height="640" rx="120" fill="#081540"/>
+  <polygon points="70,340 340,80 340,600" fill="#1a3080"/>
+  <polygon points="340,80 610,340 340,600" fill="#00b4d8"/>
+  <line x1="340" y1="80" x2="340" y2="600" stroke="#081540" stroke-width="5"/>
+  <path d="M 194,255 L 194,445 L 226,445 L 270,410 L 270,290 L 226,255 Z
+           M 219,280 L 231,280 L 256,304 L 256,396 L 231,420 L 219,420 Z"
+        fill="#ffffff" fill-rule="evenodd"/>
+  <path d="M 289,255 L 289,445 L 314,445 L 314,373 L 353,373 L 353,351
+           L 314,351 L 314,280 L 367,280 L 367,255 Z" fill="#ffffff"/>
+  <path d="M 383,255 L 408,255 L 408,420 L 484,420 L 484,445 L 383,445 Z"
+        fill="#ffffff"/>
+  <circle cx="340" cy="80"  r="12" fill="#00d8ff"/>
+  <circle cx="610" cy="340" r="12" fill="#00d8ff"/>
+  <circle cx="340" cy="600" r="12" fill="#00d8ff"/>
+  <circle cx="70"  cy="340" r="12" fill="#4a70c0"/>
+</svg>

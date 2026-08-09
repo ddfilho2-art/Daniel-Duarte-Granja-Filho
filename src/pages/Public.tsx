@@ -29,10 +29,14 @@ import { useAuth } from "../contexts/AuthContext";
 import { useVagas } from "../lib/useVagas";
 import { safeFetch } from "../lib/api";
 import { sendVerificationCode } from "../lib/email-verification";
+import { requestCandidateAnalysis } from "../lib/candidate-analysis";
+import { useTenant } from "../contexts/TenantContext";
+import { resolveAuthorizedHomePath } from "../lib/tenant-access";
 
 export function Home() {
   // [EDITABLE_START:public_home_state]
   const { user } = useAuth();
+  const { branding } = useTenant();
   const { vagas, loading, count, vagasAbertas } = useVagas();
   const [vagasDestaque, setVagasDestaque] = useState<any[]>([]);
   // [EDITABLE_END:public_home_state]
@@ -82,12 +86,12 @@ export function Home() {
   // [EDITABLE_END:public_home_useeffect_init]
 
   return (
-    <div>
+    <div className="tenant-home">
       {/* Hero Section */}
       <section
-        className="relative py-32 overflow-hidden flex items-center min-h-[600px] lg:min-h-[700px]"
+        className="tenant-hero relative py-32 overflow-hidden flex items-center min-h-[600px] lg:min-h-[700px]"
         style={{
-          backgroundColor: "#003399",
+          backgroundColor: "var(--tenant-hero-background)",
           backgroundImage:
             "url('https://images.unsplash.com/photo-1606811841689-23dfddce3e95?auto=format&fit=crop&q=80')",
           backgroundSize: "cover",
@@ -96,7 +100,7 @@ export function Home() {
         }}
       >
         {/* Gradient Overlay for Text Readability */}
-        <div className="absolute inset-0 bg-gradient-to-r from-[#003399] from-60% md:from-40% via-[#003399]/80 via-80% md:via-60% to-transparent"></div>
+        <div className="tenant-hero-overlay absolute inset-0"></div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full flex">
           <div className="max-w-2xl text-left">
@@ -111,22 +115,21 @@ export function Home() {
               <span className="text-[#00b4d8]">sua carreira</span>
             </h1>
 
-            <p className="text-lg md:text-xl text-slate-300 mb-12 max-w-xl font-light leading-relaxed">
-              A DFL é líder nacional em anestésicos odontológicos e referência
-              global em produtos farmacêuticos. Junte-se a uma empresa presente
-              em mais de 45 países e construa uma carreira de impacto.
+            <p className="text-lg md:text-xl mb-12 max-w-xl font-light leading-relaxed opacity-85">
+              Encontre oportunidades na {branding.displayName} e acompanhe cada
+              etapa do processo seletivo em um ambiente seguro.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-start gap-4">
               <Link
                 to="/vagas"
-                className="w-full sm:w-auto bg-[#3b82f6] hover:bg-[#2563eb] text-white px-8 py-3.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-3.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 shadow-lg"
               >
                 Ver vagas abertas <ChevronRight className="w-5 h-5" />
               </Link>
               <Link
                 to="/cadastro"
-                className="w-full sm:w-auto bg-[#00b4d8] hover:bg-[#0096b4] text-white px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg shadow-cyan-500/25 flex items-center justify-center"
+                className="tenant-primary-action w-full sm:w-auto px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg flex items-center justify-center"
               >
                 Cadastre-se
               </Link>
@@ -625,117 +628,12 @@ export function DetalheVaga() {
       // Avaliação IA Automática (Background)
 
       const runAIEvaluation = async () => {
+        if (!user?.id || !id) return;
+
         try {
-          const { data: existingIa } = await supabase
-            .from("analise_ia_candidato")
-            .select("id")
-            .eq("candidato_id", user?.id)
-            .eq("vaga_id", id)
-            .maybeSingle();
-
-          if (existingIa) {
-            console.log("✅ Análise IA já existe para este candidato/vaga");
-            return;
-          }
-
-          const { data: candidato } = await supabase
-            .from("users")
-            .select("*")
-            .eq("id", user?.id)
-            .maybeSingle();
-
-          const { data: vaga } = await supabase
-            .from("vagas")
-            .select("*")
-            .eq("id", id)
-            .maybeSingle();
-
-          if (!candidato || !vaga) return;
-
-          const rawViteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-          if (!rawViteKey) {
-            console.warn("⚠️ VITE_GEMINI_API_KEY não configurada");
-            return;
-          }
-
-          const { GoogleGenAI, Type } = await import("@google/genai");
-          const ai = new GoogleGenAI({ apiKey: rawViteKey });
-
-          const prompt = `Você é um recrutador técnico de alta precisão. Analise o candidato e a vaga fornecidos. Gere um JSON com a seguinte estrutura:
-{
-  "score_total": number (0-100),
-  "score_tecnico": number (0-10),
-  "score_experiencia": number (0-10),
-  "score_formacao": number (0-10),
-  "score_soft_skills": number (0-10),
-  "resumo_ia": string,
-  "risco_evasao": "Baixo" | "Médio" | "Alto",
-  "motivo_risco": string
-}
-DADOS DA VAGA:
-${JSON.stringify({ titulo: vaga.titulo, departamento: vaga.departamento, descricao: vaga.descricao, requisitos: vaga.requisitos })}
-
-DADOS DO CANDIDATO:
-${JSON.stringify({ nome: candidato.nome, email: candidato.email, resume_data: candidato.resume_data })}`;
-
-          const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.OBJECT,
-                properties: {
-                  score_total: { type: Type.NUMBER },
-                  score_tecnico: { type: Type.NUMBER },
-                  score_experiencia: { type: Type.NUMBER },
-                  score_formacao: { type: Type.NUMBER },
-                  score_soft_skills: { type: Type.NUMBER },
-                  resumo_ia: { type: Type.STRING },
-                  risco_evasao: { type: Type.STRING },
-                  motivo_risco: { type: Type.STRING },
-                },
-                required: [
-                  "score_total",
-                  "score_tecnico",
-                  "score_experiencia",
-                  "score_formacao",
-                  "score_soft_skills",
-                  "resumo_ia",
-                  "risco_evasao",
-                  "motivo_risco",
-                ],
-              },
-            },
-          });
-
-          const text = response.text;
-          if (!text) return;
-
-          const resultadoIA = JSON.parse(text);
-
-          await supabase.from("analise_ia_candidato").insert({
-            vaga_id: id,
-            candidato_id: user?.id,
-            score_total: resultadoIA.score_total,
-            tecnico: resultadoIA.score_tecnico,
-            experiencia: resultadoIA.score_experiencia,
-            formacao: resultadoIA.score_formacao,
-            soft_skills: resultadoIA.score_soft_skills,
-            ferramentas: 0,
-            justificativa: resultadoIA.resumo_ia,
-            risco_evasao: resultadoIA.risco_evasao,
-            motivo_risco: resultadoIA.motivo_risco,
-            score_tecnico: resultadoIA.score_tecnico,
-            score_experiencia: resultadoIA.score_experiencia,
-            score_formacao: resultadoIA.score_formacao,
-            score_soft_skills: resultadoIA.score_soft_skills,
-            raw_json: resultadoIA,
-          });
-
-          console.log("✅ Avaliação IA salva para", user?.id, id);
-        } catch (err_ia) {
-          console.error("❌ Erro na IA automática:", err_ia);
+          await requestCandidateAnalysis(user.id, id);
+        } catch (error) {
+          console.error("Erro na avaliação automática:", error);
         }
       };
       runAIEvaluation();
@@ -1089,7 +987,16 @@ export function Cadastro() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
   const navigate = useNavigate();
-  const { user, profile, authLoading, profileLoading } = useAuth();
+  const {
+    user,
+    profile,
+    authLoading,
+    profileLoading,
+    tenantMembershipLoading,
+    tenantRoles,
+    canAdministerTenant,
+  } = useAuth();
+  const { isTenantRoute } = useTenant();
 
   const [formData, setFormData] = useState({
     nome: "",
@@ -1103,21 +1010,32 @@ export function Cadastro() {
   // [EDITABLE_START:public_cadastro_useeffect_redirect]
   useEffect(() => {
     if (
-      !authLoading &&
-      !profileLoading &&
-      user &&
-      profile &&
-      (user as any).email_confirmed_at
+      authLoading ||
+      profileLoading ||
+      tenantMembershipLoading ||
+      !user ||
+      !profile
     ) {
-      const p = profile.perfil?.toLowerCase();
-      console.log(
-        `➡️ [NAVIGATION] disparada - Redirecionando usuário logado para /${p}`,
-      );
-      if (p === "admin") navigate("/admin");
-      else if (p === "rh") navigate("/rh");
-      else navigate("/candidato");
+      return;
     }
-  }, [user, profile, authLoading, profileLoading, navigate]);
+
+    const destination = resolveAuthorizedHomePath(
+      profile.perfil,
+      isTenantRoute,
+      { roles: tenantRoles, canAdministerTenant },
+    );
+    if (destination) navigate(destination, { replace: true });
+  }, [
+    user,
+    profile,
+    authLoading,
+    profileLoading,
+    tenantMembershipLoading,
+    tenantRoles,
+    canAdministerTenant,
+    isTenantRoute,
+    navigate,
+  ]);
   // [EDITABLE_END:public_cadastro_useeffect_redirect]
 
   // [EDITABLE_START:public_cadastro_handle_submit]
@@ -1401,28 +1319,58 @@ export function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user, profile, authLoading, profileLoading, login } = useAuth();
+  const {
+    user,
+    profile,
+    authLoading,
+    profileLoading,
+    tenantMembershipLoading,
+    tenantRoles,
+    hasTenantAccess,
+    canAdministerTenant,
+    login,
+  } = useAuth();
+  const { isTenantRoute } = useTenant();
   // [EDITABLE_END:public_login_state]
 
   // [EDITABLE_START:public_login_useeffect_redirect]
   useEffect(() => {
-    if (!authLoading && !profileLoading && user) {
-      // Se temos o perfil, redirecionamos para a rota correta
-      if (profile) {
-        console.log(
-          "[LOGIN] 🚀 Redirecionando usuário com perfil:",
-          profile.perfil,
-        );
-        const p = profile.perfil?.toLowerCase();
-        console.log(
-          `➡️ [NAVIGATION] disparada - Redirecionando usuário logado para /${p}`,
-        );
-        if (p === "rh") navigate("/rh", { replace: true });
-        else if (p === "admin") navigate("/admin", { replace: true });
-        else navigate("/candidato", { replace: true });
-      }
+    if (
+      authLoading ||
+      profileLoading ||
+      tenantMembershipLoading ||
+      !user ||
+      !profile
+    ) {
+      return;
     }
-  }, [user, profile, authLoading, profileLoading, navigate]);
+
+    const destination = resolveAuthorizedHomePath(
+      profile.perfil,
+      isTenantRoute,
+      { roles: tenantRoles, canAdministerTenant },
+    );
+
+    if (destination) {
+      navigate(destination, { replace: true });
+      return;
+    }
+
+    if (isTenantRoute && !hasTenantAccess) {
+      setError("Sua conta não possui vínculo ativo com esta empresa.");
+    }
+  }, [
+    user,
+    profile,
+    authLoading,
+    profileLoading,
+    tenantMembershipLoading,
+    tenantRoles,
+    hasTenantAccess,
+    canAdministerTenant,
+    isTenantRoute,
+    navigate,
+  ]);
   // [EDITABLE_END:public_login_useeffect_redirect]
 
   // [EDITABLE_START:public_login_handle_submit]

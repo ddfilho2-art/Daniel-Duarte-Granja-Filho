@@ -50,8 +50,8 @@ import {
   ExternalLink,
   Sparkles,
 } from "lucide-react";
-import { GoogleGenAI, Type } from "@google/genai";
 import { uploadFiles } from "../lib/upload";
+import { requestCandidateAnalysis } from "../lib/candidate-analysis";
 import { safeFetch } from "../lib/api";
 import { TransferOwnerModal } from "../components/TransferOwnerModal";
 import {
@@ -641,8 +641,18 @@ function CandidateProfileModal({
   const handleAIEvaluate = async () => {
     if (!vaga || (!candidato && !fullCandidatoData)) return;
 
-    const candidatoId = candidato.id;
+    const candidatoId =
+      candidato?.id ||
+      candidato?.candidatoId ||
+      candidatura?.candidato_id ||
+      fullCandidatoData?.id ||
+      fullCandidatoData?.uid;
     const vagaId = vaga.id;
+
+    if (!candidatoId) {
+      alert("Não foi possível identificar o candidato para a avaliação.");
+      return;
+    }
 
     setIsEvaluatingAI(true);
     try {
@@ -674,101 +684,12 @@ function CandidateProfileModal({
         return;
       }
 
-      // 2. Se NÃO existir: autorizar chamada da IA
-      // FIX: Tratar importação segura de variáveis no Vite client-side e fallback
-      const rawViteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-
-      let apiConfigKey = "";
-      try {
-        // @ts-ignore
-        apiConfigKey =
-          typeof process !== "undefined" && process.env
-            ? process.env.GEMINI_API_KEY
-            : "";
-      } catch (e) {}
-
-      const activeGeminiKey = rawViteKey || apiConfigKey || "";
-
-      if (!activeGeminiKey) {
-        console.warn(
-          "⚠️ Chave do Gemini não configurada. Avaliação por IA indisponível neste ambiente.",
-        );
-        setIsEvaluatingAI(false);
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
-
-      const prompt = `Você é um recrutador técnico de alta precisão. Analise o candidato e a vaga fornecidos. Gere um JSON com a seguinte estrutura:
-{
-"score_total": number,
-"score_experiencia": number,
-"score_cultura": number,
-"score_tecnico": number,
-"score_formacao": number,
-"score_soft_skills": number,
-"resumo_ia": string,
-"risco_evasao": "Baixo" | "Médio" | "Alto",
-"motivo_risco": string
-}
-Se os dados forem de teste ou insuficientes, preencha os números com 0. Não responda nada além do JSON.
-
----
-DADOS DA VAGA:
-${JSON.stringify(
-  {
-    titulo: vaga.titulo || vaga.cargo,
-    departamento: vaga.departamento,
-    descricao: vaga.descricao,
-    requisitos: vaga.requisitos,
-    certificacoes: vaga.certificacoes,
-  },
-  null,
-  2,
-)}
-
----
-
-DADOS DO CANDIDATO:
-${JSON.stringify(fullCandidatoData || candidato, null, 2)}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              score_total: { type: Type.NUMBER },
-              score_experiencia: { type: Type.NUMBER },
-              score_cultura: { type: Type.NUMBER },
-              score_tecnico: { type: Type.NUMBER },
-              score_formacao: { type: Type.NUMBER },
-              score_soft_skills: { type: Type.NUMBER },
-              resumo_ia: { type: Type.STRING },
-              risco_evasao: { type: Type.STRING },
-              motivo_risco: { type: Type.STRING },
-            },
-            required: [
-              "score_total",
-              "score_experiencia",
-              "score_cultura",
-              "score_tecnico",
-              "score_formacao",
-              "score_soft_skills",
-              "resumo_ia",
-              "risco_evasao",
-              "motivo_risco",
-            ],
-          },
-        },
+      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, {
+        waitForResult: true,
       });
-
-      const text = response.text;
-      if (!text) throw new Error("Resposta vazia do Gemini.");
-
-      const evaluation = JSON.parse(text);
+      if (!evaluation) {
+        throw new Error("A análise ainda está sendo processada. Tente novamente.");
+      }
 
       // Mapeia para o formato que a interface espera
       setAiEvaluation({
@@ -784,54 +705,7 @@ ${JSON.stringify(fullCandidatoData || candidato, null, 2)}`;
         justificativa: evaluation.resumo_ia,
       });
 
-      // Salvar a análise da IA no banco Supabase usando a função RPC existente
-      try {
-        const { error: rpcError } = await supabase.rpc("upsert_analise_ia", {
-          p_candidato_id: candidato.id,
-          p_vaga_id: vaga.id,
-          p_score_total: evaluation.score_total,
-          p_tecnico: evaluation.score_tecnico,
-          p_experiencia: evaluation.score_experiencia,
-          p_formacao: evaluation.score_formacao,
-          p_soft_skills: evaluation.score_soft_skills,
-          p_ferramentas: 0,
-          p_justificativa: evaluation.resumo_ia,
-          p_raw_json: evaluation,
-        });
 
-        if (rpcError) {
-          const { error: insertError } = await supabase
-            .from("analise_ia_candidato")
-            .insert({
-              candidato_id: candidato.id,
-              vaga_id: vaga.id,
-              score_total: evaluation.score_total,
-              tecnico: evaluation.score_tecnico || 0,
-              experiencia: evaluation.score_experiencia || 0,
-              formacao: evaluation.score_formacao || 0,
-              soft_skills: evaluation.score_soft_skills || 0,
-              ferramentas: 0,
-              justificativa: evaluation.resumo_ia || "Análise automática",
-              raw_json: evaluation,
-              score_experiencia: evaluation.score_experiencia || 0,
-              score_cultura: evaluation.score_cultura || 0,
-              score_tecnico: evaluation.score_tecnico || 0,
-              score_formacao: evaluation.score_formacao || 0,
-              score_soft_skills: evaluation.score_soft_skills || 0,
-              risco_evasao: evaluation.risco_evasao || "Baixo",
-              motivo_risco: evaluation.motivo_risco || "Sem informações",
-            });
-          if (insertError) {
-            console.error("Falha no fallback:", insertError);
-          } else {
-            console.log("Salvo via insert");
-          }
-        } else {
-          console.log("Análise IA salva com sucesso no banco via RPC.");
-        }
-      } catch (saveError) {
-        console.error("Erro inesperado ao salvar análise IA:", saveError);
-      }
     } catch (error: any) {
       console.error("Erro na avaliação AI:", error);
       alert("Erro ao avaliar com IA: " + error.message);
@@ -5070,164 +4944,21 @@ export function HRCandidatos() {
         return;
       }
 
-      // Obter chave da API
-      const rawViteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-      let apiConfigKey = "";
-      try {
-        apiConfigKey =
-          typeof process !== "undefined" && process.env
-            ? process.env.GEMINI_API_KEY
-            : "";
-      } catch (e) {}
-
-      const activeGeminiKey = rawViteKey || apiConfigKey || "";
-      if (!activeGeminiKey) {
-        return;
-      }
-
-      const ai = new GoogleGenAI({ apiKey: activeGeminiKey });
-
-      const prompt = `Você é um recrutador técnico de alta precisão. Analise o candidato e a vaga fornecidos. Gere um JSON com a seguinte estrutura:
-{
-"score_total": number,
-"score_experiencia": number,
-"score_cultura": number,
-"score_tecnico": number,
-"score_formacao": number,
-"score_soft_skills": number,
-"resumo_ia": string,
-"risco_evasao": "Baixo" | "Médio" | "Alto",
-"motivo_risco": string
-}
-Se os dados forem de teste ou insuficientes, preencha os números com 0. Não responda nada além do JSON.
-
----
-DADOS DA VAGA:
-${JSON.stringify(
-  {
-    titulo: vaga.titulo || vaga.cargo,
-    departamento: vaga.departamento,
-    descricao: vaga.descricao,
-    requisitos: vaga.requisitos,
-    certificacoes: vaga.certificacoes,
-  },
-  null,
-  2,
-)}
-
----
-
-DADOS DO CANDIDATO:
-${JSON.stringify(candidatoData, null, 2)}`;
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              score_total: { type: Type.NUMBER },
-              score_experiencia: { type: Type.NUMBER },
-              score_cultura: { type: Type.NUMBER },
-              score_tecnico: { type: Type.NUMBER },
-              score_formacao: { type: Type.NUMBER },
-              score_soft_skills: { type: Type.NUMBER },
-              resumo_ia: { type: Type.STRING },
-              risco_evasao: { type: Type.STRING },
-              motivo_risco: { type: Type.STRING },
-            },
-            required: [
-              "score_total",
-              "score_experiencia",
-              "score_cultura",
-              "score_tecnico",
-              "score_formacao",
-              "score_soft_skills",
-              "resumo_ia",
-              "risco_evasao",
-              "motivo_risco",
-            ],
-          },
-        },
+      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, {
+        waitForResult: true,
       });
+      if (!evaluation) return;
 
-      const text = response.text;
-      if (!text) {
-        return;
-      }
-
-      const evaluation = JSON.parse(text);
-
-      // Salvar no banco
-      try {
-        let persisted = false;
-
-        const { error: rpcError } = await supabase.rpc("upsert_analise_ia", {
-          p_candidato_id: candidatoId,
-          p_vaga_id: vagaId,
-          p_score_total: evaluation.score_total,
-          p_tecnico: evaluation.score_tecnico,
-          p_experiencia: evaluation.score_experiencia,
-          p_formacao: evaluation.score_formacao,
-          p_soft_skills: evaluation.score_soft_skills,
-          p_ferramentas: 0,
-          p_justificativa: evaluation.resumo_ia,
-          p_raw_json: evaluation,
-        });
-
-        if (rpcError) {
-          const { error: insertError } = await supabase
-            .from("analise_ia_candidato")
-            .upsert(
-              {
-                candidato_id: candidatoId,
-                vaga_id: vagaId,
+      setCandidatos((prev) =>
+        prev.map((item) =>
+          item.candidato?.id === candidatoId && item.vagaId === vagaId
+            ? {
+                ...item,
                 score_total: evaluation.score_total,
-                tecnico: evaluation.score_tecnico || 0,
-                experiencia: evaluation.score_experiencia || 0,
-                formacao: evaluation.score_formacao || 0,
-                soft_skills: evaluation.score_soft_skills || 0,
-                ferramentas: 0,
-                justificativa: evaluation.resumo_ia || "Análise automática",
-                raw_json: evaluation,
-                score_experiencia: evaluation.score_experiencia || 0,
-                score_cultura: evaluation.score_cultura || 0,
-                score_tecnico: evaluation.score_tecnico || 0,
-                score_formacao: evaluation.score_formacao || 0,
-                score_soft_skills: evaluation.score_soft_skills || 0,
-                risco_evasao: evaluation.risco_evasao || "Baixo",
-                motivo_risco: evaluation.motivo_risco || "Sem informações",
-              },
-              {
-                onConflict: "candidato_id,vaga_id",
-              },
-            );
-          if (insertError) {
-            console.error("Falha no fallback:", insertError);
-          } else {
-            persisted = true;
-          }
-        } else {
-          persisted = true;
-        }
-
-        if (persisted) {
-          setCandidatos((prev) =>
-            prev.map((item) =>
-              item.candidato?.id === candidatoId && item.vagaId === vagaId
-                ? {
-                    ...item,
-                    score_total: evaluation.score_total,
-                  }
-                : item,
-            ),
-          );
-        }
-      } catch (saveError) {
-        console.error("Erro ao salvar análise:", saveError);
-      }
+              }
+            : item,
+        ),
+      );
     } catch (error: any) {
       console.error("Erro na avaliação IA:", error);
     }

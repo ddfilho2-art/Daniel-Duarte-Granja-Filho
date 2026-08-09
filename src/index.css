@@ -33,6 +33,18 @@
   --color-ring: #0054A6;
 }
 
+:root {
+  --tenant-sidebar-background: #27336D;
+  --tenant-sidebar-text: #FFFFFF;
+  --tenant-sidebar-active: #0054A6;
+  --tenant-sidebar-hover: #33417E;
+  --tenant-home-background: #F8FAFC;
+  --tenant-hero-background: #0054A6;
+  --tenant-hero-text: #FFFFFF;
+  --tenant-primary-action: #00A859;
+  --tenant-link-color: #0054A6;
+}
+
 @layer base {
   * {
     @apply border-border;
@@ -40,6 +52,61 @@
   body {
     @apply bg-slate-50 text-slate-900 font-sans;
   }
+}
+
+.tenant-home {
+  background-color: var(--tenant-home-background);
+}
+
+.tenant-hero {
+  background-color: var(--tenant-hero-background);
+  color: var(--tenant-hero-text);
+}
+
+.tenant-hero-overlay {
+  background: linear-gradient(
+    90deg,
+    var(--tenant-hero-background) 0%,
+    color-mix(in srgb, var(--tenant-hero-background) 88%, transparent) 60%,
+    transparent 100%
+  );
+}
+
+.tenant-primary-action {
+  background-color: var(--tenant-primary-action);
+  color: #ffffff;
+}
+
+.tenant-primary-action:hover {
+  background-color: color-mix(in srgb, var(--tenant-primary-action) 88%, #000000);
+}
+
+.tenant-sidebar {
+  background-color: var(--tenant-sidebar-background);
+  color: var(--tenant-sidebar-text);
+  border-color: color-mix(in srgb, var(--tenant-sidebar-text) 18%, transparent);
+}
+
+.tenant-sidebar-border {
+  border-color: color-mix(in srgb, var(--tenant-sidebar-text) 18%, transparent);
+}
+
+.tenant-sidebar-link {
+  color: color-mix(in srgb, var(--tenant-sidebar-text) 82%, transparent);
+}
+
+.tenant-sidebar-link:hover {
+  color: var(--tenant-sidebar-text);
+  background-color: var(--tenant-sidebar-hover);
+}
+
+.tenant-sidebar-link[data-active="true"] {
+  color: var(--tenant-sidebar-text);
+  background-color: var(--tenant-sidebar-active);
+}
+
+.tenant-sidebar-muted {
+  color: color-mix(in srgb, var(--tenant-sidebar-text) 76%, transparent);
 }
 
 .glass {

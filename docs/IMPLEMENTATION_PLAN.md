@@ -1,0 +1,663 @@
+# Plano de implementação — engine seguro e multi-tenant
+
+> **Este arquivo é a fonte oficial de acompanhamento do projeto.**
+>
+> Deve ser atualizado sempre que uma tarefa for iniciada, concluída, bloqueada,
+> replanejada ou validada. Nenhuma etapa estrutural deve começar sem constar aqui.
+
+## Objetivo final
+
+Transformar a aplicação atual, criada para uma única empresa e com regras de
+negócio concentradas no frontend, em uma plataforma de recrutamento:
+
+- multi-tenant, com isolamento integral entre empresas;
+- acessada por URL canônica no formato `/t/:empresa`, por exemplo
+  `https://processflow-hub.vercel.app/t/empresa-x`;
+- administrada por um `Platform Master Admin`;
+- com identidade visual individual por empresa, configurada pelo Master Admin;
+- com administradores titulares e substitutos por empresa;
+- com engine de negócio executado por RPCs SQL transacionais;
+- com integrações secretas executadas apenas em Supabase Edge Functions;
+- com portal restrito para a clínica de saúde ocupacional;
+- com chat e anexos privados entre o RH local e a clínica;
+- sem `service_role`, Gemini, SMTP ou outros segredos no bundle do navegador;
+- documentada, testada e implantável no Supabase e na Vercel.
+
+## Definição de pronto
+
+O projeto só será considerado concluído quando:
+
+1. todas as tabelas de negócio tiverem `tenant_id` ou vínculo equivalente;
+2. RLS impedir acesso cruzado mesmo com chamadas manuais à API;
+3. nenhuma regra crítica depender exclusivamente do frontend;
+4. nenhuma chave secreta estiver no bundle ou em tabela legível pelo cliente;
+5. o Master Admin conseguir provisionar uma empresa e seu administrador;
+6. o Master Admin conseguir publicar cores e logos próprios para cada empresa;
+7. a identidade visual de um tenant nunca aparecer no site de outro tenant;
+8. substituições administrativas respeitarem período, motivo e revogação;
+9. cada slug exibir somente vagas e conteúdo da empresa correspondente;
+10. a clínica enxergar somente encaminhamentos explicitamente liberados;
+11. clínica e RH conseguirem trocar mensagens e anexos no encaminhamento;
+12. testes automatizados comprovarem isolamento entre pelo menos dois tenants;
+13. migrations puderem reconstruir o banco sem ajustes manuais ocultos;
+14. documentação de arquitetura, migrations, operação, testes e deploy estiver
+    atualizada;
+15. build, typecheck, testes e smoke tests de produção passarem.
+
+---
+
+## Legenda de status
+
+| Símbolo | Status | Significado |
+|---|---|---|
+| ✅ | Concluída | Implementada e validada conforme o critério de aceite |
+| 🔄 | Em andamento | Trabalho iniciado, ainda não concluído ou validado |
+| 🟡 | Pronta para executar | Dependências atendidas; pode ser a próxima tarefa |
+| ⏳ | Pendente | Ainda não iniciada |
+| ⛔ | Bloqueada | Depende de informação, acesso ou decisão externa |
+| ⚠️ | Em revisão | Implementada, mas aguarda revisão ou validação |
+
+## Regra de atualização
+
+Ao trabalhar em qualquer item:
+
+1. mudar o status para `🔄 Em andamento`;
+2. registrar a data e os arquivos envolvidos em **Registro de andamento**;
+3. executar validação específica;
+4. somente marcar `✅ Concluída` se a validação realmente passar;
+5. se depender de informação externa, marcar `⛔ Bloqueada` e registrar exatamente
+   o que falta;
+6. não iniciar uma migration dependente do schema remoto enquanto a descoberta do
+   banco não estiver concluída.
+
+---
+
+## Resumo executivo atual
+
+**Atualizado em:** 2026-08-08
+
+| Fase | Situação | Progresso estimado |
+|---|---|---:|
+| 0. Governança e planejamento | 🔄 Em andamento | 80% |
+| 1. Descoberta e baseline do banco | ⛔ Bloqueada | 35% |
+| 2. Contenção imediata de segurança | 🔄 Em andamento | 45% |
+| 3. Arquitetura multi-tenant | 🔄 Em andamento | 25% |
+| 4. Fundação SQL multi-tenant | 🔄 Em andamento | 20% |
+| 5. Migração dos dados atuais | ⏳ Pendente | 0% |
+| 6. RLS e isolamento por tenant | ⏳ Pendente | 0% |
+| 7. Provisionamento pelo Master Admin | ⏳ Pendente | 0% |
+| 8. Administrador titular e substituto | ⏳ Pendente | 0% |
+| 9. URLs e contexto de tenant | 🔄 Em andamento | 35% |
+| 10. Engine de recrutamento em RPC/SQL | ⏳ Pendente | 0% |
+| 11. Clínica ocupacional | 🔄 Em andamento | 55% |
+| 12. Chat e anexos do exame médico | 🔄 Em andamento | 25% |
+| 13. Edge Functions e integrações | 🔄 Em andamento | 30% |
+| 14. Refatoração do frontend | 🔄 Em andamento | 15% |
+| 15. Testes e CI | ⏳ Pendente | 0% |
+| 16. Documentação final | 🔄 Em andamento | 10% |
+| 17. Deploy Supabase/Vercel | ⏳ Pendente | 0% |
+| 18. Cutover e operação | ⏳ Pendente | 0% |
+
+> O percentual representa avanço técnico aproximado, não prazo decorrido.
+
+---
+
+# Backlog detalhado
+
+## Fase 0 — Governança e planejamento
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| GOV-001 | ✅ | Criar roadmap oficial do projeto | Este arquivo existe e contém fases, dependências e status |
+| GOV-002 | 🔄 | Manter o roadmap atualizado a cada alteração | Toda mudança futura atualiza este documento |
+| GOV-003 | 🔄 | Criar registro de decisões arquiteturais (`docs/adr/`) | Decisões de tenancy, identidade, URL e clínica documentadas |
+| GOV-004 | ⏳ | Definir estratégia de ambientes | Local, preview, staging e produção descritos |
+| GOV-005 | ⏳ | Definir política de rollback de migrations | Cada fase de migration possui backup, verificação e reversão |
+
+## Fase 1 — Descoberta e baseline do banco real
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| DB-001 | ✅ | Criar diagnóstico de schema | `supabase/diagnostics/01_schema_inventory.sql` criado |
+| DB-002 | ✅ | Criar diagnóstico de segurança e Storage | `02_security_and_storage.sql` criado |
+| DB-003 | ✅ | Criar diagnóstico de funções/RPCs | `03_function_definitions.sql` criado |
+| DB-004 | ✅ | Criar verificações operacionais | `04_operational_checks.sql` criado |
+| DB-005 | ✅ | Executar os quatro diagnósticos no banco remoto | Resultados exportados e disponibilizados sem segredos |
+| DB-006 | ✅ | Consolidar schema real usado pelo recrutamento | Todas as tabelas, colunas, FKs, RPCs, policies e buckets conhecidos |
+| DB-007 | 🔄 | Criar migration baseline do schema remoto ausente | Banco novo reproduz integralmente o runtime atual |
+| DB-008 | ⏳ | Detectar e eliminar drift entre remoto e repositório | Diff declarativo sem objetos desconhecidos |
+
+**Bloqueio atual:** executar no Supabase SQL Editor os arquivos documentados em
+`docs/DATABASE_DISCOVERY.md` e fornecer os resultados. Sem isso, não é seguro
+alterar definitivamente `users`, `vagas`, `candidaturas`, `mensagens`, `settings`,
+`logs`, `provas`, `analise_ia_candidato`, `transferencias` e buckets legados.
+
+## Fase 2 — Contenção imediata de segurança
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| SEC-001 | ⚠️ | Remover `service_role` do namespace `VITE_*` | Nenhum módulo do frontend referencia a chave; bundle inspecionado |
+| SEC-002 | ⚠️ | Remover Gemini do navegador | Frontend envia somente IDs para Edge Function; bundle sem chave/SDK |
+| SEC-003 | 🔄 | Substituir verificação vulnerável por fluxo server-side | Código nunca retorna ao cliente; fluxo de duas fases validado |
+| SEC-004 | 🔄 | Migrar operações administrativas para Edge Function | Criar/editar/resetar/inativar RH somente no servidor |
+| SEC-005 | ⏳ | Retirar SMTP de `settings` e do navegador | Senha removida da tabela/payload e rotacionada |
+| SEC-006 | ⏳ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
+| SEC-007 | ⏳ | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
+| SEC-008 | ⏳ | Tornar buckets sensíveis privados | Currículos, provas e anexos usam URL assinada |
+| SEC-009 | ⏳ | Remover scripts com credenciais fixas | Nenhuma senha literal operacional no repositório/histórico ativo |
+| SEC-010 | ⏳ | Rotacionar segredos potencialmente expostos | Service role, Gemini, SMTP, n8n e contas seed rotacionados |
+| SEC-011 | 🔄 | Corrigir sessão baseada em `localStorage` | Autenticação deriva de sessão Supabase válida e perfil reconsultado |
+| SEC-012 | ⏳ | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
+
+## Fase 3 — Arquitetura multi-tenant
+
+### Decisões já adotadas
+
+| ID | Status | Decisão |
+|---|---|---|
+| ARC-001 | ✅ | Usar rota canônica `/t/:tenantSlug`, não `\empresa` |
+| ARC-002 | ✅ | Manter uma única aplicação Vercel e um único projeto Supabase inicialmente |
+| ARC-003 | ✅ | Isolamento principal no PostgreSQL com `tenant_id` + RLS |
+| ARC-004 | ✅ | Clínica ocupacional recebe acesso por encaminhamento, não por membership global no tenant contratante |
+| ARC-005 | ✅ | Chat da clínica pertence ao encaminhamento médico, não ao chat geral da candidatura |
+| ARC-011 | ✅ | Branding é armazenado por tenant e publicado exclusivamente pelo Platform Master Admin |
+| ARC-012 | ✅ | Tema usa tokens predefinidos; não será permitido CSS arbitrário informado pelo usuário |
+
+### Decisões ainda necessárias
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| ARC-006 | 🟡 | Definir se candidato terá currículo global ou cópia por tenant | ADR aprovado com regras LGPD e revogação |
+| ARC-007 | 🟡 | Definir se haverá uma ou várias clínicas ocupacionais | Modelo suporta contrato atual e expansão futura |
+| ARC-008 | 🟡 | Definir domínio customizado por empresa em fase futura | Estratégia de host/subdomínio documentada |
+| ARC-009 | ⏳ | Definir retenção e base legal de currículo/IA/exame | Política de dados aprovada e implementável |
+| ARC-010 | ⏳ | Definir papéis finais e matriz de permissões | Matriz cobrindo Master, Admin, substituto, RH, candidato e clínica |
+
+### URL recomendada
+
+```text
+https://processflow-hub.vercel.app/                 -> portal/plataforma
+https://processflow-hub.vercel.app/master           -> Master Admin
+https://processflow-hub.vercel.app/t/empresa-x      -> site público da empresa
+https://processflow-hub.vercel.app/t/empresa-x/login
+https://processflow-hub.vercel.app/t/empresa-x/admin
+https://processflow-hub.vercel.app/t/empresa-x/rh
+https://processflow-hub.vercel.app/t/empresa-x/candidato
+https://processflow-hub.vercel.app/saude-ocupacional -> portal da clínica
+```
+
+O caractere `\` não deve ser usado em URL web. O padrão correto é `/`.
+
+## Fase 4 — Fundação SQL multi-tenant
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| TEN-001 | 🔄 | Criar tabela `tenants` | UUID, CNPJ normalizado/único, nome, slug único, status e branding |
+| TEN-002 | 🔄 | Criar papéis de plataforma | `platform_master_admin` separado dos papéis de tenant |
+| TEN-003 | 🔄 | Criar `tenant_memberships` | Usuário pode ter papel e status por empresa |
+| TEN-004 | 🔄 | Criar funções `current_tenant_id`/`has_tenant_role` | Helpers seguros, com `search_path` e ACL restrita |
+| TEN-005 | 🔄 | Criar contexto de tenant por slug | RPC pública retorna somente dados públicos do tenant ativo |
+| TEN-006 | ⏳ | Adicionar `tenant_id` às tabelas legadas | Colunas inicialmente nullable e sem quebrar produção |
+| TEN-007 | ⏳ | Criar FKs e índices compostos por tenant | Integridade e consultas tenant-aware validadas |
+| TEN-008 | ⏳ | Tornar unicidades tenant-aware | Ex.: código da vaga e login conforme regra definida |
+| TEN-009 | ⏳ | Tornar `tenant_id` obrigatório | Apenas após backfill e validação integral |
+| TEN-010 | 🔄 | Criar auditoria com `tenant_id` | Toda ação privilegiada identifica plataforma/tenant/ator |
+| TEN-011 | 🔄 | Criar `tenant_branding` | Um tema ativo por tenant, com tokens de cor e paths de assets |
+| TEN-012 | 🔄 | Criar histórico de versões do branding | Publicação, autor, versão anterior e rollback auditáveis |
+| TEN-013 | 🔄 | Criar projeção pública segura do branding | Visitante lê somente tema publicado do slug ativo |
+
+## Fase 5 — Migração dos dados da empresa atual
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| MIG-001 | ⏳ | Criar tenant da empresa atual | CNPJ, nome e slug confirmados |
+| MIG-002 | ⏳ | Fazer backfill de memberships | Admin/RH atuais associados ao tenant correto |
+| MIG-003 | ⏳ | Fazer backfill das tabelas de negócio | Nenhuma linha de negócio fica sem tenant |
+| MIG-004 | ⏳ | Fazer backfill de Storage | Paths reorganizados por tenant sem quebrar downloads |
+| MIG-005 | ⏳ | Validar contagens antes/depois | Contagens e checksums documentados |
+| MIG-006 | ⏳ | Criar backup e ensaio de rollback | Restauração testada em staging |
+
+## Fase 6 — RLS e isolamento
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| RLS-001 | ⏳ | Criar matriz de acesso por tabela/operação | SELECT/INSERT/UPDATE/DELETE explicitados |
+| RLS-002 | ⏳ | Aplicar RLS a todas as tabelas tenant-aware | Nenhuma tabela de negócio sem RLS |
+| RLS-003 | ⏳ | Remover policies `USING (true)` sensíveis | Acesso público limitado a projeções seguras |
+| RLS-004 | ⏳ | Criar views públicas de vagas | Sem PII ou campos internos |
+| RLS-005 | ⏳ | Bloquear mutações diretas do engine | Cliente usa somente RPCs aprovadas |
+| RLS-006 | ⏳ | Restringir auditoria/eventos a escrita server-side | Ator e timestamp não são forjáveis |
+| RLS-007 | ⏳ | Testar isolamento com usuário malicioso | Tentativas cross-tenant retornam zero linhas/403 |
+| RLS-008 | ⏳ | Executar Supabase database linter | Sem alertas críticos de segurança |
+
+## Fase 7 — Master Admin e provisionamento
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| MST-001 | ⏳ | Criar portal `/master` | Apenas `platform_master_admin` acessa |
+| MST-002 | ⏳ | Criar empresa por CNPJ/nome/slug | Validação, normalização e unicidade no servidor |
+| MST-003 | ⏳ | Criar administrador titular | Auth + membership + auditoria reconciliáveis |
+| MST-004 | ⏳ | Configurar branding e URL | Site responde no slug com o tema publicado da empresa |
+| MST-005 | ⏳ | Criar editor de identidade visual | Master altera tokens de menus e página inicial com pré-visualização |
+| MST-006 | ⏳ | Gerenciar logos da empresa | Upload, substituição, versão e restauração auditáveis |
+| MST-007 | ⏳ | Validar cores e acessibilidade | Apenas cores válidas e combinações com contraste mínimo são publicadas |
+| MST-008 | ⏳ | Publicar/reverter versão do tema | Alteração não fica parcial e pode voltar à versão anterior |
+| MST-009 | ⏳ | Suspender/reativar tenant | Bloqueia acessos sem perder dados |
+| MST-010 | ⏳ | Listar saúde operacional por tenant | Sem exposição de dados de outro tenant |
+| MST-011 | ⏳ | Criar fluxo de convite seguro | Senha não é escolhida/exposta pelo Master Admin |
+
+## Fase 8 — Administrador titular e substituto
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| ADM-001 | ⏳ | Modelar delegações administrativas | Titular, substituto, motivo, início, fim e status |
+| ADM-002 | ⏳ | Validar período e sobreposição | Banco impede duas delegações conflitantes |
+| ADM-003 | ⏳ | Ativar substituição automaticamente | Acesso vale somente dentro do período aprovado |
+| ADM-004 | ⏳ | Revogar em retorno/desligamento | Sessões e permissões deixam de valer |
+| ADM-005 | ⏳ | Exigir justificativa e auditoria | Toda delegação tem autor e histórico imutável |
+| ADM-006 | ⏳ | Definir poderes do substituto | Matriz explícita; sem promoção silenciosa permanente |
+| ADM-007 | ⏳ | Notificar titular/substituto/Master | Eventos e e-mails idempotentes |
+
+## Fase 9 — URLs e contexto de tenant no frontend
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| URL-001 | 🔄 | Criar `TenantProvider` | Resolve slug e mantém contexto imutável da navegação |
+| URL-002 | 🔄 | Prefixar rotas públicas e privadas com `/t/:slug` | Links e redirects preservam tenant |
+| URL-003 | 🔄 | Validar membership após login | Usuário sem vínculo não entra no tenant |
+| URL-004 | 🔄 | Aplicar branding por empresa | Nome, logos e tokens vêm da projeção pública do slug ativo |
+| URL-005 | 🔄 | Aplicar tema aos menus | Sidebar, navegação, estados ativo/hover e textos usam tokens validados |
+| URL-006 | 🔄 | Aplicar tema à página inicial | Hero, fundos, botões, destaques e cards usam tokens validados |
+| URL-007 | 🔄 | Implementar fallback visual | Tenant sem tema completo recebe tema padrão seguro |
+| URL-008 | 🔄 | Atualizar branding sem cache incorreto | Versão publicada invalida cache somente do tenant alterado |
+| URL-009 | 🔄 | Tratar slug inexistente/suspenso | Página 404/indisponível sem vazamento |
+| URL-010 | 🔄 | Evitar tenant apenas em estado local | Toda consulta deriva tenant autorizado no banco |
+| URL-011 | ⏳ | Preparar suporte futuro a domínio próprio | Resolver host para tenant sem alterar RLS |
+
+## Fase 10 — Engine de recrutamento em RPC/SQL
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| ENG-001 | ⏳ | Normalizar status de vagas e candidaturas | Um modelo canônico documentado |
+| ENG-002 | ⏳ | RPC `create_job` | Código, owner, tenant e auditoria transacionais |
+| ENG-003 | ⏳ | RPC `update_job` | Lock, owner e regras de edição no banco |
+| ENG-004 | ⏳ | RPC `transition_job` | Máquina de estado usa horário/configuração do banco |
+| ENG-005 | ⏳ | RPC `transfer_job_owner` | Vaga e histórico atualizados atomicamente |
+| ENG-006 | ⏳ | Job de retorno automático de owner | Não depende de abrir uma tela |
+| ENG-007 | ⏳ | RPC `apply_to_job` | Tenant, vaga aberta, currículo e unicidade validados |
+| ENG-008 | ⏳ | RPC `transition_application` | Fase/status/evento/auditoria na mesma transação |
+| ENG-009 | ⏳ | RPC de triagem em lote | Resultado por item e autorização tenant-aware |
+| ENG-010 | ⏳ | RPC de mensagens | Participantes, anexos, unread e evento atômicos |
+| ENG-011 | ⏳ | RPCs de provas/versionamento | Modelo único de versão e vínculo à vaga |
+| ENG-012 | ⏳ | RPC de resultado de prova | Nota, aprovação e transição consistentes |
+| ENG-013 | ⏳ | RPC de configurações | Reconciliar listas e regras em uma transação |
+| ENG-014 | ⏳ | Triggers de auditoria/outbox | Nenhum log crítico gravado pelo navegador |
+| ENG-015 | ⏳ | Views/RPCs de dashboards | Métricas calculadas no banco e filtradas por tenant |
+| ENG-016 | ⏳ | Views/RPCs de relatórios | Sem cálculo oficial no navegador |
+| ENG-017 | ⏳ | Remover mutações diretas legadas | Busca estática não encontra writes críticos no frontend |
+
+## Fase 11 — Clínica de saúde ocupacional
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| MED-001 | 🔄 | Criar tenant/organização da clínica | Clínica possui identidade própria e usuários próprios |
+| MED-002 | 🔄 | Criar contratos tenant-clínica | Empresa só encaminha para clínica contratada/ativa |
+| MED-003 | 🔄 | Criar `medical_referrals` | Snapshot mínimo da vaga e candidato encaminhado |
+| MED-004 | 🔄 | RPC `refer_to_medical_exam` | Somente RH autorizado e fase anterior válida |
+| MED-005 | 🔄 | Restringir dados liberados | Clínica não lê currículo completo nem outras vagas |
+| MED-006 | 🔄 | Criar portal `/saude-ocupacional` | Usuário da clínica vê somente seus encaminhamentos |
+| MED-007 | 🔄 | Registrar agendamento/status/resultado | Máquina de estado e auditoria no servidor |
+| MED-008 | 🔄 | Definir resultado mínimo compartilhado | Ex.: apto/inapto/pendente; dados clínicos sensíveis separados |
+| MED-009 | 🔄 | Implementar revogação/encerramento | Acesso termina conforme regra sem apagar auditoria |
+| MED-010 | 🔄 | Validar LGPD e sigilo médico | Minimização, retenção e acessos documentados |
+
+### Regra fundamental da clínica
+
+A clínica **não será membro comum do tenant contratante**. O acesso será concedido
+por linha de `medical_referrals`, contendo apenas os dados mínimos necessários.
+As policies deverão exigir simultaneamente:
+
+- usuário ativo da clínica;
+- clínica vinculada ao encaminhamento;
+- encaminhamento ativo;
+- acesso ao recurso específico solicitado.
+
+## Fase 12 — Chat e anexos do exame médico
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| CHAT-001 | 🔄 | Criar conversa por encaminhamento | Uma thread canônica por referral |
+| CHAT-002 | 🔄 | RPC de envio de mensagem | Autor derivado de `auth.uid()` e participante validado |
+| CHAT-003 | 🔄 | Implementar comunicação recíproca | RH local e clínica enviam/recebem mensagens |
+| CHAT-004 | 🔄 | Criar bucket privado de anexos médicos | Sem URL pública permanente |
+| CHAT-005 | ⏳ | Autorizar upload por referral | Path inclui referral e participante autorizado |
+| CHAT-006 | ⏳ | Validar tamanho/MIME/conteúdo | Regras também no servidor/Storage |
+| CHAT-007 | ⏳ | Criar URLs assinadas de curta duração | Download exige autorização atual |
+| CHAT-008 | ⏳ | Implementar read receipts | Leitura e contadores no servidor |
+| CHAT-009 | ⏳ | Aplicar retenção e limpeza de órfãos | Política operacional documentada e testada |
+
+## Fase 13 — Edge Functions e integrações
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| EDGE-001 | ⚠️ | `candidate-analysis` | JWT, tenant/owner, lease, minimização e persistência validados |
+| EDGE-002 | ⚠️ | `email-verification` | CAPTCHA, hash, duas fases e retry validados |
+| EDGE-003 | ⚠️ | `admin-users` | Admin ativo, tenant correto, Auth e auditoria validados |
+| EDGE-004 | ⏳ | `tenant-provisioning` | Somente Master Admin cria tenant/admin |
+| EDGE-005 | ⏳ | `mail-dispatch` | Templates server-side, outbox e Resend idempotente |
+| EDGE-006 | ⏳ | `storage-authorize` | Upload/download privado e tenant-aware |
+| EDGE-007 | ⏳ | `medical-referral` se necessário | Efeitos externos separados das RPCs SQL |
+| EDGE-008 | ⏳ | Scheduler de retries/retornos/SLA | Claims com `SKIP LOCKED` e leases |
+| EDGE-009 | ⏳ | Configurar secrets por ambiente | Nenhum segredo em Vite/Vercel frontend |
+| EDGE-010 | ⏳ | Criar observabilidade e alertas | Request ID interno, erro sanitizado e métricas |
+
+## Fase 14 — Refatoração do frontend
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| FE-001 | 🔄 | Substituir Gemini por Edge Function | Call sites não importam SDK/chave |
+| FE-002 | 🔄 | Substituir Admin APIs por Edge Function | Tela usa `admin-users` |
+| FE-003 | 🔄 | Substituir verificação RPC/n8n por Edge Function | Challenge opaco em sessão |
+| FE-004 | ⏳ | Remover SMTP de todas as telas | Nenhum `smtpPass` no estado/rede |
+| FE-005 | ⏳ | Substituir writes por RPCs do engine | Frontend apenas solicita ações de negócio |
+| FE-006 | ⏳ | Dividir arquivos monolíticos | Componentes/hooks por domínio testáveis |
+| FE-007 | ⏳ | Gerar tipos Supabase | Queries/RPCs tipadas pelo schema |
+| FE-008 | ⏳ | Corrigir acessibilidade e estados de erro | Fluxos críticos navegáveis e mensagens acionáveis |
+| FE-009 | ⏳ | Remover código morto e scripts legados | Build sem referências obsoletas |
+
+## Fase 15 — Testes e CI
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| TST-001 | ⏳ | Configurar testes unitários | Regras puras e helpers cobertos |
+| TST-002 | ⏳ | Configurar testes de banco/RLS | Casos positivos e negativos por papel |
+| TST-003 | ⏳ | Criar fixture Tenant A/Tenant B | Dados intencionalmente semelhantes |
+| TST-004 | ⏳ | Testar isolamento público | Slug A nunca retorna vagas de B |
+| TST-005 | ⏳ | Testar isolamento autenticado | Admin/RH/candidato de A não acessam B |
+| TST-006 | ⏳ | Testar clínica | Vê somente referral liberado e campos mínimos |
+| TST-007 | ⏳ | Testar chat/anexos médicos | Participantes autorizados e terceiros negados |
+| TST-008 | ⏳ | Testar delegação administrativa | Antes/durante/depois do período |
+| TST-009 | ⏳ | Testar concorrência/idempotência | Candidatura, IA, e-mail e transições sem duplicata |
+| TST-010 | ⏳ | Configurar E2E | Master cria tenant até fluxo de exame médico |
+| TST-011 | ⏳ | Criar CI | Install, typecheck, lint, testes, migration test e build |
+| TST-012 | ⏳ | Executar teste de segurança manual | Chamadas REST forjadas não quebram isolamento |
+| TST-013 | ⏳ | Testar isolamento do branding | Tema/logo A nunca aparece em rotas, cache ou API do Tenant B |
+| TST-014 | ⏳ | Testar permissões do editor visual | Tenant Admin e RH não publicam tema reservado ao Master |
+| TST-015 | ⏳ | Testar acessibilidade do tema | Contraste, foco e legibilidade passam nos tokens publicados |
+| TST-016 | ⏳ | Testar rollback de identidade visual | Versão anterior é restaurada atomicamente |
+
+## Fase 16 — Documentação
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| DOC-001 | ✅ | Documentar descoberta do banco | `docs/DATABASE_DISCOVERY.md` |
+| DOC-002 | ✅ | Criar plano de implementação | Este arquivo |
+| DOC-003 | ⏳ | Reescrever README | Instalação, arquitetura, ambientes e comandos reais |
+| DOC-004 | ⏳ | Documentar arquitetura multi-tenant | Diagramas, fronteiras e decisões |
+| DOC-005 | ⏳ | Criar catálogo de migrations | Ordem, dependências, impacto e rollback |
+| DOC-006 | ⏳ | Documentar RPCs | Contratos, autorização e exemplos |
+| DOC-007 | ⏳ | Documentar Edge Functions | Secrets, deploy, payloads e erros |
+| DOC-008 | ⏳ | Criar guia de teste multi-tenant | Passo a passo manual e automatizado |
+| DOC-009 | ⏳ | Criar guia de deploy Vercel/Supabase | Staging, produção e rollback |
+| DOC-010 | ⏳ | Criar runbook operacional | Incidentes, retries, rotação e suporte |
+| DOC-011 | ⏳ | Documentar LGPD/retenção | Currículos, IA, e-mails, chats e exame médico |
+| DOC-012 | ⏳ | Documentar identidade visual por tenant | Tokens, assets, publicação, cache, acessibilidade e rollback |
+
+## Fase 17 — Deploy Supabase e Vercel
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| DEP-001 | ⏳ | Criar projetos Supabase staging/produção | Ambientes separados e vinculados |
+| DEP-002 | ⏳ | Aplicar migrations em staging | Replay integral sem intervenção manual |
+| DEP-003 | ⏳ | Configurar secrets das Edge Functions | Secrets server-side por ambiente |
+| DEP-004 | ⏳ | Publicar Edge Functions | Versões e JWT settings corretos |
+| DEP-005 | ⏳ | Configurar Vercel Preview/Production | Variáveis públicas apenas |
+| DEP-006 | ⏳ | Configurar SPA rewrite | Deep links `/t/:slug/...` funcionam |
+| DEP-007 | ⏳ | Configurar domínios e URLs de Auth | Redirects permitidos e tenant preservado |
+| DEP-008 | ⏳ | Executar smoke test em preview | Tenant A, B, Master e clínica validados |
+| DEP-009 | ⏳ | Promover para produção | Checklist e aprovação registrados |
+| DEP-010 | ⏳ | Validar bundle de produção | Sem service role, Gemini, SMTP ou URLs secretas |
+
+## Fase 18 — Cutover e operação
+
+| ID | Status | Ação | Critério de aceite |
+|---|---|---|---|
+| OPS-001 | ⏳ | Congelar writes durante migração final | Janela comunicada e controlada |
+| OPS-002 | ⏳ | Executar backup final | Restore point verificado |
+| OPS-003 | ⏳ | Aplicar backfill/RLS final | Checks de integridade aprovados |
+| OPS-004 | ⏳ | Rotacionar todos os segredos | Antigos revogados |
+| OPS-005 | ⏳ | Monitorar erros e isolamento | Alertas e dashboards ativos |
+| OPS-006 | ⏳ | Encerrar APIs e scripts legados | Superfície antiga inacessível |
+| OPS-007 | ⏳ | Revisão pós-implantação | Pendências e melhorias registradas |
+
+---
+
+# Ordem obrigatória de execução
+
+```mermaid
+flowchart TD
+    A[Roadmap e decisões] --> B[Diagnóstico do banco remoto]
+    B --> C[Baseline reproduzível]
+    C --> D[Fundação multi-tenant]
+    D --> E[Backfill da empresa atual]
+    E --> F[RLS tenant-aware]
+    F --> G[Master Admin e delegações]
+    F --> H[RPCs do engine]
+    G --> I[Rotas por tenant]
+    H --> I
+    F --> J[Clínica e encaminhamentos]
+    J --> K[Chat e anexos médicos]
+    I --> L[Testes multi-tenant]
+    K --> L
+    L --> M[Staging]
+    M --> N[Deploy Vercel e Supabase]
+    N --> O[Cutover e monitoramento]
+```
+
+## Especificação inicial da identidade visual
+
+O editor do `Platform Master Admin` deverá trabalhar com campos controlados, e
+não com CSS livre. A proposta inicial de `tenant_branding` inclui:
+
+| Grupo | Tokens/atributos iniciais |
+|---|---|
+| Identidade | `display_name`, `logo_primary_path`, `logo_light_path`, `favicon_path` |
+| Menu lateral | `sidebar_background`, `sidebar_text`, `sidebar_active`, `sidebar_hover` |
+| Página inicial | `home_background`, `hero_background`, `hero_text`, `primary_action`, `accent` |
+| Componentes | `primary_color`, `secondary_color`, `link_color`, `focus_ring_color` |
+| Controle | `version`, `status`, `published_at`, `published_by`, `updated_at` |
+
+Regras obrigatórias:
+
+1. cores devem ser normalizadas e validadas pelo servidor, inicialmente no
+   formato hexadecimal `#RRGGBB`;
+2. combinações críticas devem atender contraste WCAG AA;
+3. o cliente recebe somente a versão `published` do tenant resolvido pelo slug;
+4. upload de logo é autorizado somente para o Master Admin;
+5. assets usam paths como `tenant-branding/{tenant_id}/{version}/...`;
+6. inicialmente serão aceitos PNG e WebP; SVG só poderá ser habilitado com
+   sanitização server-side específica;
+7. tamanho, dimensões e MIME devem ser validados no servidor/Storage;
+8. substituir uma logo não sobrescreve silenciosamente a anterior: cria uma
+   nova versão e permite rollback;
+9. toda publicação registra tenant, ator, versão anterior, horário e motivo;
+10. não será permitido salvar URLs externas arbitrárias como logo;
+11. o frontend deve aplicar tokens por variáveis CSS geradas internamente, sem
+    inserir HTML ou CSS fornecido pelo administrador;
+12. falha ao carregar tema/logo usa o branding padrão, nunca o tema de outro
+    tenant.
+
+## Próximas ações desbloqueáveis
+
+1. **DB-005:** executar os quatro diagnósticos no Supabase remoto;
+2. **ARC-006:** confirmar se o currículo será global ou isolado por empresa;
+3. **SEC-005/SEC-006:** retirar SMTP e relay público do frontend;
+4. **revisar e validar** as migrations e Edge Functions já iniciadas;
+5. a fundação independente `TEN-001` a `TEN-005` e `TEN-010` a `TEN-013` pode
+   ser preparada e revisada antes do baseline, mas só será aplicada em staging
+   após o preflight; `TEN-006` a `TEN-009` continuam bloqueados pelo diagnóstico
+   do schema legado.
+
+---
+
+# Plano de teste multi-tenant — visão inicial
+
+A versão detalhada será criada em `docs/MULTI_TENANT_TESTING.md`, mas o teste de
+aceite deverá usar no mínimo:
+
+- `tenant-a` e `tenant-b`;
+- um admin e um RH em cada tenant;
+- um candidato com candidaturas distintas;
+- uma clínica ocupacional;
+- uma vaga e uma candidatura por tenant;
+- um referral médico somente para a candidatura do Tenant A.
+
+Testes negativos obrigatórios:
+
+1. Admin A tenta consultar/alterar vaga B;
+2. RH A tenta consultar candidato B;
+3. candidato altera `tenant_id` manualmente no payload;
+4. usuário abre URL `/t/tenant-b` mantendo sessão do Tenant A;
+5. clínica tenta listar vagas/currículos sem referral;
+6. clínica tenta abrir referral de outra clínica;
+7. RH B tenta abrir chat médico do Tenant A;
+8. URL assinada de anexo expira e não pode ser reutilizada;
+9. substituto tenta administrar antes/depois da vigência;
+10. chamada REST direta tenta contornar a interface.
+
+Todos devem ser negados no banco/servidor, não apenas ocultados na UI.
+
+---
+
+# Registro de andamento
+
+## 2026-08-08 — Descoberta do banco remoto concluída
+
+- concluídos `DB-005` e `DB-006` a partir dos quatro diagnósticos executados no
+  Supabase; a exportação de segurança foi preservada em
+  `docs/Supabase Snippet Untitled query.csv`;
+- confirmado que o schema remoto ainda é legado: as tabelas `tenants`,
+  `tenant_memberships` e as migrations multi-tenant locais ainda não foram
+  aplicadas;
+- confirmado que `candidaturas.id`, `vagas.id`, `users.id` e seus vínculos
+  legados usam `text`, enquanto objetos mais recentes usam UUID;
+- corrigida a migration de saúde ocupacional para manter `legacy_application_id`
+  como `text` até a criação da FK de legado, evitando incompatibilidade de tipo;
+- identificados bloqueadores críticos para qualquer rollout: RLS ausente nas
+  principais tabelas de negócio, policies permissivas, buckets de anexos/provas
+  expostos e RPCs `SECURITY DEFINER` executáveis por `PUBLIC`.
+
+## 2026-08-08 — Bridge de migração legado → tenant iniciada
+
+- criada `20260808100000_legacy_recruitment_tenant_bridge.sql`, que adiciona
+  `tenant_id` nullable e FKs `NOT VALID` às tabelas legadas confirmadas, sem
+  alterar linhas existentes;
+- criada `20260808101000_legacy_rpc_hardening.sql`, que restringe a RPC legada
+  de transição de candidatura a Admin/RH autenticado e elimina execução pública
+  da telemetria de infraestrutura;
+- criado `docs/REMOTE_MIGRATION_RUNBOOK.md` com a ordem segura de staging.
+
+## 2026-08-08 — Fundação do portal de saúde ocupacional
+
+- iniciadas as fases 11 e 12 por meio da migration
+  `supabase/migrations/20260808090000_occupational_health_referrals.sql`;
+- modelados contratos entre empresa e clínica, encaminhamentos com snapshot mínimo
+  de candidato/vaga, tipos de exame (admissional, demissional e outros), estados,
+  agendamento, resultado ocupacional mínimo e cancelamento auditável;
+- o acesso da clínica é validado pela membership da própria organização clínica e
+  pelo encaminhamento específico; a clínica não se torna membro do tenant da
+  empresa e não recebe currículo completo;
+- criados RPCs para encaminhar, atualizar, cancelar, listar e trocar mensagens;
+  toda identidade de ator é derivada de `auth.uid()`;
+- criado o portal autenticado `/saude-ocupacional`, onde a clínica lista apenas
+  seus encaminhamentos e atualiza agendamento, atendimento e resultado;
+- criado bucket privado `medical-referral-attachments`, ainda sem fluxo de upload
+  ou URL assinada: `CHAT-005` a `CHAT-009` continuam pendentes;
+- o vínculo `legacy_application_id` permanece sem FK por decisão deliberada: a
+  tabela remota `candidaturas` ainda não foi inventariada. A integração automática
+  da fase legada “Exame” e os testes de RLS em Supabase permanecem bloqueados por
+  `DB-005`/`DB-006`;
+- o build de produção passou. O typecheck completo segue falhando por problemas
+  preexistentes fora desta entrega (`scripts/seed.ts` e Edge Functions Deno
+  incluídas pelo `tsconfig`), registrados para correção na
+  fase de baseline/CI.
+
+## 2026-07-20 — Planejamento inicial
+
+- criado `docs/IMPLEMENTATION_PLAN.md`;
+- consolidado o objetivo multi-tenant e o portal da clínica;
+- adotada a rota `/t/:tenantSlug`;
+- registrada a identidade visual por tenant, editável pelo Platform Master Admin;
+- definidos tokens iniciais para menu lateral, página inicial e logos;
+- proibido CSS arbitrário e previsto versionamento/rollback do tema;
+- identificada a descoberta do banco remoto como bloqueio estrutural;
+- registrados os trabalhos de segurança já iniciados, ainda não considerados
+  concluídos sem validação executável;
+- validação local de Node/npm/deno não disponível no ambiente atual.
+
+## 2026-07-20 — Fundação multi-tenant iniciada
+
+- itens `TEN-001` a `TEN-005` e `TEN-010` a `TEN-013` movidos para
+  `🔄 Em andamento`;
+- criada a migration
+  `supabase/migrations/20260720100000_multitenant_foundation.sql` com tenants,
+  papéis de plataforma, memberships, delegações, auditoria e branding
+  versionado;
+- criada a ADR `docs/adr/0001-multi-tenant-routing-and-access.md` com as decisões
+  de URL, isolamento, branding e acesso da clínica;
+- adicionados ao roadmap os requisitos de cores dos menus, cores da página
+  inicial, logos, publicação, cache, acessibilidade e rollback por empresa;
+- escopo limitado a novos objetos independentes das tabelas legadas ainda não
+  diagnosticadas;
+- migration e ADR permanecem em revisão; nenhum item foi marcado como concluído
+  sem replay e testes em staging.
+
+## 2026-07-20 — Contexto e branding no frontend iniciados
+
+- itens `URL-001`, `URL-002`, `URL-004` a `URL-010` movidos para
+  `🔄 Em andamento`;
+- definida a utilização de `BrowserRouter.basename` em `/t/:slug` para preservar
+  links existentes;
+- definido header dinâmico `x-tenant-id` no cliente Supabase após resolução do
+  slug;
+- iniciada aplicação de tokens CSS e logos da versão publicada do branding.
+
+## 2026-07-20 — Sessão e membership iniciadas
+
+- `SEC-011` e `URL-003` movidos para `🔄 Em andamento`;
+- autenticação passará a depender de uma sessão Supabase válida, e não do JSON em
+  `localStorage`;
+- rotas privadas em `/t/:slug` passarão a exigir membership ativa no tenant.
+
+## 2026-08-01 — Sessão e autorização tenant-aware endurecidas
+
+- criada a migration
+  `supabase/migrations/20260720103000_current_tenant_access.sql` com a RPC
+  autenticada `get_current_tenant_access`;
+- a RPC deriva o ator exclusivamente de `auth.uid()`, exige que o tenant informado
+  coincida com `x-tenant-id` e rejeita tenants inativos;
+- o frontend deixou de consultar `tenant_memberships` diretamente para decidir o
+  acesso da sessão;
+- criado `src/lib/tenant-access.ts` para validar o payload da RPC e resolver a rota
+  inicial pelo papel efetivo do tenant;
+- `AuthContext` passou a validar a sessão com `supabase.auth.getUser()`, manter o
+  UUID do Auth como identidade canônica e ignorar respostas assíncronas obsoletas;
+- rotas protegidas, login e cadastro agora aguardam a autorização tenant-aware e
+  não exigem que o papel da membership coincida com o perfil global legado;
+- `SEC-011` e `URL-003` permanecem `🔄 Em andamento`: faltam replay da migration,
+  testes com dois tenants e validação de build em ambiente com dependências.
+
+## 2026-07-20 — Segurança iniciada antes do roadmap
+
+Trabalho existente que precisa ser revisado e validado antes de receber status
+`Concluída`:
+
+- diagnósticos SQL em `supabase/diagnostics/`;
+- foundation SQL em migrations `20260720090000` e `20260720091000`;
+- Edge Functions `candidate-analysis`, `email-verification` e `admin-users`;
+- helpers React correspondentes;
+- remoção inicial de Gemini e `service_role` do módulo frontend;
+- substituição parcial das APIs administrativas.
+
+Esses itens permanecem `⚠️ Em revisão` ou `🔄 Em andamento` porque ainda não foram
+aplicados em um banco de staging nem validados com build/testes.

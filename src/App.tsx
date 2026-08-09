@@ -1,6 +1,5 @@
 import React from "react";
 import {
-  BrowserRouter,
   Routes,
   Route,
   Navigate,
@@ -8,6 +7,8 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { UIProvider } from "./contexts/UIContext";
+import { useTenant } from "./contexts/TenantContext";
+import { resolveAuthorizedHomePath } from "./lib/tenant-access";
 
 // Public Pages
 import {
@@ -19,6 +20,7 @@ import {
   SobreNos,
 } from "./pages/Public";
 import { VerifyEmail } from "./pages/VerifyEmail";
+import { OccupationalHealthPortal } from "./pages/OccupationalHealth";
 
 // Admin Pages
 import {
@@ -70,13 +72,23 @@ const ProtectedRoute = ({
   children: React.ReactNode;
   allowedProfiles?: string[];
 }) => {
-  const { user, profile, authLoading, profileLoading, isAuthenticated } =
-    useAuth();
+  const {
+    user,
+    profile,
+    authLoading,
+    profileLoading,
+    tenantMembershipLoading,
+    tenantRoles,
+    hasTenantAccess,
+    canAdministerTenant,
+    isAuthenticated,
+  } = useAuth();
+  const { isTenantRoute } = useTenant();
   const location = useLocation();
 
   // CORREÇÃO 1: Enquanto qualquer dado de autenticação estiver carregando,
   // mantemos o Loading para evitar redirecionamentos precipitados.
-  if (authLoading || profileLoading) {
+  if (authLoading || profileLoading || tenantMembershipLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
@@ -101,20 +113,48 @@ const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
-  // CORREÇÃO 4: Verificação de perfil permitida (Case Insensitive)
+  if (isTenantRoute && !hasTenantAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-xl font-bold text-slate-900">Acesso não autorizado</h1>
+          <p className="mt-3 text-sm text-slate-600">
+            Sua conta não possui vínculo ativo com esta empresa.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.location.assign("/")}
+            className="mt-6 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white"
+          >
+            Voltar ao portal
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // A UI mantém compatibilidade com `perfil`, mas em uma rota tenant o papel
+  // também precisa existir na membership autorizada pelo banco.
   if (allowedProfiles) {
     const userProfileNormalized = profile.perfil.toLowerCase();
-    const isAllowed = allowedProfiles.some(
+    const legacyAllowed = allowedProfiles.some(
       (p) => p.toLowerCase() === userProfileNormalized,
     );
+    const tenantAllowed = allowedProfiles.some((allowedProfile) => {
+      const normalized = allowedProfile.toLowerCase();
+      if (normalized === "admin") return canAdministerTenant;
+      if (normalized === "rh") return tenantRoles.includes("hr");
+      if (normalized === "candidato") return tenantRoles.includes("candidate");
+      return false;
+    });
+    const isAllowed = isTenantRoute ? tenantAllowed : legacyAllowed;
 
     if (!isAllowed) {
       const redirectPath =
-        userProfileNormalized === "admin"
-          ? "/admin"
-          : userProfileNormalized === "rh"
-            ? "/rh"
-            : "/candidato";
+        resolveAuthorizedHomePath(userProfileNormalized, isTenantRoute, {
+          roles: tenantRoles,
+          canAdministerTenant,
+        }) || "/";
 
       console.log(
         `➡️ [AUTH] Acesso negado para ${userProfileNormalized}. Indo para ${redirectPath}`,
@@ -130,8 +170,7 @@ const App = () => {
   return (
     <AuthProvider>
       <UIProvider>
-        <BrowserRouter>
-          <Routes>
+        <Routes>
             {/* Public Routes */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Home />} />
@@ -142,6 +181,15 @@ const App = () => {
               <Route path="/sobre" element={<SobreNos />} />
               <Route path="/login" element={<Login />} />
             </Route>
+
+            <Route
+              path="/saude-ocupacional"
+              element={
+                <ProtectedRoute>
+                  <OccupationalHealthPortal />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Admin Routes */}
             <Route
@@ -206,8 +254,7 @@ const App = () => {
 
             {/* Fallback - Colocado como última opção para evitar falsos positivos */}
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
+        </Routes>
       </UIProvider>
     </AuthProvider>
   );

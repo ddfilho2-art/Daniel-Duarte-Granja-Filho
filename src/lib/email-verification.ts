@@ -1,46 +1,84 @@
 import { supabase } from "./supabase";
+import { readEdgeFunctionError } from "./function-errors";
 
-const N8N_WEBHOOK = "https://n8n.fluxos.online/webhook/enviar_confirmacao";
+const CHALLENGE_ID_KEY = "pending_verify_challenge_id";
+const CHALLENGE_TOKEN_KEY = "pending_verify_challenge_token";
+
+interface VerificationResponse {
+  success: boolean;
+  code?: string;
+  error?: string;
+  challengeId?: string;
+  challengeToken?: string;
+  retryAfter?: number;
+}
 
 export async function sendVerificationCode(
   email: string,
-  name?: string,
+  _name?: string,
+  captchaToken?: string,
 ): Promise<void> {
-  const { data, error } = await (supabase as any).rpc(
-    "create_email_verification_code",
-    { p_email: email },
+  const { data, error } = await supabase.functions.invoke<VerificationResponse>(
+    "email-verification",
+    {
+      body: {
+        action: "request",
+        email: email.trim().toLowerCase(),
+        captchaToken,
+      },
+    },
   );
 
-  if (error) throw new Error(error.message);
-
-  const code = data as string;
-
-  try {
-    const response = await fetch(N8N_WEBHOOK, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name: name ?? "", code }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Webhook retornou status ${response.status}`);
-    }
-  } catch (err) {
-    console.error("[verify] webhook error", err);
-    throw new Error("Falha ao enviar e-mail. Tente novamente.");
+  if (error || !data?.success || !data.challengeId || !data.challengeToken) {
+    const errorBody = error ? await readEdgeFunctionError(error) : {};
+    throw new Error(
+      data?.code ||
+        errorBody.code ||
+        "Falha ao enviar o código de confirmação.",
+    );
   }
+
+  sessionStorage.setItem(CHALLENGE_ID_KEY, data.challengeId);
+  sessionStorage.setItem(CHALLENGE_TOKEN_KEY, data.challengeToken);
 }
 
 export async function verifyEmailCode(
   email: string,
   code: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const { data, error } = await (supabase as any).rpc("verify_email_code", {
-    p_email: email,
-    p_code: code,
-  });
+  const challengeId = sessionStorage.getItem(CHALLENGE_ID_KEY);
+  const challengeToken = sessionStorage.getItem(CHALLENGE_TOKEN_KEY);
 
-  if (error) return { success: false, error: error.message };
+  if (!challengeId || !challengeToken) {
+    return { success: false, error: "no_code" };
+  }
 
-  return data as { success: boolean; error?: string };
+  const { data, error } = await supabase.functions.invoke<VerificationResponse>(
+    "email-verification",
+    {
+      body: {
+        action: "verify",
+        email: email.trim().toLowerCase(),
+        code,
+        challengeId,
+        challengeToken,
+      },
+    },
+  );
+
+  if (error || !data?.success) {
+    const errorBody = error ? await readEdgeFunctionError(error) : {};
+    return {
+      success: false,
+      error:
+        data?.error ||
+        data?.code ||
+        errorBody.code ||
+        "invalid_or_expired_code",
+    };
+  }
+
+  sessionStorage.removeItem(CHALLENGE_ID_KEY);
+  sessionStorage.removeItem(CHALLENGE_TOKEN_KEY);
+  return { success: true };
 }

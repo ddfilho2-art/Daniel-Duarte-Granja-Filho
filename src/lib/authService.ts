@@ -1,98 +1,135 @@
 import { supabase } from "./supabase";
 
-export async function loginWithLogin(
-  loginInput: string,
-  passwordInput?: string,
-) {
-  const loginLower = loginInput.toLowerCase().trim();
+export interface UserProfile {
+  id: string;
+  uid: string;
+  nome: string;
+  email: string;
+  login: string;
+  perfil: string;
+  status: string;
+  avatar_url?: string;
+  foto_url?: string;
+  cargo?: string;
+  matricula?: string;
+  unidade_negocio_id?: string;
+  resume_completed?: boolean;
+  email_verified?: boolean;
+  resume_data?: Record<string, unknown>;
+}
 
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .or(`login_lower.eq.${loginLower},email.eq.${loginLower}`)
-    .limit(1)
-    .maybeSingle();
-
-  if (error || !data) {
-    console.error("[AUTH SERVICE] Supabase Error:", error);
-    throw new Error(
-      "Usuário não encontrado" + (error ? `: ${error.message}` : ""),
-    );
-  }
-
-  if (passwordInput) {
-    const { data: authData, error: authError } =
-      await supabase.auth.signInWithPassword({
-        email: data.email,
-        password: passwordInput,
-      });
-
-    // 🔥 REMOVIDO: Fallback automático de signUp que causava inconsistências
-    // Usuários devem ser criados apenas via:
-    // 1. Formulário de cadastro (Public.tsx)
-    // 2. Admin/Seed (supabaseAdmin)
-    if (authError) {
-      throw new Error("Email ou senha inválidos.");
-    }
-
-    if (data.email_verified === false) {
-      await supabase.auth.signOut();
-      throw new Error(`EMAIL_NOT_VERIFIED:${data.email}:${data.nome || ""}`);
-    }
-
-    // Validação obrigatória de sessão para garantir o JWT
-    const {
-      data: { session: supabaseSession },
-    } = await supabase.auth.getSession();
-    if (!supabaseSession) {
-      throw new Error("Sessão Supabase não foi criada após autenticação");
-    }
-
-    console.log(
-      "✅ [AUTH] Sessão Supabase estabelecida:",
-      supabaseSession.user.id,
-    );
-  } else {
-    // Se não houver senha, bloqueamos operações que exigem token se o contexto exigir segurança
-    console.warn(
-      "[AUTH SERVICE] Login sem senha: auth.uid() permanecerá nulo.",
-    );
-  }
-
-  if (data.status !== "Ativo") {
-    throw new Error("Usuário inativo");
-  }
-
-  // Capturamos a sessão atual para garantir o UID correto
-  const {
-    data: { session: supabaseSession },
-  } = await supabase.auth.getSession();
-
-  const session = {
-    id: data.id,
-    uid: supabaseSession?.user?.id || data.uid, // Prioridade para o UID real do Supabase
-    nome: data.nome,
-    email: data.email,
-    login: data.login,
-    perfil: data.perfil,
-    status: data.status,
+function normalizeProfile(
+  data: Record<string, any>,
+  authUserId: string,
+): UserProfile {
+  return {
+    id: String(data.id),
+    uid: authUserId,
+    nome: String(data.nome || ""),
+    email: String(data.email || ""),
+    login: String(data.login || data.email || ""),
+    perfil: String(data.perfil || "Candidato"),
+    status: String(data.status || ""),
+    avatar_url: data.avatar_url,
     foto_url: data.foto_url,
     cargo: data.cargo,
     matricula: data.matricula,
     unidade_negocio_id: data.unidade_negocio_id,
     resume_completed: data.resume_completed,
     email_verified: data.email_verified,
+    resume_data: data.resume_data,
   };
+}
 
-  // Sincronização opcional do UID na tabela caso esteja desatualizado (importante para RLS)
-  if (supabaseSession && data.uid !== supabaseSession.user.id) {
-    console.log("[AUTH] Sincronizando UID na tabela users...");
-    await supabase
-      .from("users")
-      .update({ uid: supabaseSession.user.id })
-      .eq("id", data.id);
+function assertProfileAccess(profile: UserProfile): void {
+  if (profile.status.toLocaleLowerCase("pt-BR") !== "ativo") {
+    throw new Error("Usuário inativo");
   }
 
-  localStorage.setItem("session", JSON.stringify(session));
-  return session;
+  if (profile.email_verified === false) {
+    throw new Error(
+      `EMAIL_NOT_VERIFIED:${profile.email}:${profile.nome || ""}`,
+    );
+  }
+}
+
+export async function loadProfileForAuthUser(
+  authUserId: string,
+): Promise<UserProfile> {
+  const byUid = await supabase
+    .from("users")
+    .select("*")
+    .eq("uid", authUserId)
+    .maybeSingle();
+
+  if (byUid.error) throw byUid.error;
+
+  let data = byUid.data;
+  if (!data) {
+    const byId = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", authUserId)
+      .maybeSingle();
+    if (byId.error) throw byId.error;
+    data = byId.data;
+  }
+
+  if (!data) throw new Error("Perfil não encontrado para o usuário autenticado.");
+
+  const profile = normalizeProfile(data, authUserId);
+  assertProfileAccess(profile);
+  return profile;
+}
+
+async function resolveLoginEmail(loginInput: string): Promise<string> {
+  const normalized = loginInput.trim().toLocaleLowerCase("pt-BR");
+  if (!normalized) throw new Error("Email ou senha inválidos.");
+  if (normalized.includes("@")) return normalized;
+
+  // Compatibilidade temporária com logins legados. A resolução será movida para
+  // uma Edge Function tenant-aware após o baseline da tabela public.users.
+  const { data, error } = await supabase
+    .from("users")
+    .select("email")
+    .eq("login_lower", normalized)
+    .maybeSingle();
+
+  if (error || !data?.email) throw new Error("Email ou senha inválidos.");
+  return String(data.email).trim().toLocaleLowerCase("pt-BR");
+}
+
+export async function loginWithLogin(
+  loginInput: string,
+  passwordInput?: string,
+): Promise<UserProfile> {
+  if (!passwordInput) throw new Error("A senha é obrigatória.");
+
+  const email = await resolveLoginEmail(loginInput);
+  const { data: authData, error: authError } =
+    await supabase.auth.signInWithPassword({
+      email,
+      password: passwordInput,
+    });
+
+  if (authError || !authData.user || !authData.session) {
+    throw new Error("Email ou senha inválidos.");
+  }
+
+  try {
+    return await loadProfileForAuthUser(authData.user.id);
+  } catch (error) {
+    await supabase.auth.signOut();
+    throw error;
+  }
+}
+
+export async function loadCurrentProfile(): Promise<UserProfile | null> {
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return null;
+  return loadProfileForAuthUser(user.id);
 }

@@ -31,7 +31,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { safeFetch } from "../lib/api";
+import { executeAdminUserAction } from "../lib/admin-users";
 import {
   BarChart as ReBarChart,
   Bar,
@@ -866,31 +866,13 @@ export function AdminGestaoUsuarios() {
     setError("");
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        throw new Error("Sessão inválida ou expirada. Faça login novamente.");
-      }
-
-      const response = await safeFetch("/api/admin-create-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          nome: formData.nome,
-          email: formData.email,
-          login: formData.login,
-          senha: formData.senha,
-        }),
+      await executeAdminUserAction({
+        action: "create",
+        nome: formData.nome,
+        email: formData.email,
+        login: formData.login,
+        password: formData.senha,
       });
-
-      if (!response.ok || !response.data?.success) {
-        throw new Error(response.data?.message || "Erro ao criar usuário.");
-      }
 
       setIsCreateModalOpen(false);
       setFormData({ nome: "", email: "", login: "", senha: "" });
@@ -912,51 +894,12 @@ export function AdminGestaoUsuarios() {
         throw new Error("Usuário selecionado inválido.");
       }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        throw new Error("Sessão inválida ou expirada. Faça login novamente.");
-      }
-
-      const emailChanged =
-        String(formData.email || "")
-          .trim()
-          .toLowerCase() !==
-        String(selectedUser.email || "")
-          .trim()
-          .toLowerCase();
-
-      const { error: dbError } = await supabase
-        .from("users")
-        .update({
-          nome: formData.nome,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", selectedUser.id);
-
-      if (dbError) throw dbError;
-
-      if (emailChanged) {
-        const response = await safeFetch("/api/admin-update-user-email", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            userId: selectedUser.id,
-            email: formData.email,
-          }),
-        });
-
-        if (!response.ok || !response.data?.success) {
-          throw new Error(
-            response.data?.message || "Erro ao atualizar e-mail do usuário.",
-          );
-        }
-      }
+      await executeAdminUserAction({
+        action: "update",
+        userId: selectedUser.id,
+        nome: formData.nome,
+        email: formData.email,
+      });
 
       setIsEditModalOpen(false);
       await fetchUsers();
@@ -977,29 +920,11 @@ export function AdminGestaoUsuarios() {
         throw new Error("Usuário selecionado inválido.");
       }
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.access_token) {
-        throw new Error("Sessão inválida ou expirada. Faça login novamente.");
-      }
-
-      const response = await safeFetch("/api/admin-reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          userId: selectedUser.id,
-          senha: formData.senha,
-        }),
+      await executeAdminUserAction({
+        action: "reset_password",
+        userId: selectedUser.id,
+        password: formData.senha,
       });
-
-      if (!response.ok || !response.data?.success) {
-        throw new Error(response.data?.message || "Erro ao resetar senha.");
-      }
 
       setIsResetModalOpen(false);
       setFormData((prev) => ({ ...prev, senha: "" }));
@@ -1013,33 +938,18 @@ export function AdminGestaoUsuarios() {
   const handleStatusChange = async (user: any, newStatus: string) => {
     try {
       setStatusLoadingId(user.id);
-      // Protocolo DFL: Se o status for inativar, use 'cancelado'
       const targetStatus = newStatus === "Inativo" ? "cancelado" : newStatus;
 
-      const updateData: any = { status: targetStatus };
-      if (targetStatus === "cancelado") {
-        updateData.removed_at = new Date().toISOString();
-      }
+      await executeAdminUserAction({
+        action: "set_status",
+        userId: String(user.id),
+        status: targetStatus,
+      });
 
-      console.log(
-        `[OPS-RH] Executando status change para ${targetStatus} no ID ${user.id}`,
-      );
-
-      const { error } = await supabase
-        .from("users")
-        .update(updateData)
-        .eq("id", String(user.id)); // Força String no ID conforme protocolo
-
-      if (error) throw error;
-
-      // Sucesso imediato na UI (Trigger do banco cuida do log)
       await fetchUsers();
 
-      // Feedback operacional solicitado
       if (targetStatus === "cancelado") {
-        alert(
-          "Status atualizado com sucesso no banco. O log de auditoria aparecerá em breve.",
-        );
+        alert("Usuário inativado e acesso de autenticação bloqueado.");
       }
     } catch (err) {
       console.error("[OPS-FATAL] Falha na alteração de status:", err);

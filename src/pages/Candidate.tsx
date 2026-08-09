@@ -30,7 +30,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { ChatInput } from "../components/ChatInput";
 import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
-import { GoogleGenAI, Type } from "@google/genai";
+import { requestCandidateAnalysis } from "../lib/candidate-analysis";
 
 export function CandidateDashboard() {
   const { profile, updateProfile } = useAuth();
@@ -1827,113 +1827,9 @@ export function CandidateVagas() {
         vagaId: string,
       ) => {
         try {
-          const { data: existing } = await supabase
-            .from("analise_ia_candidato")
-            .select("id")
-            .eq("candidato_id", userId)
-            .eq("vaga_id", vagaId)
-            .maybeSingle();
-
-          if (!existing) {
-            // Busca dados do candidato
-            const { data: candidato } = await supabase
-              .from("users")
-              .select("*")
-              .eq("id", userId)
-              .maybeSingle();
-
-            // Busca dados da vaga
-            const { data: vaga } = await supabase
-              .from("vagas")
-              .select("*")
-              .eq("id", vagaId)
-              .maybeSingle();
-
-            if (candidato && vaga) {
-              const rawViteKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
-
-              if (rawViteKey) {
-                const ai = new GoogleGenAI({ apiKey: rawViteKey });
-                const prompt = `
-                  Atue como um recrutador especialista e avalie a aderência entre um candidato e uma vaga.
-
-                  DADOS DA VAGA:
-                  ${JSON.stringify({ titulo: vaga.titulo || (vaga as any).cargo, departamento: vaga.departamento, descricao: vaga.descricao, requisitos: vaga.requisitos, certificacoes: vaga.certificacoes }, null, 2)}
-
-                  DADOS DO CANDIDATO:
-                  ${JSON.stringify(candidato, null, 2)}
-
-                  INSTRUÇÕES:
-                  1. Avaliar o candidato com base na vaga
-                  2. Atribuir notas de 0 a 10 para: tecnico, experiencia, formacao, soft_skills, ferramentas
-                  3. Calcular score_total de 0 a 100
-                  4. Gerar uma justificativa objetiva (máx 3 linhas)
-                `;
-
-                const response = await ai.models.generateContent({
-                  model: "gemini-2.5-flash",
-                  contents: prompt,
-                  config: {
-                    responseMimeType: "application/json",
-                    responseSchema: {
-                      type: Type.OBJECT,
-                      properties: {
-                        score_total: { type: Type.NUMBER },
-                        metricas: {
-                          type: Type.OBJECT,
-                          properties: {
-                            tecnico: { type: Type.NUMBER },
-                            experiencia: { type: Type.NUMBER },
-                            formacao: { type: Type.NUMBER },
-                            soft_skills: { type: Type.NUMBER },
-                            ferramentas: { type: Type.NUMBER },
-                          },
-                          required: [
-                            "tecnico",
-                            "experiencia",
-                            "formacao",
-                            "soft_skills",
-                            "ferramentas",
-                          ],
-                        },
-                        justificativa: { type: Type.STRING },
-                      },
-                      required: ["score_total", "metricas", "justificativa"],
-                    },
-                  },
-                });
-
-                const text = response.text;
-                if (text) {
-                  const resultadoIA = JSON.parse(text);
-                  const metr = resultadoIA.metricas || {};
-
-                  const { error } = await supabase
-                    .from("analise_ia_candidato")
-                    .insert({
-                      vaga_id: vagaId,
-                      candidato_id: userId,
-                      score_total: resultadoIA.score_total,
-                      tecnico: metr.tecnico || 0,
-                      experiencia: metr.experiencia || 0,
-                      formacao: metr.formacao || 0,
-                      soft_skills: metr.soft_skills || 0,
-                      ferramentas: metr.ferramentas || 0,
-                      justificativa: resultadoIA.justificativa,
-                      raw_json: resultadoIA,
-                    });
-                  if (error) throw error;
-                  console.log(
-                    "✅ Avaliação IA salva automaticamente",
-                    userId,
-                    vagaId,
-                  );
-                }
-              }
-            }
-          }
-        } catch (err) {
-          console.error("Erro na avaliação IA automática:", err);
+          await requestCandidateAnalysis(userId, vagaId);
+        } catch (error) {
+          console.error("Erro na avaliação automática:", error);
         }
       };
 

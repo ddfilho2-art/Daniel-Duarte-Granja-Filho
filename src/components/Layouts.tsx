@@ -29,16 +29,34 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUI } from "../contexts/UIContext";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
+import { useTenant } from "../contexts/TenantContext";
 
 import DFLlogo from "../assets/DFLlogo.svg";
 
-const Logo = () => (
-  <div className="flex items-center gap-2">
-    <img src={DFLlogo} alt="DFL Logo" className="h-10 w-auto object-contain" />
-  </div>
-);
+const Logo = ({ variant = "primary" }: { variant?: "primary" | "light" }) => {
+  const { branding } = useTenant();
+  const tenantLogo =
+    variant === "light"
+      ? branding.logoLightUrl || branding.logoPrimaryUrl
+      : branding.logoPrimaryUrl;
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <img
+        src={tenantLogo || DFLlogo}
+        alt={`Logo ${branding.displayName}`}
+        className="h-10 max-w-44 object-contain"
+      />
+      {!tenantLogo && branding.displayName !== "DFL" && (
+        <span className="truncate text-sm font-bold">{branding.displayName}</span>
+      )}
+    </div>
+  );
+};
 
 export function PublicLayout() {
+  const { branding } = useTenant();
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
@@ -76,9 +94,15 @@ export function PublicLayout() {
       <main className="flex-1">
         <Outlet />
       </main>
-      <footer className="bg-[#27336D] text-slate-400 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-slate-800 text-sm text-center">
-          © {new Date().getFullYear()} DFL. Todos os direitos reservados.
+      <footer
+        className="py-12"
+        style={{
+          backgroundColor: "var(--color-secondary)",
+          color: "color-mix(in srgb, #ffffff 72%, transparent)",
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-8 border-t border-white/20 text-sm text-center">
+          © {new Date().getFullYear()} {branding.displayName}. Todos os direitos reservados.
         </div>
       </footer>
     </div>
@@ -106,11 +130,8 @@ function SidebarItem({
   return (
     <Link
       to={to}
-      className={`flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        isActive
-          ? "bg-primary/10 text-primary"
-          : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-      }`}
+      data-active={isActive}
+      className="tenant-sidebar-link flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
     >
       <div className="flex items-center gap-3">
         <Icon className="w-5 h-5" />
@@ -224,14 +245,14 @@ function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
-      <aside className="w-64 bg-white border-r border-slate-200 flex flex-col fixed h-full z-10">
-        <div className="h-16 flex items-center px-6 border-b border-slate-200">
+      <aside className="tenant-sidebar w-64 border-r flex flex-col fixed h-full z-10">
+        <div className="tenant-sidebar-border h-16 flex items-center px-6 border-b">
           <Link to="/">
-            <Logo />
+            <Logo variant="light" />
           </Link>
         </div>
 
-        <div className="p-4 border-t border-slate-200">
+        <div className="tenant-sidebar-border p-4 border-t">
           <div className="flex items-center gap-3">
             {/* Avatar */}
             {userAvatar && !imgLoadError ? (
@@ -250,13 +271,13 @@ function DashboardLayout({
 
             {/* Nome + Link */}
             <div className="flex flex-col">
-              <span className="text-sm font-medium text-slate-700">
+              <span className="text-sm font-medium">
                 {userName}
               </span>
               {profile?.perfil !== "Candidato" && (
                 <Link
                   to={`/${location.pathname.split("/")[1] || "rh"}/perfil`}
-                  className="text-xs text-blue-600 hover:underline"
+                  className="tenant-sidebar-muted text-xs hover:underline"
                 >
                   Meu Perfil
                 </Link>
@@ -271,7 +292,7 @@ function DashboardLayout({
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-200 space-y-2">
+        <div className="tenant-sidebar-border p-4 border-t space-y-2">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"

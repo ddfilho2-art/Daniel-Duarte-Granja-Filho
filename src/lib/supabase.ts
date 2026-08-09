@@ -1,42 +1,37 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn("⚠️ Supabase credentials missing. Check your .env file.");
+  throw new Error(
+    "VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY são obrigatórias.",
+  );
 }
 
-export const supabase: SupabaseClient = createClient(
-  supabaseUrl || "",
-  supabaseAnonKey || "",
-);
+let activeTenantId: string | null = null;
 
-const isBrowser = typeof window !== "undefined";
-const supabaseServiceRoleKey = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
-
-// IMPORTANTE:
-// - No navegador, NÃO criamos client administrativo para evitar múltiplas instâncias
-//   e exposição desnecessária de comportamento privilegiado.
-// - Em contexto não-browser, ele pode existir caso a chave esteja disponível.
-export const supabaseAdmin: SupabaseClient | null =
-  !isBrowser && supabaseUrl && supabaseServiceRoleKey
-    ? createClient(supabaseUrl, supabaseServiceRoleKey, {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      })
-    : null;
-
-// Debug apenas do client principal no browser
-if (isBrowser && import.meta.env.DEV) {
-  (window as any).supabase = supabase;
+export function setSupabaseTenantId(tenantId: string | null): void {
+  activeTenantId = tenantId;
 }
 
-/*
- * Padrão recomendado:
- * - Frontend: use apenas `supabase`
- * - Operações administrativas sensíveis: use API server-side
- * - `supabaseAdmin` não deve ser usado no navegador
- */
+export function getSupabaseTenantId(): string | null {
+  return activeTenantId;
+}
+
+const tenantAwareFetch: typeof fetch = (input, init: RequestInit = {}) => {
+  const headers = new Headers(
+    input instanceof Request ? input.headers : undefined,
+  );
+  new Headers(init.headers).forEach((value, key) => headers.set(key, value));
+  if (activeTenantId) headers.set("x-tenant-id", activeTenantId);
+
+  return globalThis.fetch(input, {
+    ...init,
+    headers,
+  });
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  global: { fetch: tenantAwareFetch },
+});
