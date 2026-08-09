@@ -1,0 +1,10 @@
+project_id = "recruta-ai"
+
+[functions.email-verification]
+verify_jwt = false
+
+[functions.candidate-analysis]
+verify_jwt = true
+
+[functions.admin-users]
+verify_jwt = true
