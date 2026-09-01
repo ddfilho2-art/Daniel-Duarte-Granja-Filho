@@ -306,6 +306,8 @@ function CandidateProfileModal({
   const [aiEvaluation, setAiEvaluation] = useState<any>(null);
   const [isEvaluatingAI, setIsEvaluatingAI] = useState(false);
   const [aiTriggered, setAiTriggered] = useState(false);
+  const [isReferring, setIsReferring] = useState(false);
+  const [referralSuccess, setReferralSuccess] = useState(false);
 
   // Scroll para o topo quando o modal abre
   useEffect(() => {
@@ -995,6 +997,55 @@ function CandidateProfileModal({
                           ? "Candidato já está em Reserva"
                           : "Marcar como Reserva"}
                       </button>
+                      {(["Entrega de documentação", "Proposta", "Exame", "Exame Médico"].includes(currentFase)) && (
+                        <button
+                          onClick={async () => {
+                            if (!candidaturaId || !vaga) return;
+                            setIsReferring(true);
+                            try {
+                              // Find active contract
+                              const { data: contracts } = await supabase
+                                .from("occupational_health_contracts")
+                                .select("id")
+                                .eq("status", "active")
+                                .limit(1);
+                              if (!contracts || contracts.length === 0) {
+                                alert("Nenhum contrato ativo com clínica de saúde ocupacional.");
+                                return;
+                              }
+                              const contractId = contracts[0].id;
+                              const candidateName = fullCandidatoData?.nome || candidato?.nome || nome;
+                              const candidateEmail = fullCandidatoData?.email || candidato?.email || email;
+                              const { error: rpcError } = await supabase.rpc("refer_to_medical_exam", {
+                                p_contract_id: contractId,
+                                p_legacy_application_id: candidaturaId,
+                                p_candidate_snapshot: { name: candidateName, email: candidateEmail },
+                                p_job_snapshot: { title: vaga?.titulo || "Vaga", id: vaga?.id },
+                                p_exam_type: "admission",
+                                p_employer_note: null,
+                              });
+                              if (rpcError) throw rpcError;
+                              // Advance phase to Exame Médico
+                              await supabase.from("candidaturas").update({
+                                fase: "Exame Médico",
+                                status: "APROVADA",
+                                updated_at: new Date().toISOString(),
+                              }).eq("id", candidaturaId);
+                              setReferralSuccess(true);
+                              setTimeout(() => { setReferralSuccess(false); onActionComplete?.(); }, 2000);
+                            } catch (err: any) {
+                              alert("Erro ao encaminhar: " + (err.message || String(err)));
+                            } finally {
+                              setIsReferring(false);
+                            }
+                          }}
+                          disabled={isReferring || isProcessing}
+                          className="w-full bg-teal-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-teal-600 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <Heart className="w-4 h-4" />
+                          {isReferring ? "Encaminhando..." : referralSuccess ? "Encaminhado!" : "Encaminhar p/ Exame Médico"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

@@ -24,6 +24,8 @@ import {
   X,
   Activity,
   Repeat,
+  Building2,
+  Palette,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useUI } from "../contexts/UIContext";
@@ -505,6 +507,16 @@ export function AdminLayout() {
     { to: "/admin/auditoria", icon: Shield, label: "Auditoria" },
     { to: "/admin/performance", icon: Activity, label: "SRE" },
     { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
+  ];
+
+  return <DashboardLayout menuItems={menuItems} />;
+}
+
+export function MasterLayout() {
+  const menuItems = [
+    { to: "/master", icon: Home, label: "Dashboard" },
+    { to: "/master/tenants", icon: Building2, label: "Empresas" },
+    { to: "/master/branding", icon: Palette, label: "Identidade Visual" },
   ];
 
   return <DashboardLayout menuItems={menuItems} />;

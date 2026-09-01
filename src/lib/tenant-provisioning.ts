@@ -1,0 +1,155 @@
+import { supabase } from "./supabase";
+
+// ── Types ──────────────────────────────────────────────────────────────────────
+
+export interface TenantListItem {
+  id: string;
+  kind: string;
+  cnpj: string;
+  legal_name: string;
+  display_name: string;
+  slug: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TenantDetail extends TenantListItem {
+  metadata: Record<string, unknown>;
+  published_branding_id: string | null;
+  memberCount: number;
+}
+
+export interface ProvisionPayload {
+  kind?: "employer" | "occupational_health_provider";
+  cnpj: string;
+  legalName: string;
+  displayName: string;
+  slug: string;
+  adminEmail: string;
+  adminPassword: string;
+}
+
+export interface BrandingDraftPayload {
+  display_name?: string;
+  sidebar_background?: string;
+  sidebar_text?: string;
+  sidebar_active?: string;
+  sidebar_hover?: string;
+  home_background?: string;
+  hero_background?: string;
+  hero_text?: string;
+  primary_action?: string;
+  accent?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  link_color?: string;
+  focus_ring_color?: string;
+}
+
+interface EdgeResponse {
+  success: boolean;
+  code: string;
+  message?: string;
+  requestId: string;
+  result?: Record<string, unknown>;
+  tenants?: TenantListItem[];
+  tenant?: TenantDetail;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+async function callEdge(
+  action: string,
+  body: Record<string, unknown>,
+): Promise<EdgeResponse> {
+  const { data, error } = await supabase.functions.invoke<EdgeResponse>(
+    "tenant-provisioning",
+    { body: { action, ...body } },
+  );
+
+  if (error) {
+    throw new Error(error.message || "Edge function error");
+  }
+
+  if (!data?.success) {
+    throw new Error(data?.message || data?.code || "Operation failed");
+  }
+
+  return data;
+}
+
+// ── API ────────────────────────────────────────────────────────────────────────
+
+export async function listTenants(): Promise<TenantListItem[]> {
+  const data = await callEdge("list_tenants", {});
+  return data.tenants || [];
+}
+
+export async function getTenant(tenantId: string): Promise<TenantDetail> {
+  const data = await callEdge("get_tenant", { tenantId });
+  if (!data.tenant) throw new Error("Tenant not found");
+  return data.tenant;
+}
+
+export async function provisionTenant(
+  payload: ProvisionPayload,
+): Promise<Record<string, unknown>> {
+  const data = await callEdge("provision", payload as unknown as Record<string, unknown>);
+  return data.result || {};
+}
+
+export async function suspendTenant(tenantId: string): Promise<void> {
+  await callEdge("suspend", { tenantId });
+}
+
+export async function activateTenant(tenantId: string): Promise<void> {
+  await callEdge("activate", { tenantId });
+}
+
+// ── Branding (direct RPC via service_role through Edge Function) ───────────────
+
+export async function createBrandingDraft(
+  tenantId: string,
+  theme: BrandingDraftPayload,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.rpc("create_tenant_branding_draft", {
+    p_actor_id: (await supabase.auth.getUser()).data.user?.id,
+    p_tenant_id: tenantId,
+    p_theme: theme,
+    p_reason: reason,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function publishBranding(
+  tenantId: string,
+  brandingId: string,
+  reason: string,
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase.rpc("publish_tenant_branding", {
+    p_actor_id: (await supabase.auth.getUser()).data.user?.id,
+    p_tenant_id: tenantId,
+    p_branding_id: brandingId,
+    p_reason: reason,
+  });
+
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function getBrandingVersions(
+  tenantId: string,
+): Promise<Record<string, unknown>[]> {
+  const { data, error } = await supabase
+    .from("tenant_branding_versions")
+    .select("*")
+    .eq("tenant_id", tenantId)
+    .order("version", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}

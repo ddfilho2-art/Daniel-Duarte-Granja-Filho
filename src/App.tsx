@@ -22,6 +22,13 @@ import {
 import { VerifyEmail } from "./pages/VerifyEmail";
 import { OccupationalHealthPortal } from "./pages/OccupationalHealth";
 
+// Master Admin Pages
+import {
+  MasterDashboard,
+  MasterTenantList,
+  MasterBrandingEditor,
+} from "./pages/Master";
+
 // Admin Pages
 import {
   AdminDashboard,
@@ -63,6 +70,7 @@ import {
   HRLayout,
   CandidateLayout,
   PublicLayout,
+  MasterLayout,
 } from "./components/Layouts";
 
 const ProtectedRoute = ({
@@ -180,6 +188,20 @@ const App = () => {
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/sobre" element={<SobreNos />} />
               <Route path="/login" element={<Login />} />
+            </Route>
+
+            {/* Master Admin Routes */}
+            <Route
+              path="/master"
+              element={
+                <ProtectedRoute allowedProfiles={["Admin"]}>
+                  <MasterLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route index element={<MasterDashboard />} />
+              <Route path="tenants" element={<MasterTenantList />} />
+              <Route path="branding" element={<MasterBrandingEditor />} />
             </Route>
 
             <Route
