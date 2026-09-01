@@ -5,7 +5,7 @@ import {
   readJsonBody,
   requestId,
   sha256,
-} from "../_shared/http.ts";
+} from "shared/http.ts";
 
 type AdminAction =
   | {
