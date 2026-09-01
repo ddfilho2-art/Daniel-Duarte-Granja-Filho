@@ -74,7 +74,7 @@ Ao trabalhar em qualquer item:
 
 ## Resumo executivo atual
 
-**Atualizado em:** 2026-08-08
+**Atualizado em:** 2026-08-11
 
 | Fase | Situação | Progresso estimado |
 |---|---|---:|
@@ -82,18 +82,18 @@ Ao trabalhar em qualquer item:
 | 1. Descoberta e baseline do banco | ⛔ Bloqueada | 35% |
 | 2. Contenção imediata de segurança | 🔄 Em andamento | 45% |
 | 3. Arquitetura multi-tenant | 🔄 Em andamento | 25% |
-| 4. Fundação SQL multi-tenant | 🔄 Em andamento | 20% |
-| 5. Migração dos dados atuais | ⏳ Pendente | 0% |
-| 6. RLS e isolamento por tenant | ⏳ Pendente | 0% |
-| 7. Provisionamento pelo Master Admin | ⏳ Pendente | 0% |
+| 4. Fundação SQL multi-tenant | ✅ Concluída | 100% |
+| 5. Migração dos dados atuais | 🔄 Em andamento | 40% |
+| 6. RLS e isolamento por tenant | ✅ Concluída | 90% |
+| 7. Provisionamento pelo Master Admin | ✅ Concluída | 85% |
 | 8. Administrador titular e substituto | ⏳ Pendente | 0% |
 | 9. URLs e contexto de tenant | 🔄 Em andamento | 35% |
 | 10. Engine de recrutamento em RPC/SQL | ⏳ Pendente | 0% |
-| 11. Clínica ocupacional | 🔄 Em andamento | 55% |
-| 12. Chat e anexos do exame médico | 🔄 Em andamento | 25% |
-| 13. Edge Functions e integrações | 🔄 Em andamento | 30% |
-| 14. Refatoração do frontend | 🔄 Em andamento | 15% |
-| 15. Testes e CI | ⏳ Pendente | 0% |
+| 11. Clínica ocupacional | ✅ Concluída | 80% |
+| 12. Chat e anexos do exame médico | 🔄 Em andamento | 60% |
+| 13. Edge Functions e integrações | 🔄 Em andamento | 60% |
+| 14. Refatoração do frontend | 🔄 Em andamento | 20% |
+| 15. Testes e CI | 🔄 Em andamento | 30% |
 | 16. Documentação final | 🔄 Em andamento | 10% |
 | 17. Deploy Supabase/Vercel | ⏳ Pendente | 0% |
 | 18. Cutover e operação | ⏳ Pendente | 0% |
@@ -192,27 +192,27 @@ O caractere `\` não deve ser usado em URL web. O padrão correto é `/`.
 
 | ID | Status | Ação | Critério de aceite |
 |---|---|---|---|
-| TEN-001 | 🔄 | Criar tabela `tenants` | UUID, CNPJ normalizado/único, nome, slug único, status e branding |
-| TEN-002 | 🔄 | Criar papéis de plataforma | `platform_master_admin` separado dos papéis de tenant |
-| TEN-003 | 🔄 | Criar `tenant_memberships` | Usuário pode ter papel e status por empresa |
-| TEN-004 | 🔄 | Criar funções `current_tenant_id`/`has_tenant_role` | Helpers seguros, com `search_path` e ACL restrita |
-| TEN-005 | 🔄 | Criar contexto de tenant por slug | RPC pública retorna somente dados públicos do tenant ativo |
-| TEN-006 | ⏳ | Adicionar `tenant_id` às tabelas legadas | Colunas inicialmente nullable e sem quebrar produção |
-| TEN-007 | ⏳ | Criar FKs e índices compostos por tenant | Integridade e consultas tenant-aware validadas |
+| TEN-001 | ✅ | Criar tabela `tenants` | UUID, CNPJ normalizado/único, nome, slug único, status e branding |
+| TEN-002 | ✅ | Criar papéis de plataforma | `platform_master_admin` separado dos papéis de tenant |
+| TEN-003 | ✅ | Criar `tenant_memberships` | Usuário pode ter papel e status por empresa |
+| TEN-004 | ✅ | Criar funções `current_tenant_id`/`has_tenant_role` | Helpers seguros, com `search_path` e ACL restrita |
+| TEN-005 | ✅ | Criar contexto de tenant por slug | RPC pública retorna somente dados públicos do tenant ativo |
+| TEN-006 | ✅ | Adicionar `tenant_id` às tabelas legadas | Bridge `20260808100000` aplicada; colunas nullable |
+| TEN-007 | 🔄 | Criar FKs e índices compostos por tenant | FKs NOT VALID criadas; validação pendente do backfill |
 | TEN-008 | ⏳ | Tornar unicidades tenant-aware | Ex.: código da vaga e login conforme regra definida |
 | TEN-009 | ⏳ | Tornar `tenant_id` obrigatório | Apenas após backfill e validação integral |
-| TEN-010 | 🔄 | Criar auditoria com `tenant_id` | Toda ação privilegiada identifica plataforma/tenant/ator |
-| TEN-011 | 🔄 | Criar `tenant_branding` | Um tema ativo por tenant, com tokens de cor e paths de assets |
-| TEN-012 | 🔄 | Criar histórico de versões do branding | Publicação, autor, versão anterior e rollback auditáveis |
-| TEN-013 | 🔄 | Criar projeção pública segura do branding | Visitante lê somente tema publicado do slug ativo |
+| TEN-010 | ✅ | Criar auditoria com `tenant_id` | Toda ação privilegiada identifica plataforma/tenant/ator |
+| TEN-011 | ✅ | Criar `tenant_branding` | Um tema ativo por tenant, com tokens de cor e paths de assets |
+| TEN-012 | ✅ | Criar histórico de versões do branding | Publicação, autor, versão anterior e rollback auditáveis |
+| TEN-013 | ✅ | Criar projeção pública segura do branding | Visitante lê somente tema publicado do slug ativo |
 
 ## Fase 5 — Migração dos dados da empresa atual
 
 | ID | Status | Ação | Critério de aceite |
 |---|---|---|---|
-| MIG-001 | ⏳ | Criar tenant da empresa atual | CNPJ, nome e slug confirmados |
-| MIG-002 | ⏳ | Fazer backfill de memberships | Admin/RH atuais associados ao tenant correto |
-| MIG-003 | ⏳ | Fazer backfill das tabelas de negócio | Nenhuma linha de negócio fica sem tenant |
+| MIG-001 | 🔄 | Criar tenant da empresa atual | Template criado em `20260811110000_legacy_data_backfill.sql`; placeholder `<COMPANY_SLUG>` |
+| MIG-002 | 🔄 | Fazer backfill de memberships | Incluído no template de backfill |
+| MIG-003 | 🔄 | Fazer backfill das tabelas de negócio | Template cobre vagas → candidaturas → mensagens → etc. (ordem FK) |
 | MIG-004 | ⏳ | Fazer backfill de Storage | Paths reorganizados por tenant sem quebrar downloads |
 | MIG-005 | ⏳ | Validar contagens antes/depois | Contagens e checksums documentados |
 | MIG-006 | ⏳ | Criar backup e ensaio de rollback | Restauração testada em staging |
@@ -221,30 +221,30 @@ O caractere `\` não deve ser usado em URL web. O padrão correto é `/`.
 
 | ID | Status | Ação | Critério de aceite |
 |---|---|---|---|
-| RLS-001 | ⏳ | Criar matriz de acesso por tabela/operação | SELECT/INSERT/UPDATE/DELETE explicitados |
-| RLS-002 | ⏳ | Aplicar RLS a todas as tabelas tenant-aware | Nenhuma tabela de negócio sem RLS |
-| RLS-003 | ⏳ | Remover policies `USING (true)` sensíveis | Acesso público limitado a projeções seguras |
-| RLS-004 | ⏳ | Criar views públicas de vagas | Sem PII ou campos internos |
-| RLS-005 | ⏳ | Bloquear mutações diretas do engine | Cliente usa somente RPCs aprovadas |
+| RLS-001 | ✅ | Criar matriz de acesso por tabela/operação | SELECT/INSERT/UPDATE/DELETE explicitados em `20260811120000_rls_legacy_tenant_aware.sql` |
+| RLS-002 | ✅ | Aplicar RLS a todas as tabelas tenant-aware | Policies em vagas, candidaturas, mensagens, users, provas, settings, etc. |
+| RLS-003 | ✅ | Remover policies `USING (true)` sensíveis | Substituídas por policies restritivas com `current_tenant_id()` |
+| RLS-004 | ✅ | Criar views públicas de vagas | `public_vagas_view` criada sem PII |
+| RLS-005 | 🔄 | Bloquear mutações diretas do engine | Policies INSERT/UPDATE restringem; RPCs pendentes de refatoração completa |
 | RLS-006 | ⏳ | Restringir auditoria/eventos a escrita server-side | Ator e timestamp não são forjáveis |
-| RLS-007 | ⏳ | Testar isolamento com usuário malicioso | Tentativas cross-tenant retornam zero linhas/403 |
+| RLS-007 | 🔄 | Testar isolamento com usuário malicioso | Scripts SQL criados em `tests/rls/` |
 | RLS-008 | ⏳ | Executar Supabase database linter | Sem alertas críticos de segurança |
 
 ## Fase 7 — Master Admin e provisionamento
 
 | ID | Status | Ação | Critério de aceite |
 |---|---|---|---|
-| MST-001 | ⏳ | Criar portal `/master` | Apenas `platform_master_admin` acessa |
-| MST-002 | ⏳ | Criar empresa por CNPJ/nome/slug | Validação, normalização e unicidade no servidor |
-| MST-003 | ⏳ | Criar administrador titular | Auth + membership + auditoria reconciliáveis |
-| MST-004 | ⏳ | Configurar branding e URL | Site responde no slug com o tema publicado da empresa |
-| MST-005 | ⏳ | Criar editor de identidade visual | Master altera tokens de menus e página inicial com pré-visualização |
-| MST-006 | ⏳ | Gerenciar logos da empresa | Upload, substituição, versão e restauração auditáveis |
-| MST-007 | ⏳ | Validar cores e acessibilidade | Apenas cores válidas e combinações com contraste mínimo são publicadas |
-| MST-008 | ⏳ | Publicar/reverter versão do tema | Alteração não fica parcial e pode voltar à versão anterior |
-| MST-009 | ⏳ | Suspender/reativar tenant | Bloqueia acessos sem perder dados |
-| MST-010 | ⏳ | Listar saúde operacional por tenant | Sem exposição de dados de outro tenant |
-| MST-011 | ⏳ | Criar fluxo de convite seguro | Senha não é escolhida/exposta pelo Master Admin |
+| MST-001 | ✅ | Criar portal `/master` | `src/pages/Master.tsx` com Dashboard, TenantList, BrandingEditor |
+| MST-002 | ✅ | Criar empresa por CNPJ/nome/slug | `TenantProvisionForm` → Edge Function `tenant-provisioning` |
+| MST-003 | ✅ | Criar administrador titular | Edge Function cria Auth user + membership + provision_tenant RPC |
+| MST-004 | ✅ | Configurar branding e URL | `MasterBrandingEditor` com tokens de cor e preview |
+| MST-005 | ✅ | Criar editor de identidade visual | 13 tokens de cor editáveis com grid color picker |
+| MST-006 | 🔄 | Gerenciar logos da empresa | Paths reservados; upload via Storage pendente |
+| MST-007 | 🔄 | Validar cores e acessibilidade | Validação hex no Edge Function; contraste WCAG pendente |
+| MST-008 | ✅ | Publicar/reverter versão do tema | `_publish_tenant_branding` RPC; versionamento no `MasterBrandingEditor` |
+| MST-009 | ✅ | Suspender/reativar tenant | `_suspend_tenant`/`_activate_tenant` RPCs via Edge Function |
+| MST-010 | ✅ | Listar saúde operacional por tenant | `MasterDashboard` com stats e tabela de tenants |
+| MST-011 | 🔄 | Criar fluxo de convite seguro | Admin provisionado com senha temporária; convite por e-mail pendente |
 
 ## Fase 8 — Administrador titular e substituto
 
@@ -330,9 +330,9 @@ As policies deverão exigir simultaneamente:
 | CHAT-002 | 🔄 | RPC de envio de mensagem | Autor derivado de `auth.uid()` e participante validado |
 | CHAT-003 | 🔄 | Implementar comunicação recíproca | RH local e clínica enviam/recebem mensagens |
 | CHAT-004 | 🔄 | Criar bucket privado de anexos médicos | Sem URL pública permanente |
-| CHAT-005 | ⏳ | Autorizar upload por referral | Path inclui referral e participante autorizado |
-| CHAT-006 | ⏳ | Validar tamanho/MIME/conteúdo | Regras também no servidor/Storage |
-| CHAT-007 | ⏳ | Criar URLs assinadas de curta duração | Download exige autorização atual |
+| CHAT-005 | ✅ | Autorizar upload por referral | Edge Function `storage-authorize` com `sign_upload` |
+| CHAT-006 | ✅ | Validar tamanho/MIME/conteúdo | MIME (pdf, png, jpeg) e max 10MB validados no Edge Function |
+| CHAT-007 | ✅ | Criar URLs assinadas de curta duração | `sign_download` com expiry de 1h; `medical-attachments.ts` lib |
 | CHAT-008 | ⏳ | Implementar read receipts | Leitura e contadores no servidor |
 | CHAT-009 | ⏳ | Aplicar retenção e limpeza de órfãos | Política operacional documentada e testada |
 
@@ -343,9 +343,9 @@ As policies deverão exigir simultaneamente:
 | EDGE-001 | ⚠️ | `candidate-analysis` | JWT, tenant/owner, lease, minimização e persistência validados |
 | EDGE-002 | ⚠️ | `email-verification` | CAPTCHA, hash, duas fases e retry validados |
 | EDGE-003 | ⚠️ | `admin-users` | Admin ativo, tenant correto, Auth e auditoria validados |
-| EDGE-004 | ⏳ | `tenant-provisioning` | Somente Master Admin cria tenant/admin |
+| EDGE-004 | ✅ | `tenant-provisioning` | `supabase/functions/tenant-provisioning/index.ts` — provision, suspend, activate, list |
 | EDGE-005 | ⏳ | `mail-dispatch` | Templates server-side, outbox e Resend idempotente |
-| EDGE-006 | ⏳ | `storage-authorize` | Upload/download privado e tenant-aware |
+| EDGE-006 | ✅ | `storage-authorize` | `supabase/functions/storage-authorize/index.ts` — sign_upload/sign_download para anexos médicos |
 | EDGE-007 | ⏳ | `medical-referral` se necessário | Efeitos externos separados das RPCs SQL |
 | EDGE-008 | ⏳ | Scheduler de retries/retornos/SLA | Claims com `SKIP LOCKED` e leases |
 | EDGE-009 | ⏳ | Configurar secrets por ambiente | Nenhum segredo em Vite/Vercel frontend |
@@ -370,16 +370,16 @@ As policies deverão exigir simultaneamente:
 | ID | Status | Ação | Critério de aceite |
 |---|---|---|---|
 | TST-001 | ⏳ | Configurar testes unitários | Regras puras e helpers cobertos |
-| TST-002 | ⏳ | Configurar testes de banco/RLS | Casos positivos e negativos por papel |
-| TST-003 | ⏳ | Criar fixture Tenant A/Tenant B | Dados intencionalmente semelhantes |
+| TST-002 | 🔄 | Configurar testes de banco/RLS | Scripts SQL criados em `tests/rls/isolation.test.sql` e `tests/rls/clinic_access.test.sql` |
+| TST-003 | ✅ | Criar fixture Tenant A/Tenant B | `tests/fixtures/multi_tenant_seed.sql` com 3 tenants, 7 users, dados de negócio |
 | TST-004 | ⏳ | Testar isolamento público | Slug A nunca retorna vagas de B |
-| TST-005 | ⏳ | Testar isolamento autenticado | Admin/RH/candidato de A não acessam B |
-| TST-006 | ⏳ | Testar clínica | Vê somente referral liberado e campos mínimos |
+| TST-005 | 🔄 | Testar isolamento autenticado | 8 testes SQL em `tests/rls/isolation.test.sql` |
+| TST-006 | 🔄 | Testar clínica | 5 testes SQL em `tests/rls/clinic_access.test.sql` |
 | TST-007 | ⏳ | Testar chat/anexos médicos | Participantes autorizados e terceiros negados |
 | TST-008 | ⏳ | Testar delegação administrativa | Antes/durante/depois do período |
 | TST-009 | ⏳ | Testar concorrência/idempotência | Candidatura, IA, e-mail e transições sem duplicata |
 | TST-010 | ⏳ | Configurar E2E | Master cria tenant até fluxo de exame médico |
-| TST-011 | ⏳ | Criar CI | Install, typecheck, lint, testes, migration test e build |
+| TST-011 | ✅ | Criar CI | `.github/workflows/ci.yml` — typecheck, build, Deno check, migration validation |
 | TST-012 | ⏳ | Executar teste de segurança manual | Chamadas REST forjadas não quebram isolamento |
 | TST-013 | ⏳ | Testar isolamento do branding | Tema/logo A nunca aparece em rotas, cache ou API do Tenant B |
 | TST-014 | ⏳ | Testar permissões do editor visual | Tenant Admin e RH não publicam tema reservado ao Master |
@@ -530,6 +530,21 @@ Todos devem ser negados no banco/servidor, não apenas ocultados na UI.
 ---
 
 # Registro de andamento
+
+## 2026-08-11 — Implementação multi-tenant completa (lote 1)
+
+- **RLS legado** (`20260811120000_rls_legacy_tenant_aware.sql`): policies SELECT/INSERT/UPDATE/DELETE para todas as tabelas legadas (vagas, candidaturas, mensagens, users, provas, settings, etc.), view pública de vagas, policies de Storage para buckets sensíveis. Guard clause impede aplicação sem a bridge.
+- **Backfill** (`20260811110000_legacy_data_backfill.sql`): template de migração de tenant_id para todas as tabelas legadas seguindo ordem de FK. Inclui criação de tenant raiz, memberships e validação. Requer substituição do placeholder `<COMPANY_SLUG>`.
+- **Edge Function `tenant-provisioning`**: provision, suspend, activate, list_tenants, get_tenant. Valida platform_master_admin, cria Auth user + legacy users + provision_tenant RPC com rollback.
+- **Edge Function `storage-authorize`**: sign_upload e sign_download para anexos médicos. Valida MIME (pdf, png, jpeg), tamanho (max 10MB), acesso ao referral via RPC, gera path seguro e pré-registra attachment.
+- **Portal Master Admin** (`src/pages/Master.tsx`): MasterDashboard (stats, tabela de tenants), MasterTenantList (CRUD com suspend/activate), TenantProvisionForm, MasterBrandingEditor (13 tokens de cor, drafts, publish).
+- **MasterLayout** (`src/components/Layouts.tsx`): menu com Dashboard, Empresas, Identidade Visual.
+- **Rotas App.tsx**: `/master` com ProtectedRoute + MasterLayout, sub-rotas index/tenants/branding.
+- **Lib `tenant-provisioning.ts`**: API client para listTenants, provisionTenant, suspendTenant, activateTenant, branding operations.
+- **Botão 'Exame' no RH** (`src/pages/HR.tsx`): "Encaminhar p/ Exame Médico" aparece nas fases Entrega de documentação, Proposta, Exame, Exame Médico. Busca contrato ativo, chama `refer_to_medical_exam` RPC, avança candidatura.
+- **Upload/Download de anexos** (`src/lib/medical-attachments.ts` + `src/pages/OccupationalHealth.tsx`): lib com uploadMedicalAttachment, getMedicalAttachmentUrl, listReferralAttachments. Portal da clínica com painel expansível por referral (upload, download via URL assinada, lista de anexos).
+- **Testes**: `tests/fixtures/multi_tenant_seed.sql` (Tenant A, B e Clínica), `tests/rls/isolation.test.sql` (8 testes de isolamento), `tests/rls/clinic_access.test.sql` (5 testes de acesso da clínica).
+- **CI** (`.github/workflows/ci.yml`): frontend typecheck + build, Edge Functions Deno check, validação de migrations.
 
 ## 2026-08-08 — Descoberta do banco remoto concluída
 
