@@ -845,16 +845,11 @@ export function AdminGestaoUsuarios() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("perfil", "RH")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
+      const response = await executeAdminUserAction({ action: "list" });
+      const data = Array.isArray(response.data) ? response.data : [];
+      setUsers(data as any[]);
     } catch (err) {
-      console.error("Erro ao buscar usuários:", err);
+      console.error("Erro ao buscar usuários RH:", err);
     } finally {
       setLoading(false);
     }
