@@ -24,7 +24,7 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
 }
 
 interface AdminUserRequest {
-  action: "list" | "get" | "create" | "update" | "delete";
+  action: "list" | "get" | "get_single" | "create" | "update" | "delete";
   tenant_id: string;
   user_id?: string;
   email?: string;
