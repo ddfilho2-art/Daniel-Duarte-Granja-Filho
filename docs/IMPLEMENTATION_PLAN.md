@@ -765,6 +765,14 @@ aplicados em um banco de staging nem validados com build/testes.
 
 
 
+
+### 2026-09-26 — SEC-004 — histórico de transferências movido para fluxo server-side
+- **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/components/TransferOwnerModal.tsx`
+- **Ajuste:** o histórico de transferências de uma vaga passou a ser obtido pela ação `transfer_history` do `admin-users`, em vez de consulta direta a `transferencias` pelo frontend.
+- **Proteção:** a Edge Function valida o tenant autorizado, verifica a existência da vaga e, quando há proprietário atual, confirma que ele pertence ao tenant antes de retornar o histórico.
+- **Resultado esperado:** retirar mais uma leitura administrativa privilegiada do cliente e manter a autorização centralizada no servidor.
+- **Validação:** inspeção estática do contrato cliente/Edge Function; sem alteração remota no Supabase, build ou deploy nesta etapa.
+
 ### 2026-09-26 — SEC-004 — remoção da leitura direta de RH no modal de transferência
 - **Arquivo:** `src/components/TransferOwnerModal.tsx`
 - **Ajuste:** a lista de usuários RH ativos usada para transferência de vagas deixou de consultar diretamente `users` pelo frontend e passou a usar `executeAdminUserAction({ action: "list" })`.
