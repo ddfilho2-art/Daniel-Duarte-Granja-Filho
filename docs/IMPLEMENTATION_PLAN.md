@@ -723,3 +723,12 @@ aplicados em um banco de staging nem validados com build/testes.
 - `supabase/functions/admin-users/index.ts`: o cliente Supabase com `service_role` usado exclusivamente no backend agora desabilita `autoRefreshToken` e `persistSession`, evitando persistência/renovação de sessão em execução server-side.
 - Mantida a separação entre `userClient` (Bearer do operador, anon key) para autenticação/autorização e `adminClient` (service role) somente após autorização tenant-aware.
 - Nenhuma alteração foi aplicada remotamente no Supabase e nenhum deploy/merge foi executado nesta etapa.
+
+### 2026-09-26 — SEC-003/SEC-004 — alinhamento do admin-users com o frontend
+
+- `supabase/functions/admin-users/index.ts`: alinhadas as ações da Edge Function ao contrato efetivamente usado por `src/lib/admin-users.ts` e `src/pages/Admin.tsx`.
+- Adicionadas operações server-side para `reset_password` e `set_status`, sempre condicionadas à autorização tenant-aware e à existência do usuário em `tenant_memberships`.
+- A ação `update` passou a atualizar os dados do usuário RH e o e-mail do Auth no servidor.
+- A ação `create` passou a aceitar nome, login, e-mail e senha do fluxo atual e concluir a criação server-side, sem retornar service_role ao cliente.
+- O cliente frontend já existente usa `supabase.functions.invoke('admin-users')`; portanto o fluxo administrativo deixa de depender conceitualmente das três APIs Vercel legadas para essas ações.
+- Validação realizada por inspeção estática do contrato entre `src/lib/admin-users.ts`, `src/pages/Admin.tsx` e `admin-users/index.ts`. Build/execução remota ainda não foram realizados nesta etapa.
