@@ -150,12 +150,18 @@ create table if not exists public.settings (
   updated_at timestamptz default now()
 );
 
-create table if not exists public.configuracoes (
-  chave text primary key,
-  valor text not null,
-  descricao text,
-  atualizado_em timestamptz default now()
-);
+do $
+begin
+  if to_regclass('public.configuracoes') is null then
+    create table public.configuracoes (
+      chave text primary key,
+      valor text not null,
+      descricao text,
+      atualizado_em timestamptz default now()
+    );
+  end if;
+end;
+$;
 
 insert into public.settings (id, data) values
   ('email', '{
@@ -166,10 +172,28 @@ insert into public.settings (id, data) values
   }'::jsonb)
 on conflict (id) do nothing;
 
-insert into public.configuracoes (chave, valor, descricao) values
-  ('tempo_max_cancelamento_horas', '4', 'Tempo máximo permitido para cancelar após criação'),
-  ('tempo_limite_edicao_horas', '24', 'Horas máximas após criação para editar vaga')
-on conflict (chave) do nothing;
+do $
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'configuracoes'
+      and column_name = 'updated_by'
+  ) then
+    insert into public.configuracoes (chave, valor)
+    values
+      ('tempo_max_cancelamento_horas', '"4"'::jsonb),
+      ('tempo_limite_edicao_horas', '"24"'::jsonb)
+    on conflict (chave) do nothing;
+  else
+    insert into public.configuracoes (chave, valor, descricao)
+    values
+      ('tempo_max_cancelamento_horas', '4', 'Tempo máximo permitido para cancelar após criação'),
+      ('tempo_limite_edicao_horas', '24', 'Horas máximas após criação para editar vaga')
+    on conflict (chave) do nothing;
+  end if;
+end;
+$;
 
 create table if not exists public.departamentos (
   id text primary key default gen_random_uuid()::text,
