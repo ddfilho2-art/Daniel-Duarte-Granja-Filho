@@ -746,4 +746,10 @@ aplicados em um banco de staging nem validados com build/testes.
 - `supabase/functions/admin-users/index.ts`: a ação `create` agora verifica previamente os usuários do Auth e rejeita e-mails já existentes com `EMAIL_ALREADY_EXISTS`.
 - Isso evita que o fluxo administrativo de criação reutilize uma conta Auth existente e, na sequência, altere sua senha/metadados.
 - Validação realizada por inspeção estática após o commit. Sem execução remota/build nesta etapa.
+### 2026-09-26 — SEC-004 — listagem de RH movida para o admin-users
 
+- `supabase/functions/admin-users/index.ts`: a ação `list` deixou de retornar somente `tenant_memberships` e passou a compor a resposta com os registros de `users` pertencentes ao tenant, restringindo o conjunto ao perfil `RH`.
+- A resposta preserva os campos usados pela tela administrativa e inclui `tenant_membership` como metadado server-side do vínculo.
+- A consulta é feita exclusivamente depois da validação do Bearer token e de `can_administer_tenant`, usando o `tenant_id` derivado do header validado.
+- Esta alteração prepara a remoção da consulta direta `.from("users")` da tela `AdminGestaoUsuarios`, eliminando mais uma leitura administrativa direta do frontend.
+- Validação realizada por inspeção estática do fluxo. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
