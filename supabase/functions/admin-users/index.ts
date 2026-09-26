@@ -30,6 +30,9 @@ interface AdminUserRequest {
   email?: string;
   roles?: string[];
   status?: string;
+  nome?: string;
+  login?: string;
+  password?: string;
 }
 
 interface AdminUserResponse {
@@ -265,6 +268,166 @@ async function deleteMember(
   }
 }
 
+
+// Update legacy users profile fields while keeping the target inside the authorized tenant.
+async function updateLegacyUser(
+  tenantId: string,
+  userId: string,
+  nome: string,
+  email: string
+): Promise<AdminUserResponse> {
+  try {
+    const { data: membership, error: membershipError } = await adminClient
+      .from("tenant_memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (membershipError) throw membershipError;
+    if (!membership) {
+      return { success: false, code: "USER_NOT_FOUND", error: "User is not a member of this tenant" };
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    if (!nome.trim() || nome.trim().length < 3 || !emailRegex.test(normalizedEmail)) {
+      return { success: false, code: "INVALID_INPUT", error: "Nome ou e-mail inválido" };
+    }
+
+    const { data, error } = await adminClient
+      .from("users")
+      .update({
+        nome: nome.trim(),
+        email: normalizedEmail,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select("id, nome, email, login, perfil, status")
+      .single();
+
+    if (error) throw error;
+
+    const { error: authError } = await adminClient.auth.admin.updateUserById(
+      userId,
+      { email: normalizedEmail }
+    );
+    if (authError) throw authError;
+
+    return { success: true, data, code: "USER_UPDATED" };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+async function resetUserPassword(
+  tenantId: string,
+  userId: string,
+  password: string
+): Promise<AdminUserResponse> {
+  try {
+    const { data: membership, error: membershipError } = await adminClient
+      .from("tenant_memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (membershipError) throw membershipError;
+    if (!membership) {
+      return { success: false, code: "USER_NOT_FOUND", error: "User is not a member of this tenant" };
+    }
+
+    if (!password || password.length < 8 || !/[A-Z]/.test(password) ||
+        !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
+      return { success: false, code: "INVALID_PASSWORD", error: "Password policy rejected" };
+    }
+
+    const { error } = await adminClient.auth.admin.updateUserById(userId, {
+      password,
+    });
+    if (error) {
+      return { success: false, code: "AUTH_PASSWORD_RESET_FAILED", error: error.message };
+    }
+
+    return { success: true, code: "PASSWORD_RESET", message: "Password reset successfully" };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
+async function setUserStatus(
+  tenantId: string,
+  userId: string,
+  status: string
+): Promise<AdminUserResponse> {
+  try {
+    const { data: membership, error: membershipError } = await adminClient
+      .from("tenant_memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (membershipError) throw membershipError;
+    if (!membership) {
+      return { success: false, code: "USER_NOT_FOUND", error: "User is not a member of this tenant" };
+    }
+
+    const normalizedStatus = status.trim();
+    const allowedStatuses = ["Ativo", "Inativo", "cancelado", "active", "revoked"];
+    if (!allowedStatuses.includes(normalizedStatus)) {
+      return { success: false, code: "INVALID_STATUS", error: "Invalid user status" };
+    }
+
+    const legacyStatus = normalizedStatus === "cancelado" || normalizedStatus === "Inativo"
+      ? "Inativo"
+      : "Ativo";
+    const membershipStatus = legacyStatus === "Inativo" ? "revoked" : "active";
+
+    const { data, error } = await adminClient
+      .from("users")
+      .update({
+        status: legacyStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId)
+      .select("id, nome, email, login, perfil, status")
+      .single();
+
+    if (error) throw error;
+
+    const { error: membershipUpdateError } = await adminClient
+      .from("tenant_memberships")
+      .update({
+        status: membershipStatus,
+        ...(membershipStatus === "revoked"
+          ? { revoked_at: new Date().toISOString() }
+          : { revoked_at: null }),
+      })
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId);
+
+    if (membershipUpdateError) throw membershipUpdateError;
+
+    return { success: true, code: "STATUS_UPDATED", data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      code: "INTERNAL_ERROR",
+    };
+  }
+}
+
 // Main handler
 async function handleRequest(
   req: Request
@@ -389,30 +552,75 @@ async function handleRequest(
 
       case "create":
       case "post":
-        if (!body.email || !body.roles) {
+        if (!body.email || !body.nome || !body.login || !body.password) {
           result = {
             success: false,
-            error: "email and roles required",
+            code: "INVALID_INPUT",
+            error: "nome, email, login and password are required",
           };
         } else {
-          result = await createMember(tenantId, body.email, body.roles);
+          result = await createMember(tenantId, body.email, ["RH"]);
+          if (result.success && result.data && typeof result.data === "object") {
+            const created = result.data as Record<string, unknown>;
+            const createdId = String(created.user_id || created.id || "");
+            if (createdId) {
+              const updateResult = await updateLegacyUser(
+                tenantId,
+                createdId,
+                body.nome,
+                body.email
+              );
+              if (!updateResult.success) result = updateResult;
+              else {
+                const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
+                  createdId,
+                  { password: body.password, user_metadata: { nome: body.nome, perfil: "RH", login: body.login } }
+                );
+                if (authUpdateError) result = { success: false, code: "AUTH_CREATE_FAILED", error: authUpdateError.message };
+              }
+              if (result.success) {
+                const { error: loginError } = await adminClient
+                  .from("users")
+                  .update({ login: body.login.trim(), login_lower: body.login.trim().toLowerCase() })
+                  .eq("id", createdId);
+                if (loginError) result = { success: false, code: "INTERNAL_ERROR", error: loginError.message };
+              }
+            }
+          }
         }
         break;
 
       case "update":
       case "put":
-        if (!body.user_id || !body.roles) {
-          result = {
-            success: false,
-            error: "user_id and roles required",
-          };
+        if (!body.user_id || body.roles) {
+          if (body.user_id && body.roles) {
+            result = await updateMember(tenantId, body.user_id, body.roles, body.status);
+          } else {
+            result = { success: false, code: "INVALID_INPUT", error: "user_id and profile fields required" };
+          }
         } else {
-          result = await updateMember(
+          result = await updateLegacyUser(
             tenantId,
             body.user_id,
-            body.roles,
-            body.status
+            body.nome,
+            body.email
           );
+        }
+        break;
+
+      case "reset_password":
+        if (!body.user_id || !body.password) {
+          result = { success: false, code: "INVALID_INPUT", error: "user_id and password required" };
+        } else {
+          result = await resetUserPassword(tenantId, body.user_id, body.password);
+        }
+        break;
+
+      case "set_status":
+        if (!body.user_id || !body.status) {
+          result = { success: false, code: "INVALID_INPUT", error: "user_id and status required" };
+        } else {
+          result = await setUserStatus(tenantId, body.user_id, body.status);
         }
         break;
 
