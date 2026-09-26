@@ -827,3 +827,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Resultado:** elimina da interface administrativa a antiga superfície de configuração de credenciais SMTP e alinha o teste com o relay server-side protegido já implementado.
 - **Validação:** inspeção estática confirmou ausência de referências aos campos antigos e ausência de `smtpConfig` no payload do teste. Nenhuma alteração remota no Supabase, build ou deploy foi executada.
 - **Pendência:** a tabela `settings` ainda possui fluxo de persistência legado para demais configurações; a remoção/limpeza definitiva de registros antigos de credenciais depende da estratégia de dados e será tratada separadamente.
+
+
+### 2026-09-26 — DB-007 — criação do projeto Supabase remoto e aplicação do primeiro lote de migrations
+
+- **Projeto:** Supabase `Recruta AÍ` — ref `dmzagrakkduddofkqjhg` — região `sa-east-1`.
+- **Ajuste remoto:** projeto novo criado na organização `wqhcrrbkkfyibzelpnxk`; banco inicialmente vazio.
+- **Migrations aplicadas:** primeiro lote histórico, da `20260423170831_d6090254-9aed-463b-9e68-2e0e9b516b73` até `20260426001601_7cb4f188-57c7-4b50-9ea5-f888ee9603f5`, total de 8 migrations.
+- **Validação:** `list_migrations` confirmou as 8 execuções remotas com sucesso.
+- **Observação:** o mecanismo remoto registra a versão pela data/hora de execução, preservando o nome da migration; portanto a versão remota não replica literalmente o timestamp do arquivo Git.
+- **Próximo passo:** continuar a aplicação cronológica das migrations restantes e validar o schema antes do deploy das Edge Functions.
