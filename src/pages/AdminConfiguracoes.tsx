@@ -125,10 +125,6 @@ export function AdminConfiguracoes() {
   const [saving, setSaving] = useState(false);
 
   const [config, setConfig] = useState<Record<string, any>>({
-    smtpHost: '',
-    smtpPort: '',
-    smtpUser: '',
-    smtpPass: '',
     emailTemplateSubject: 'Nova Mensagem do RH - [Nome da Empresa]',
     emailTemplateBody: 'Olá [Nome do Candidato],\n\nVocê tem uma nova mensagem do RH referente à sua candidatura para a vaga de [Título da Vaga].\n\nAcesse o portal do candidato para visualizar e responder.\n\nAtenciosamente,\nEquipe de RH',
     regrasTempoCancelamentoVaga: 4,
@@ -394,7 +390,7 @@ export function AdminConfiguracoes() {
   const [activeTab, setActiveTab] = useState('email');
 
   const TABS = [
-    { id: 'email', label: 'E-mail (SMTP)', icon: Server },
+    { id: 'email', label: 'E-mail', icon: Server },
     { id: 'templates', label: 'Templates', icon: Mail },
     { id: 'vagas', label: 'Vagas (Campos)', icon: Briefcase },
     { id: 'regras', label: 'Regras de Negócio', icon: Settings }
@@ -411,14 +407,9 @@ export function AdminConfiguracoes() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           to: emailDestino,
-          subject: 'Teste de Configuração SMTP - DFL RH',
-          body: 'Este é um e-mail de teste para validar as configurações de SMTP do sistema DFL RH.',
-          smtpConfig: {
-            smtpHost: config.smtpHost,
-            smtpPort: config.smtpPort,
-            smtpUser: config.smtpUser,
-            smtpPass: config.smtpPass
-          }
+          subject: 'Teste de envio de e-mail - Recruta AÍ',
+          body: 'Este é um e-mail de teste para validar o serviço de envio configurado no servidor do Recruta AÍ.',
+          
         })
       });
 
@@ -482,7 +473,7 @@ export function AdminConfiguracoes() {
                 <button
                   type="button"
                   onClick={handleTestEmail}
-                  disabled={testingEmail || !config.smtpHost || !config.smtpUser || !config.smtpPass}
+                  disabled={testingEmail}
                   className="mt-4 flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors disabled:opacity-50"
                 >
                   <Mail className="w-4 h-4" />
