@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, AlertTriangle, History, CheckCircle2, UserPlus, Repeat } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { executeAdminUserAction } from '../lib/admin-users';
 import { useAuth } from '../contexts/AuthContext';
 import { logAudit } from '../lib/audit';
 
@@ -41,15 +42,11 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
 
   const fetchRhUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('perfil', 'RH')
-        .eq('status', 'Ativo');
-      
-      if (error) throw error;
-      
-      const users = (data || []).filter((u: any) => u.id !== vaga.owner_id);
+      const response = await executeAdminUserAction({ action: 'list' });
+      const data = Array.isArray(response.data) ? response.data : [];
+      const users = data.filter(
+        (u: any) => u?.status === 'Ativo' && u?.id !== vaga.owner_id,
+      );
       setRhUsers(users);
     } catch (error) {
       console.error('Erro ao buscar usuários RH:', error);
