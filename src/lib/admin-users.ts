@@ -2,6 +2,7 @@ import { supabase } from "./supabase";
 import { readEdgeFunctionError } from "./function-errors";
 
 type AdminUserAction =
+  | { action: "list" }
   | {
       action: "create";
       nome: string;
@@ -30,6 +31,7 @@ interface AdminUserResponse {
   success: boolean;
   code?: string;
   requestId?: string;
+  data?: unknown;
   user?: Record<string, unknown>;
 }
 
