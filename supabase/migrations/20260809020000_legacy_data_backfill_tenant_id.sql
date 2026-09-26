@@ -28,7 +28,7 @@ begin
   select count(*) into v_tenants_count from public.tenants;
 
   if v_tenants_count = 0 then
-    raise exception 'no_tenants_found: provision tenants before backfill';
+    raise notice 'No tenants exist yet; legacy backfill will remain pending until tenant provisioning.';
   end if;
 
   raise notice 'Backfill status: % vagas without tenant_id, % candidaturas without tenant_id, % tenants available',
