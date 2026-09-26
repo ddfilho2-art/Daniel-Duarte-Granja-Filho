@@ -72,8 +72,11 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const payload = typeof req.body === 'object' && req.body !== null ? req.body : {};
-    const { to, subject, html, body } = payload;
+    const input = typeof req.body === 'object' && req.body !== null ? req.body : {};
+    const { to, subject, html, body } = input;
+    // Persist only the fields needed for delivery. Never queue arbitrary request
+    // properties because legacy clients may still send SMTP credentials.
+    const payload = { to, subject, html: html || null, body: body || null };
 
     const emailContent = html || (body ? body.replace(/\n/g, '<br>') : null);
     const textContent = body || '';
