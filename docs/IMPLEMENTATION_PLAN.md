@@ -875,3 +875,11 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Implementado:** migration RLS 20260811120000 ajustada para usar os nomes reais da baseline na view pública (`local` → `localizacao` e `atualizado_em` → `updated_at`).
 - **Validado:** migrations 20260811110000 e 20260811120000 aplicadas com sucesso. O banco segue sem tenant e sem dados de negócio; as tabelas legadas críticas permanecem vazias.
 - **Próximo passo:** aplicar o hardening final da fila de e-mail e executar a validação estrutural completa do Supabase (migrations, RLS/policies, views, funções e advisors).
+
+### 2026-09-26 — SEC-008 — hardening estrutural da baseline recuperada
+- **Implementado:** RLS habilitado nas tabelas legadas recuperadas que estavam expostas sem proteção; políticas adicionadas para candidatos, histórico de processo, resultados de prova, catálogos, transferências, visualizações RH e banco de talentos.
+- **Implementado:** view public.vagas_publica ajustada para `security_invoker=true`; acesso anônimo limitado a vagas abertas; função trigger-only handle_new_user deixou de ser executável pela API.
+- **Implementado:** processo_instancia_counters passou a ficar inacessível para anon/authenticated, preservando uso interno/service_role.
+- **Validado:** 18 tabelas legadas/relacionadas verificadas com RLS habilitado; a view pública está com security_invoker=true; não há usuários, vagas, candidatos, candidaturas, mensagens ou provas no projeto. Permanecem apenas as configurações padrão da baseline (1 settings, 2 configuracoes) e nenhum tenant.
+- **Advisors:** os erros críticos de RLS desabilitado nas tabelas recuperadas e de security-definer view foram eliminados. Permanecem avisos de funções SECURITY DEFINER da fundação operacional e otimizações/performance que exigem avaliação por contrato, não correção cega.
+- **Bloqueio funcional restante:** a baseline histórica recuperada não contém as tabelas opcionais `candidatura_historico`, `analise_ia_candidato`, `provas_versoes`, `transferencias`, `unidades_negocio` e `email_queue`. As migrations agora tratam essas estruturas como opcionais, mas as funcionalidades que dependem delas ainda não devem ser declaradas prontas até a recuperação de seus schemas reais.
