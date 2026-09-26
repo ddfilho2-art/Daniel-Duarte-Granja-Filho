@@ -177,34 +177,6 @@ create policy candidatura_eventos_select_policy on public.candidatura_eventos
 comment on policy candidatura_eventos_select_policy on public.candidatura_eventos is
   'Access follows parent application authorization';
 
--- CANDIDATURA_HISTORICO (Application History) - Inherit from candidaturas
-alter table public.candidatura_historico enable row level security;
-
-drop policy if exists candidatura_historico_select_policy on public.candidatura_historico;
-create policy candidatura_historico_select_policy on public.candidatura_historico
-  for select
-  using (
-    public.is_platform_master_admin()
-    or exists (
-      select 1 from public.candidaturas c
-      where c.id = candidatura_historico.candidatura_id
-        and (
-          c.tenant_id is not null
-          and public.is_tenant_member(c.tenant_id)
-          and (
-            public.has_tenant_role(
-              c.tenant_id,
-              array['tenant_admin', 'tenant_admin_substitute', 'hr']::public.tenant_role[]
-            )
-            or c.candidato_id = auth.uid()::text
-          )
-        )
-    )
-  );
-
-comment on policy candidatura_historico_select_policy on public.candidatura_historico is
-  'Access follows parent application authorization';
-
 -- MENSAGENS (Messages) - Application participants only
 alter table public.mensagens enable row level security;
 
@@ -255,34 +227,6 @@ create policy mensagens_insert_policy on public.mensagens
 comment on policy mensagens_select_policy on public.mensagens is
   'Application participants can view and send messages';
 
--- ANALISE_IA_CANDIDATO (AI Analysis) - HR/Admin only, tenant-aware
-alter table public.analise_ia_candidato enable row level security;
-
-drop policy if exists analise_ia_candidato_select_policy on public.analise_ia_candidato;
-create policy analise_ia_candidato_select_policy on public.analise_ia_candidato
-  for select
-  using (
-    public.is_platform_master_admin()
-    or (
-      tenant_id is not null
-      and public.can_administer_tenant(tenant_id)
-    )
-  );
-
-drop policy if exists analise_ia_candidato_insert_policy on public.analise_ia_candidato;
-create policy analise_ia_candidato_insert_policy on public.analise_ia_candidato
-  for insert
-  with check (
-    public.is_platform_master_admin()
-    or (
-      tenant_id is not null
-      and public.can_administer_tenant(tenant_id)
-    )
-  );
-
-comment on policy analise_ia_candidato_select_policy on public.analise_ia_candidato is
-  'AI analysis is tenant-specific; only admins can access';
-
 -- PROVAS (Assessments) - HR/Admin only
 alter table public.provas enable row level security;
 
@@ -311,27 +255,6 @@ create policy provas_insert_policy on public.provas
 comment on policy provas_select_policy on public.provas is
   'Only admins can view and manage assessments';
 
--- PROVAS_VERSOES (Assessment Versions) - Inherit from provas
-alter table public.provas_versoes enable row level security;
-
-drop policy if exists provas_versoes_select_policy on public.provas_versoes;
-create policy provas_versoes_select_policy on public.provas_versoes
-  for select
-  using (
-    public.is_platform_master_admin()
-    or exists (
-      select 1 from public.provas p
-      where p.id = provas_versoes.prova_id
-        and (
-          p.tenant_id is not null
-          and public.can_administer_tenant(p.tenant_id)
-        )
-    )
-  );
-
-comment on policy provas_versoes_select_policy on public.provas_versoes is
-  'Access follows parent assessment authorization';
-
 -- ===========================================================================
 -- REMAINING LEGACY TABLES - PERMISSIVE RLS (tenant awareness pending)
 -- ===========================================================================
@@ -350,42 +273,6 @@ create policy settings_select_policy on public.settings
     )
   );
 
--- Transferências - Admin only
-alter table public.transferencias enable row level security;
-
-drop policy if exists transferencias_select_policy on public.transferencias;
-create policy transferencias_select_policy on public.transferencias
-  for select
-  using (
-    public.is_platform_master_admin()
-    or (
-      tenant_id is not null
-      and public.can_administer_tenant(tenant_id)
-    )
-  );
-
--- Unidades de Negócio - Members only
-alter table public.unidades_negocio enable row level security;
-
-drop policy if exists unidades_negocio_select_policy on public.unidades_negocio;
-create policy unidades_negocio_select_policy on public.unidades_negocio
-  for select
-  using (
-    public.is_platform_master_admin()
-    or (
-      tenant_id is not null
-      and public.is_tenant_member(tenant_id)
-    )
-  );
-
--- Email Queue - System/Service role only
-alter table public.email_queue enable row level security;
-
-drop policy if exists email_queue_select_policy on public.email_queue;
-create policy email_queue_select_policy on public.email_queue
-  for select
-  using (false); -- Only service_role can access via direct connection
-
 -- Logs - Admin only
 alter table public.logs enable row level security;
 
@@ -401,39 +288,9 @@ create policy logs_select_policy on public.logs
   );
 
 -- ===========================================================================
--- CONSTRAINTS & VALIDATIONS
--- ===========================================================================
-
--- Ensure candidaturas.tenant_id matches vaga.tenant_id
-alter table public.candidaturas
-  add constraint candidaturas_tenant_vaga_match
-  check (
-    vaga_id is null
-    or tenant_id is null
-    or (
-      select count(*) = 0
-      from public.vagas v
-      where v.id = candidaturas.vaga_id
-        and v.tenant_id is distinct from candidaturas.tenant_id
-    )
-  );
-
--- Ensure mensagens.tenant_id matches candidatura.tenant_id
-alter table public.mensagens
-  add constraint mensagens_tenant_candidatura_match
-  check (
-    candidatura_id is null
-    or tenant_id is null
-    or (
-      select count(*) = 0
-      from public.candidaturas c
-      where c.id = mensagens.candidatura_id
-        and c.tenant_id is distinct from mensagens.tenant_id
-    )
-  );
-
-comment on constraint candidaturas_tenant_vaga_match on public.candidaturas is
-  'Applications must belong to the same tenant as their job posting';
-
-comment on constraint mensagens_tenant_candidatura_match on public.mensagens is
-  'Messages must belong to the same tenant as their application';
+-- OPTIONAL LEGACY CONTRACTS
+-- candidatura_historico, analise_ia_candidato, provas_versoes, transferencias,
+-- unidades_negocio and email_queue are intentionally absent from the recovered
+-- baseline. Their RLS/backfill will be applied only after their real schema is
+-- recovered. Cross-table tenant consistency is likewise deferred; PostgreSQL
+-- CHECK constraints cannot contain subqueries, so no invalid constraint is created.
