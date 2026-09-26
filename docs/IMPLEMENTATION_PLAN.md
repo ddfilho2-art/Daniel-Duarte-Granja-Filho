@@ -762,3 +762,12 @@ aplicados em um banco de staging nem validados com build/testes.
 - Com isso, a listagem administrativa de RH passa pelo mesmo fluxo server-side já usado para criar, editar, redefinir senha e alterar status.
 - O `x-tenant-id` continua sendo aplicado pelo `tenantAwareFetch` do cliente Supabase, derivado do `TenantContext`; a Edge Function valida esse tenant antes de consultar os dados com `service_role`.
 - Validação realizada por inspeção estática dos três pontos do fluxo: cliente, página e Edge Function. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
+
+
+### 2026-09-26 — SEC-004 — remoção da segunda leitura direta de RH no dashboard
+
+- `src/pages/Admin.tsx`: o cálculo de carga de trabalho deixou de consultar diretamente `users` para obter os RH ativos.
+- O dashboard agora reutiliza `executeAdminUserAction({ action: "list" })`, mantendo a listagem de RH dentro do fluxo server-side tenant-aware já criado.
+- O filtro `status === "Ativo"` continua sendo aplicado no frontend apenas para o cálculo visual da carga; a origem dos usuários passa pela autorização do `admin-users`.
+- A consulta de vagas abertas permanece separada, pois envolve outro domínio de dados e exige avaliação própria de escopo/tenant antes de ser migrada.
+- Validação realizada por inspeção estática. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
