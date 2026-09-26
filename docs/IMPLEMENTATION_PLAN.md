@@ -795,3 +795,14 @@ aplicados em um banco de staging nem validados com build/testes.
 - O filtro `status === "Ativo"` continua sendo aplicado no frontend apenas para o cálculo visual da carga; a origem dos usuários passa pela autorização do `admin-users`.
 - A consulta de vagas abertas permanece separada, pois envolve outro domínio de dados e exige avaliação própria de escopo/tenant antes de ser migrada.
 - Validação realizada por inspeção estática. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
+
+
+### 2026-09-26 — SEC-004 — retorno automático de transferência movido para fluxo server-side
+
+- **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/pages/Admin.tsx`
+- **Ajuste:** o retorno automático de uma transferência temporária deixou de atualizar `vagas` e inserir `transferencias` diretamente pelo navegador; a tela agora chama a ação server-side `auto_return`.
+- **Proteções:** o servidor valida a vaga, confirma o vínculo do proprietário atual quando existente e exige que o proprietário original pertença ao tenant autorizado antes de restaurar a propriedade.
+- **Identidade:** o histórico usa o usuário autenticado como `executado_por_id`; o cliente não pode mais informar arbitrariamente esse identificador.
+- **Resultado esperado:** eliminar mais uma escrita administrativa privilegiada direta do frontend e manter a persistência da transferência no `admin-users`.
+- **Validação:** inspeção estática do contrato cliente/Edge Function e confirmação de que o bloco de retorno do frontend não contém mais escrita direta em `vagas`/`transferencias`. Nenhuma alteração remota no Supabase, build ou deploy foi executada.
+- **Pendência:** assim como a transferência normal, histórico e atualização da vaga continuam sendo duas escritas sequenciais; atomicidade transacional permanece pendente de entendimento do modelo de dados.
