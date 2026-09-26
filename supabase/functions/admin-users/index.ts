@@ -194,13 +194,16 @@ async function listTransferHistory(
   try {
     const { data: vaga, error: vagaError } = await adminClient
       .from("vagas")
-      .select("id, owner_id")
+      .select("id, tenant_id, owner_id")
       .eq("id", vagaId)
       .maybeSingle();
 
     if (vagaError) throw vagaError;
     if (!vaga) {
       return { success: false, code: "VAGA_NOT_FOUND", error: "Vaga não encontrada." };
+    }
+    if (vaga.tenant_id !== tenantId) {
+      return { success: false, code: "VAGA_NOT_IN_TENANT", error: "Vaga fora do tenant autorizado." };
     }
 
     if (vaga.owner_id) {
@@ -221,6 +224,7 @@ async function listTransferHistory(
       .from("transferencias")
       .select("*")
       .eq("vaga_id", vagaId)
+      .eq("tenant_id", tenantId)
       .order("data_execucao", { ascending: false });
 
     if (error) throw error;
@@ -247,11 +251,12 @@ async function executeTransfer(
   try {
     const { data: vaga, error: vagaError } = await adminClient
       .from("vagas")
-      .select("id, owner_id, owner_nome")
+      .select("id, tenant_id, owner_id, owner_nome")
       .eq("id", vagaId)
       .maybeSingle();
     if (vagaError) throw vagaError;
     if (!vaga) return { success: false, code: "VAGA_NOT_FOUND", error: "Vaga não encontrada." };
+    if (vaga.tenant_id !== tenantId) return { success: false, code: "VAGA_NOT_IN_TENANT", error: "Vaga fora do tenant autorizado." };
 
     if (vaga.owner_id) {
       const { data: oldMembership, error: oldMembershipError } = await adminClient
@@ -287,6 +292,7 @@ async function executeTransfer(
 
     const now = new Date().toISOString();
     const transferData: Record<string, unknown> = {
+      tenant_id: tenantId,
       vaga_id: vagaId,
       data_execucao: now,
       tipo: type,
@@ -359,12 +365,13 @@ async function executeAutoReturn(
   try {
     const { data: vaga, error: vagaError } = await adminClient
       .from("vagas")
-      .select("id, titulo, owner_id, owner_nome, transferencia_ativa, transferencia_temporaria")
+      .select("id, titulo, tenant_id, owner_id, owner_nome, transferencia_ativa, transferencia_temporaria")
       .eq("id", vagaId.trim())
       .maybeSingle();
 
     if (vagaError) throw vagaError;
     if (!vaga) return { success: false, code: "VAGA_NOT_FOUND", error: "Vaga não encontrada." };
+    if (vaga.tenant_id !== tenantId) return { success: false, code: "VAGA_NOT_IN_TENANT", error: "Vaga fora do tenant autorizado." };
 
     const temporary = vaga.transferencia_temporaria as Record<string, unknown> | null;
     const originalOwnerId = typeof temporary?.original_owner_id === "string"
@@ -405,6 +412,7 @@ async function executeAutoReturn(
 
     const now = new Date().toISOString();
     const { error: historyError } = await adminClient.from("transferencias").insert({
+      tenant_id: tenantId,
       vaga_id: vaga.id,
       tipo: "Retorno Automático",
       data_execucao: now,
