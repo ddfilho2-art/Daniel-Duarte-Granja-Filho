@@ -139,7 +139,7 @@ Ao trabalhar em qualquer item:
 | SEC-004 | 🔄 | Migrar operações administrativas para Edge Function | Criar/editar/resetar/inativar RH somente no servidor |
 | SEC-005 | ⏳ | Retirar SMTP de `settings` e do navegador | Senha removida da tabela/payload e rotacionada |
 | SEC-006 | ✅ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
-| SEC-007 | ⏳ | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
+| SEC-007 | 🔄 | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
 | SEC-008 | ⏳ | Tornar buckets sensíveis privados | Currículos, provas e anexos usam URL assinada |
 | SEC-009 | ⏳ | Remover scripts com credenciais fixas | Nenhuma senha literal operacional no repositório/histórico ativo |
 | SEC-010 | ⏳ | Rotacionar segredos potencialmente expostos | Service role, Gemini, SMTP, n8n e contas seed rotacionados |
@@ -697,7 +697,9 @@ aplicados em um banco de staging nem validados com build/testes.
 
 ### 2026-09-26 — SEC-007
 
-- `api/cron/retry-emails.ts` já validava `CRON_SECRET` no gatilho externo.
-- O processamento interno `POST /api/retry-emails` passou a exigir o mesmo segredo via header `x-cron-secret`.
-- O cron agora encaminha explicitamente esse header na chamada interna.
-- `SEC-007` permanece em andamento: a autenticação foi fechada, mas ainda faltam claim atômico/idempotência para impedir processamento concorrente da mesma mensagem.
+- `api/cron/retry-emails.ts` valida `CRON_SECRET` no gatilho externo e encaminha o segredo ao processamento interno via `x-cron-secret`.
+- `api/retry-emails.ts` passou a fazer claim atômico por lease (`processing_token` + `processing_started_at`) antes de enviar cada mensagem; uma segunda execução concorrente não consegue assumir a mesma mensagem enquanto o lease estiver válido.
+- O lease expirado pode ser recuperado após 15 minutos, evitando mensagens presas indefinidamente por uma execução encerrada.
+- O envio ao Resend passou a usar uma `Idempotency-Key` estável derivada do `email_queue.id`, reduzindo o risco de duplicidade quando o worker cai depois que o provedor aceita a mensagem. O Resend mantém essas chaves por 24 horas. citeturn2search0turn2search3
+- Criada `supabase/migrations/20260926130000_email_queue_retry_claim.sql`, defensiva para não criar a estrutura se `public.email_queue` ainda não existir no ambiente alvo.
+- `SEC-007` permanece `🔄 Em andamento`: falta aplicar/replay da migration no banco correto e executar teste concorrente real. Nenhuma migration foi aplicada remotamente nesta retomada porque o projeto Supabase conectado não foi confirmado como o banco legado do Recruta AÍ.
