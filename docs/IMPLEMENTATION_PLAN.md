@@ -856,3 +856,9 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Estado remoto:** 24 migrations registradas com sucesso; a 25ª não foi registrada/aplicada integralmente. Nenhum dado de negócio foi inserido no novo projeto.
 - **Validação adicional:** inventário remoto confirmou que o projeto novo contém a fundação BPM/operacional e as tabelas multi-tenant/saúde ocupacional, mas não o legado de recrutamento.
 - **Próximo passo obrigatório:** obter/reconstruir a baseline real das tabelas legadas (colunas, tipos, constraints, índices, triggers e views) antes de continuar. Edge Functions administrativas não serão publicadas como “prontas” enquanto esse contrato de banco estiver ausente.
+
+### 2026-09-26 — DB-007 — baseline legada recuperada do histórico e aplicada
+- **Implementado:** recuperada do Git histórico a supabase_setup.sql original (commit 642b5f84e09b5b3a5ea042e936188e507bfe7a77) e o trigger create_user_trigger.sql; criada a migration versionada 20260926140000_legacy_recruitment_baseline.sql na branch de manutenção.
+- **Ajuste de compatibilidade:** a tabela public.configuracoes já existia na fundação operacional com contrato diferente; a baseline foi tornada condicional para preservar o schema existente, sem inventar colunas legadas.
+- **Validado:** migration 20260926140000_legacy_recruitment_baseline aplicada com sucesso no projeto dmzagrakkduddofkqjhg; 17 tabelas legadas esperadas estão presentes, sem carga de dados de negócio.
+- **Próximo passo:** aplicar a bridge de tenancy 20260808100000_legacy_recruitment_tenant_bridge.sql e deixar o próprio banco revelar eventuais incompatibilidades contratuais antes das demais migrations.
