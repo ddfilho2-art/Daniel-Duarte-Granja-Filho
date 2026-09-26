@@ -150,7 +150,7 @@ create table if not exists public.settings (
   updated_at timestamptz default now()
 );
 
-do $
+do $recruta$
 begin
   if to_regclass('public.configuracoes') is null then
     create table public.configuracoes (
@@ -161,7 +161,7 @@ begin
     );
   end if;
 end;
-$;
+$recruta$;
 
 insert into public.settings (id, data) values
   ('email', '{
@@ -172,7 +172,7 @@ insert into public.settings (id, data) values
   }'::jsonb)
 on conflict (id) do nothing;
 
-do $
+do $recruta$
 begin
   if exists (
     select 1 from information_schema.columns
@@ -193,7 +193,7 @@ begin
     on conflict (chave) do nothing;
   end if;
 end;
-$;
+$recruta$;
 
 create table if not exists public.departamentos (
   id text primary key default gen_random_uuid()::text,
