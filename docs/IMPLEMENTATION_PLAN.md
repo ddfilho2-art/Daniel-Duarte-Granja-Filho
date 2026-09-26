@@ -764,6 +764,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - Validação realizada por inspeção estática dos três pontos do fluxo: cliente, página e Edge Function. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
 
 
+
+### 2026-09-26 — SEC-004 — remoção da leitura direta de RH no modal de transferência
+- **Arquivo:** `src/components/TransferOwnerModal.tsx`
+- **Ajuste:** a lista de usuários RH ativos usada para transferência de vagas deixou de consultar diretamente `users` pelo frontend e passou a usar `executeAdminUserAction({ action: "list" })`.
+- **Resultado esperado:** centralizar também esse ponto de leitura administrativa no fluxo server-side do `admin-users`, mantendo a filtragem visual de RH ativo e exclusão do proprietário atual no cliente.
+- **Validação:** inspeção estática do contrato entre cliente e Edge Function; nenhuma alteração remota no Supabase, build ou deploy nesta etapa.
+
 ### 2026-09-26 — SEC-004 — remoção da segunda leitura direta de RH no dashboard
 
 - `src/pages/Admin.tsx`: o cálculo de carga de trabalho deixou de consultar diretamente `users` para obter os RH ativos.
