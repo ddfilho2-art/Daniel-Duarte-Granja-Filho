@@ -25,7 +25,7 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
 }
 
 interface AdminUserRequest {
-  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status" | "transfer_history" | "transfer";
+  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status" | "transfer_history" | "transfer" | "auto_return";
   tenant_id: string;
   user_id?: string;
   email?: string;
@@ -342,6 +342,99 @@ async function executeTransfer(
     if (updateError) throw updateError;
 
     return { success: true, data: updatedVaga, message: "Transferência executada com sucesso." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function executeAutoReturn(
+  tenantId: string,
+  operatorId: string,
+  vagaId: string,
+): Promise<AdminUserResponse> {
+  if (!vagaId?.trim()) {
+    return { success: false, code: "INVALID_INPUT", error: "vaga_id required" };
+  }
+
+  try {
+    const { data: vaga, error: vagaError } = await adminClient
+      .from("vagas")
+      .select("id, titulo, owner_id, owner_nome, transferencia_ativa, transferencia_temporaria")
+      .eq("id", vagaId.trim())
+      .maybeSingle();
+
+    if (vagaError) throw vagaError;
+    if (!vaga) return { success: false, code: "VAGA_NOT_FOUND", error: "Vaga não encontrada." };
+
+    const temporary = vaga.transferencia_temporaria as Record<string, unknown> | null;
+    const originalOwnerId = typeof temporary?.original_owner_id === "string"
+      ? temporary.original_owner_id
+      : null;
+    const originalOwnerName = typeof temporary?.original_owner_nome === "string"
+      ? temporary.original_owner_nome
+      : "Sem proprietário";
+
+    if (!vaga.transferencia_ativa || !temporary || !originalOwnerId) {
+      return { success: false, code: "INVALID_TRANSFER", error: "A vaga não possui uma transferência temporária válida para retorno." };
+    }
+
+    const currentOwnerId = vaga.owner_id as string | null;
+    if (currentOwnerId) {
+      const { data: currentMembership, error: currentMembershipError } = await adminClient
+        .from("tenant_memberships")
+        .select("user_id")
+        .eq("tenant_id", tenantId)
+        .eq("user_id", currentOwnerId)
+        .maybeSingle();
+      if (currentMembershipError) throw currentMembershipError;
+      if (!currentMembership) {
+        return { success: false, code: "VAGA_NOT_IN_TENANT", error: "Vaga fora do tenant autorizado." };
+      }
+    }
+
+    const { data: originalMembership, error: originalMembershipError } = await adminClient
+      .from("tenant_memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", originalOwnerId)
+      .maybeSingle();
+    if (originalMembershipError) throw originalMembershipError;
+    if (!originalMembership) {
+      return { success: false, code: "OWNER_NOT_IN_TENANT", error: "Proprietário original não pertence ao tenant autorizado." };
+    }
+
+    const now = new Date().toISOString();
+    const { error: historyError } = await adminClient.from("transferencias").insert({
+      vaga_id: vaga.id,
+      tipo: "Retorno Automático",
+      data_execucao: now,
+      novo_owner_id: originalOwnerId,
+      novo_owner_nome: originalOwnerName,
+      prev_owner_id: currentOwnerId,
+      prev_owner_nome: vaga.owner_nome || "Sem proprietário",
+      justificativa: "Retorno automático de propriedade após o término do período de ausência temporária.",
+      executado_por: "Sistema (Auto-retorno)",
+      executado_por_id: operatorId,
+    });
+    if (historyError) throw historyError;
+
+    const { data: updatedVaga, error: updateError } = await adminClient
+      .from("vagas")
+      .update({
+        owner_id: originalOwnerId,
+        owner_nome: originalOwnerName,
+        transferencia_ativa: false,
+        transferencia_tipo: null,
+        transferencia_temporaria: null,
+        updated_at: now,
+      })
+      .eq("id", vaga.id)
+      .select("id, titulo, owner_id, owner_nome, transferencia_ativa, transferencia_tipo, transferencia_temporaria")
+      .single();
+
+    if (updateError) throw updateError;
+
+    return { success: true, data: updatedVaga, message: "Retorno automático executado com sucesso." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
