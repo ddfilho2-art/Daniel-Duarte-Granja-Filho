@@ -25,7 +25,7 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
 }
 
 interface AdminUserRequest {
-  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status";
+  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status" | "transfer_history";
   tenant_id: string;
   user_id?: string;
   email?: string;
@@ -174,6 +174,49 @@ async function getMember(
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+async function listTransferHistory(
+  tenantId: string,
+  vagaId: string,
+): Promise<AdminUserResponse> {
+  try {
+    const { data: vaga, error: vagaError } = await adminClient
+      .from("vagas")
+      .select("id, owner_id")
+      .eq("id", vagaId)
+      .maybeSingle();
+
+    if (vagaError) throw vagaError;
+    if (!vaga) {
+      return { success: false, code: "VAGA_NOT_FOUND", error: "Vaga não encontrada." };
+    }
+
+    if (vaga.owner_id) {
+      const { data: membership, error: membershipError } = await adminClient
+        .from("tenant_memberships")
+        .select("user_id")
+        .eq("tenant_id", tenantId)
+        .eq("user_id", vaga.owner_id)
+        .maybeSingle();
+
+      if (membershipError) throw membershipError;
+      if (!membership) {
+        return { success: false, code: "VAGA_NOT_IN_TENANT", error: "Vaga fora do tenant autorizado." };
+      }
+    }
+
+    const { data, error } = await adminClient
+      .from("transferencias")
+      .select("*")
+      .eq("vaga_id", vagaId)
+      .order("data_execucao", { ascending: false });
+
+    if (error) throw error;
+    return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -589,6 +632,14 @@ async function handleRequest(
       case "list":
       case "get":
         result = await listMembers(tenantId);
+        break;
+
+      case "transfer_history":
+        if (!body.user_id) {
+          result = { success: false, code: "INVALID_INPUT", error: "vaga_id required" };
+        } else {
+          result = await listTransferHistory(tenantId, body.user_id);
+        }
         break;
 
       case "get_single":
