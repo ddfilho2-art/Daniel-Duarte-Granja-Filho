@@ -79,7 +79,7 @@ async function listMembers(
   tenantId: string
 ): Promise<AdminUserResponse> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("tenant_memberships")
       .select(
         `
@@ -115,7 +115,7 @@ async function getMember(
   userId: string
 ): Promise<AdminUserResponse> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("tenant_memberships")
       .select("*")
       .eq("tenant_id", tenantId)
@@ -157,7 +157,7 @@ async function createMember(
     const userId = authData?.user?.id || email; // Fallback if user exists
 
     // Then add to tenant_memberships
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("tenant_memberships")
       .insert({
         tenant_id: tenantId,
@@ -197,7 +197,7 @@ async function updateMember(
       updateData.status = status;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await adminClient
       .from("tenant_memberships")
       .update(updateData)
       .eq("tenant_id", tenantId)
@@ -226,7 +226,7 @@ async function deleteMember(
   userId: string
 ): Promise<AdminUserResponse> {
   try {
-    const { error } = await supabase
+    const { error } = await adminClient
       .from("tenant_memberships")
       .update({
         status: "revoked",
