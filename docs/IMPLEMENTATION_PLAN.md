@@ -695,6 +695,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - `SEC-006` concluído. `SEC-005` permanece dependente da confirmação/remoção de configurações SMTP legadas no banco. `SEC-012` permanece em andamento por causa da CSP.
 
 
+### 2026-09-26 — SEC-012
+
+- Inventário do frontend não encontrou scripts, fontes ou frames de terceiros necessários ao runtime; a comunicação do navegador fica restrita ao próprio site e ao Supabase.
+- `vercel.json` passou a enviar CSP com `script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `form-action 'self'`, recursos de imagem limitados ao próprio site/Supabase e `connect-src` limitado ao próprio site/Supabase (HTTPS/WSS).
+- Resend permanece deliberadamente fora do `connect-src`: o navegador não deve falar diretamente com o provedor de e-mail.
+- `SEC-012` permanece `🔄 Em andamento` até validação em preview/produção e confirmação de que nenhum asset/integração legítima adicional é bloqueado.
+
 ### 2026-09-26 — SEC-007
 
 - `api/cron/retry-emails.ts` valida `CRON_SECRET` no gatilho externo e encaminha o segredo ao processamento interno via `x-cron-secret`.
