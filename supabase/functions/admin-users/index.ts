@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { readJsonBody } from "../_shared/http.ts";
 
 function getCorsHeaders(req: Request): Record<string, string> | null {
   const origin = req.headers.get("Origin");
@@ -24,7 +25,7 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
 }
 
 interface AdminUserRequest {
-  action: "list" | "get" | "get_single" | "create" | "update" | "delete";
+  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status";
   tenant_id: string;
   user_id?: string;
   email?: string;
@@ -40,6 +41,7 @@ interface AdminUserResponse {
   data?: unknown;
   error?: string;
   message?: string;
+  code?: string;
 }
 
 // Initialize Supabase client
@@ -525,10 +527,26 @@ async function handleRequest(
       );
     }
 
-    // Parse request body
-    const body =
-      req.method !== "GET" ? (await req.json()) : {};
-    const action = (body.action || req.method?.toLowerCase()) as string;
+    // Parse JSON with a bounded body and explicit content type.
+    let body: AdminUserRequest;
+    try {
+      body = await readJsonBody<AdminUserRequest>(req);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "invalid_json";
+      const status = code === "payload_too_large"
+        ? 413
+        : code === "unsupported_media_type"
+          ? 415
+          : 400;
+      return new Response(
+        JSON.stringify({ success: false, code, error: code }),
+        {
+          status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    const action = body.action;
 
     let result: AdminUserResponse;
 
