@@ -837,3 +837,11 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validação:** `list_migrations` confirmou as 8 execuções remotas com sucesso.
 - **Observação:** o mecanismo remoto registra a versão pela data/hora de execução, preservando o nome da migration; portanto a versão remota não replica literalmente o timestamp do arquivo Git.
 - **Próximo passo:** continuar a aplicação cronológica das migrations restantes e validar o schema antes do deploy das Edge Functions.
+
+
+### 2026-09-26 — DB-007 — segundo lote de migrations aplicado e validado
+
+- **Migrations aplicadas:** da `20260427095220_f93e18c0-1831-4f1e-891b-8d963cedf41e` até `20260528101500_complete_operational_schema_hardening`, total de 8 migrations adicionais.
+- **Escopo:** catálogos, integrações, eventos de instância, grupos, códigos de instância, versionamento de processos e hardening operacional/RLS.
+- **Validação:** `list_migrations` confirmou 16 migrations remotas no projeto novo, todas com execução registrada.
+- **Próximo passo:** aplicar o lote de segurança/multi-tenant e, em seguida, validar as tabelas e políticas antes das Edge Functions.
