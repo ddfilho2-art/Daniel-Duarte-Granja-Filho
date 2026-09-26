@@ -869,3 +869,9 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Implementado:** ajustado o backfill de tenant para projeto novo sem tenants e para tabelas opcionais ausentes; removida a instrução PostgreSQL inválida de COMMENT ON migration.
 - **Validado:** migrations 20260808100000, 20260809010000 e 20260809020000 aplicadas com sucesso no projeto dmzagrakkduddofkqjhg. O banco continua sem dados de negócio; o backfill permanece sem atribuição de tenant enquanto não houver tenant provisionado.
 - **Próximo passo:** aplicar e validar as migrations seguintes de backfill/RLS e, se necessário, corrigir somente incompatibilidades comprovadas pelo schema recuperado.
+
+### 2026-09-26 — DB-007 — backfill/RLS legados concluídos no schema recuperado
+- **Implementado:** migration de backfill 20260811110000 ajustada para projeto novo sem root tenant; quando não há tenant, a operação é explicitamente adiada, sem criar empresa fictícia.
+- **Implementado:** migration RLS 20260811120000 ajustada para usar os nomes reais da baseline na view pública (`local` → `localizacao` e `atualizado_em` → `updated_at`).
+- **Validado:** migrations 20260811110000 e 20260811120000 aplicadas com sucesso. O banco segue sem tenant e sem dados de negócio; as tabelas legadas críticas permanecem vazias.
+- **Próximo passo:** aplicar o hardening final da fila de e-mail e executar a validação estrutural completa do Supabase (migrations, RLS/policies, views, funções e advisors).
