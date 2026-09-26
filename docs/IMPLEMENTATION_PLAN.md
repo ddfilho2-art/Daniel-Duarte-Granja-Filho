@@ -717,3 +717,9 @@ aplicados em um banco de staging nem validados com build/testes.
 - O envio ao Resend passou a usar uma `Idempotency-Key` estável derivada do `email_queue.id`, reduzindo o risco de duplicidade quando o worker cai depois que o provedor aceita a mensagem. O Resend mantém essas chaves por 24 horas. citeturn2search0turn2search3
 - Criada `supabase/migrations/20260926130000_email_queue_retry_claim.sql`, defensiva para não criar a estrutura se `public.email_queue` ainda não existir no ambiente alvo.
 - `SEC-007` permanece `🔄 Em andamento`: falta aplicar/replay da migration no banco correto e executar teste concorrente real. Nenhuma migration foi aplicada remotamente nesta retomada porque o projeto Supabase conectado não foi confirmado como o banco legado do Recruta AÍ.
+
+### 2026-09-26 — SEC-003/SEC-004 — endurecimento adicional do admin-users
+
+- `supabase/functions/admin-users/index.ts`: o cliente Supabase com `service_role` usado exclusivamente no backend agora desabilita `autoRefreshToken` e `persistSession`, evitando persistência/renovação de sessão em execução server-side.
+- Mantida a separação entre `userClient` (Bearer do operador, anon key) para autenticação/autorização e `adminClient` (service role) somente após autorização tenant-aware.
+- Nenhuma alteração foi aplicada remotamente no Supabase e nenhum deploy/merge foi executado nesta etapa.
