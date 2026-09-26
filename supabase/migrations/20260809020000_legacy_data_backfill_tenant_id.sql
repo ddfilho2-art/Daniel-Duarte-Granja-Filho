@@ -172,36 +172,35 @@ $recruta$;
 -- Optional table not present in the recovered baseline. Intentionally skipped.
 
 -- PHASE 7: Backfill PROVAS (Assessments) and PROVAS_VERSOES
--- Strategy: Assign to default tenant (assessments are global per tenant)
--- ============================================================================
-
+-- provas is part of the recovered baseline; provas_versoes is optional.
 do $recruta$
 declare
   v_default_tenant_id uuid;
-  v_updated_provas bigint;
-  v_updated_versoes bigint;
+  v_updated_provas bigint := 0;
+  v_updated_versoes bigint := 0;
 begin
   v_default_tenant_id := public._backfill_default_tenant();
+  if v_default_tenant_id is not null then
+    update public.provas
+    set tenant_id = v_default_tenant_id
+    where tenant_id is null;
+    get diagnostics v_updated_provas = row_count;
 
-  update public.provas
-  set tenant_id = v_default_tenant_id
-  where tenant_id is null;
-
-  get diagnostics v_updated_provas = row_count;
-
-  update public.provas_versoes pv
-  set tenant_id = p.tenant_id
-  from public.provas p
-  where pv.prova_id = p.id
-    and pv.tenant_id is null;
-
-  get diagnostics v_updated_versoes = row_count;
-
+    if to_regclass('public.provas_versoes') is not null then
+      update public.provas_versoes pv
+      set tenant_id = p.tenant_id
+      from public.provas p
+      where pv.prova_id = p.id
+        and pv.tenant_id is null;
+      get diagnostics v_updated_versoes = row_count;
+    end if;
+  else
+    raise notice 'Phase 7 skipped: no active employer tenant exists yet';
+  end if;
   raise notice 'Phase 7 complete: backfilled % provas and % provas_versoes', v_updated_provas, v_updated_versoes;
 end;
 $recruta$;
 
--- ============================================================================
 -- PHASE 8: Backfill SETTINGS, UNIDADES_NEGOCIO, TRANSFERENCIAS
 -- Only the recovered settings table is guaranteed here. Optional tables are skipped.
 do $recruta$
