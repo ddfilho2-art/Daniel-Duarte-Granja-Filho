@@ -56,14 +56,10 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
   const fetchHistory = async () => {
     setLoadingHistory(true);
     try {
-      const { data, error } = await supabase
-        .from('transferencias')
-        .select('*')
-        .eq('vaga_id', vaga.id)
-        .order('data_execucao', { ascending: false });
+      const response = await executeAdminUserAction({ action: 'transfer_history', userId: vaga.id });
+      const data = Array.isArray(response.data) ? response.data : [];
       
-      if (error) throw error;
-      setHistory(data || []);
+      setHistory(data as any[]);
     } catch (error) {
       console.error('Erro ao buscar histórico:', error);
     } finally {
