@@ -753,3 +753,12 @@ aplicados em um banco de staging nem validados com build/testes.
 - A consulta é feita exclusivamente depois da validação do Bearer token e de `can_administer_tenant`, usando o `tenant_id` derivado do header validado.
 - Esta alteração prepara a remoção da consulta direta `.from("users")` da tela `AdminGestaoUsuarios`, eliminando mais uma leitura administrativa direta do frontend.
 - Validação realizada por inspeção estática do fluxo. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
+
+
+### 2026-09-26 — SEC-004 — remoção da leitura direta de usuários RH no frontend
+
+- `src/lib/admin-users.ts`: adicionada a ação `list` ao contrato do cliente e suporte ao campo `data` retornado pela Edge Function.
+- `src/pages/Admin.tsx`: `AdminGestaoUsuarios.fetchUsers()` deixou de consultar diretamente `users` com o cliente Supabase e passou a chamar `executeAdminUserAction({ action: "list" })`.
+- Com isso, a listagem administrativa de RH passa pelo mesmo fluxo server-side já usado para criar, editar, redefinir senha e alterar status.
+- O `x-tenant-id` continua sendo aplicado pelo `tenantAwareFetch` do cliente Supabase, derivado do `TenantContext`; a Edge Function valida esse tenant antes de consultar os dados com `service_role`.
+- Validação realizada por inspeção estática dos três pontos do fluxo: cliente, página e Edge Function. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
