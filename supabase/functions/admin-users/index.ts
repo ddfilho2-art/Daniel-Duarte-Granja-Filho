@@ -577,7 +577,30 @@ async function handleRequest(
             error: "nome, email, login and password are required",
           };
         } else {
-          result = await createMember(tenantId, body.email, ["RH"]);
+          const normalizedEmail = body.email.trim().toLowerCase();
+          const { data: existingAuthUsers, error: existingAuthError } =
+            await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+
+          if (existingAuthError) {
+            result = {
+              success: false,
+              code: "INTERNAL_ERROR",
+              error: existingAuthError.message,
+            };
+          } else if (
+            existingAuthUsers.users.some(
+              (candidate) => candidate.email?.toLowerCase() === normalizedEmail
+            )
+          ) {
+            result = {
+              success: false,
+              code: "EMAIL_ALREADY_EXISTS",
+              error: "Este e-mail já está em uso.",
+            };
+          } else {
+            result = await createMember(tenantId, normalizedEmail, ["RH"]);
+          }
+
           if (result.success && result.data && typeof result.data === "object") {
             const created = result.data as Record<string, unknown>;
             const createdId = String(created.user_id || created.id || "");
