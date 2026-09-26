@@ -1,8 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-function setCors(res: any) {
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+function setCors(res: any, req: any) {
+  const origin = req.headers?.origin || req.headers?.Origin;
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "");
+  if (origin && appUrl && origin === appUrl) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
@@ -31,7 +36,7 @@ function getBearerToken(req: any) {
 }
 
 export default async function handler(req: any, res: any) {
-  setCors(res);
+  setCors(res, req);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
