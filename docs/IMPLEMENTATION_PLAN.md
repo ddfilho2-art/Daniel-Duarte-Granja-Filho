@@ -816,3 +816,14 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Persistência:** novas linhas de histórico de transferência passam a receber o `tenant_id` autenticado/autorizado pelo servidor, evitando que uma operação privilegiada crie registro sem vínculo de tenant.
 - **Validação:** inspeção estática confirmou os filtros e os três caminhos de persistência. Nenhuma alteração remota no Supabase foi executada.
 - **Resultado:** o fluxo administrativo de transferências fica mais consistente com as políticas multi-tenant já previstas nas migrations do repositório.
+
+
+### 2026-09-26 — SEC-005/SEC-006 — remoção das credenciais de transporte de e-mail da configuração administrativa
+
+- **Arquivo:** `src/pages/AdminConfiguracoes.tsx`
+- **Ajuste:** a tela administrativa deixou de exibir e armazenar campos de credenciais de transporte de e-mail no estado/configuração do navegador.
+- **Teste de e-mail:** o botão de teste agora envia somente `to`, assunto e corpo para `/api/send-email`; não envia configuração de transporte pelo navegador.
+- **Interface:** a aba foi renomeada para serviço de e-mail e passa a informar que API key, remetente e credenciais permanecem exclusivamente no backend.
+- **Resultado:** elimina da interface administrativa a antiga superfície de configuração de credenciais SMTP e alinha o teste com o relay server-side protegido já implementado.
+- **Validação:** inspeção estática confirmou ausência de referências aos campos antigos e ausência de `smtpConfig` no payload do teste. Nenhuma alteração remota no Supabase, build ou deploy foi executada.
+- **Pendência:** a tabela `settings` ainda possui fluxo de persistência legado para demais configurações; a remoção/limpeza definitiva de registros antigos de credenciais depende da estratégia de dados e será tratada separadamente.
