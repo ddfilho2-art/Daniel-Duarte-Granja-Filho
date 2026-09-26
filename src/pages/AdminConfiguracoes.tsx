@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Mail, Server, Key, User, FileText, Settings, Plus, Trash2, Edit2, GripVertical, Check, X, Briefcase, ChevronUp, ChevronDown, Activity } from 'lucide-react';
+import { Save, Mail, FileText, Settings, Plus, Trash2, Edit2, GripVertical, Check, X, Briefcase, ChevronUp, ChevronDown, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { safeFetch } from '../lib/api';
 
@@ -390,7 +390,7 @@ export function AdminConfiguracoes() {
   const [activeTab, setActiveTab] = useState('email');
 
   const TABS = [
-    { id: 'email', label: 'E-mail', icon: Server },
+    { id: 'email', label: 'E-mail', icon: Mail },
     { id: 'templates', label: 'Templates', icon: Mail },
     { id: 'vagas', label: 'Vagas (Campos)', icon: Briefcase },
     { id: 'regras', label: 'Regras de Negócio', icon: Settings }
