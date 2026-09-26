@@ -143,18 +143,32 @@ async function createMember(
   roles: string[]
 ): Promise<AdminUserResponse> {
   try {
-    // First, get or create auth user
-    const { data: authData, error: authError } = await adminClient.auth.admin
-      .createUser({
-        email,
-        email_confirm: true,
-      });
+    // Reuse an existing Auth user when present; never use email as user_id.
+    const normalizedEmail = email.trim().toLowerCase();
+    const { data: authList, error: authListError } =
+      await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
 
-    if (authError && !authError.message.includes("already exists")) {
-      throw authError;
+    if (authListError) throw authListError;
+
+    let authUser = authList.users.find(
+      (candidate) => candidate.email?.toLowerCase() === normalizedEmail
+    );
+
+    if (!authUser) {
+      const { data: createdAuth, error: createAuthError } =
+        await adminClient.auth.admin.createUser({
+          email: normalizedEmail,
+          email_confirm: true,
+        });
+
+      if (createAuthError || !createdAuth?.user) {
+        throw createAuthError || new Error("AUTH_CREATE_FAILED");
+      }
+
+      authUser = createdAuth.user;
     }
 
-    const userId = authData?.user?.id || email; // Fallback if user exists
+    const userId = authUser.id;
 
     // Then add to tenant_memberships
     const { data, error } = await adminClient
