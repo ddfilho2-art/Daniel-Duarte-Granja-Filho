@@ -25,6 +25,27 @@ type AdminUserAction =
       action: "set_status";
       userId: string;
       status: string;
+    }
+  | {
+      action: "transfer_history";
+      userId: string;
+    }
+  | {
+      action: "transfer";
+      vaga_id: string;
+      new_owner_id: string;
+      type: "Temporária" | "Definitiva";
+      justification: string;
+      absence_reason?: string;
+      start_date?: string;
+      end_date?: string;
+      auto_return?: boolean;
+      termination_reason?: string;
+      effective_date?: string;
+    }
+  | {
+      action: "auto_return";
+      vaga_id: string;
     };
 
 interface AdminUserResponse {
