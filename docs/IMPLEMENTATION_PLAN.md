@@ -732,3 +732,11 @@ aplicados em um banco de staging nem validados com build/testes.
 - A ação `create` passou a aceitar nome, login, e-mail e senha do fluxo atual e concluir a criação server-side, sem retornar service_role ao cliente.
 - O cliente frontend já existente usa `supabase.functions.invoke('admin-users')`; portanto o fluxo administrativo deixa de depender conceitualmente das três APIs Vercel legadas para essas ações.
 - Validação realizada por inspeção estática do contrato entre `src/lib/admin-users.ts`, `src/pages/Admin.tsx` e `admin-users/index.ts`. Build/execução remota ainda não foram realizados nesta etapa.
+
+### 2026-09-26 — SEC-003/SEC-004 — limite e validação do payload do admin-users
+
+- `supabase/functions/admin-users/index.ts`: substituída a leitura direta de `req.json()` pelo helper compartilhado `readJsonBody`.
+- O endpoint administrativo agora exige `application/json`, limita o corpo a 16 KiB e retorna `400`, `413` ou `415` conforme o erro de parsing/tamanho/media type.
+- A interface de request foi atualizada para refletir também `reset_password` e `set_status`; a resposta passou a declarar `code` usado pelo cliente.
+- Validação realizada por inspeção estática após o commit. Sem execução remota/build nesta etapa.
+
