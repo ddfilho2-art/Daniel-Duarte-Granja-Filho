@@ -86,11 +86,10 @@ async function listMembers(
   tenantId: string
 ): Promise<AdminUserResponse> {
   try {
-    const { data, error } = await adminClient
+    const { data: memberships, error: membershipError } = await adminClient
       .from("tenant_memberships")
       .select(
         `
-        id,
         user_id,
         roles,
         status,
@@ -101,12 +100,47 @@ async function listMembers(
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false });
 
-    if (error) throw error;
+    if (membershipError) throw membershipError;
+
+    const userIds = (memberships || []).map((membership) => membership.user_id);
+    if (userIds.length === 0) {
+      return {
+        success: true,
+        data: [],
+        message: "Found 0 tenant members",
+      };
+    }
+
+    const { data: users, error: usersError } = await adminClient
+      .from("users")
+      .select("*")
+      .in("id", userIds)
+      .eq("perfil", "RH");
+
+    if (usersError) throw usersError;
+
+    const membershipByUserId = new Map(
+      (memberships || []).map((membership) => [membership.user_id, membership]),
+    );
+
+    const result = (users || [])
+      .map((user) => {
+        const membership = membershipByUserId.get(user.id);
+        return {
+          ...user,
+          tenant_membership: membership || null,
+        };
+      })
+      .sort((a, b) => {
+        const aDate = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const bDate = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return bDate - aDate;
+      });
 
     return {
       success: true,
-      data,
-      message: `Found ${data?.length || 0} tenant members`,
+      data: result,
+      message: `Found ${result.length} RH members`,
     };
   } catch (error) {
     return {
