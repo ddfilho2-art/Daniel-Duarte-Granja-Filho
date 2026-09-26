@@ -766,6 +766,15 @@ aplicados em um banco de staging nem validados com build/testes.
 
 
 
+
+### 2026-09-26 — SEC-004 — execução da transferência de vaga movida para fluxo server-side
+- **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/components/TransferOwnerModal.tsx`
+- **Ajuste:** a criação do histórico em `transferencias` e a atualização de `vagas` deixaram de ser executadas diretamente pelo frontend. O modal agora chama a ação `transfer` do `admin-users`.
+- **Proteções:** o servidor valida a vaga, o vínculo do proprietário atual com o tenant quando aplicável, o novo proprietário como membro ativo do tenant e como RH ativo. O identificador de quem executou a operação vem do token autenticado, não do payload do navegador.
+- **Resultado esperado:** retirar a escrita administrativa direta do cliente e concentrar autorização e persistência no servidor.
+- **Observação:** a operação ainda utiliza duas escritas sequenciais (histórico e vaga); atomicidade transacional poderá ser tratada em etapa própria após confirmação do modelo de dados.
+- **Validação:** inspeção estática do contrato cliente/Edge Function; sem alteração remota no Supabase, build ou deploy nesta etapa.
+
 ### 2026-09-26 — SEC-004 — histórico de transferências movido para fluxo server-side
 - **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/components/TransferOwnerModal.tsx`
 - **Ajuste:** o histórico de transferências de uma vaga passou a ser obtido pela ação `transfer_history` do `admin-users`, em vez de consulta direta a `transferencias` pelo frontend.
