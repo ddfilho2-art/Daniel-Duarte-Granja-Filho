@@ -466,10 +466,12 @@ export function AdminConfiguracoes() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-6 border-b border-slate-200 bg-slate-50">
                 <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Server className="w-5 h-5 text-primary" />
-                  Configurações de E-mail (SMTP)
+                  <Mail className="w-5 h-5 text-primary" />
+                  Serviço de E-mail
                 </h2>
-                <p className="text-sm text-slate-500 mt-1">Configure o servidor SMTP para envio de e-mails do sistema.</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  O envio de e-mails é controlado pelo servidor e pelas credenciais de ambiente. Nenhuma credencial de transporte é armazenada ou enviada pelo navegador.
+                </p>
                 <button
                   type="button"
                   onClick={handleTestEmail}
@@ -479,68 +481,12 @@ export function AdminConfiguracoes() {
                   <Mail className="w-4 h-4" />
                   {testingEmail ? 'Enviando teste...' : 'Testar Envio de E-mail'}
                 </button>
-              </div>
-              <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Host SMTP</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Server className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="text"
-                      name="smtpHost"
-                      value={config.smtpHost}
-                      onChange={handleChange}
-                      placeholder="smtp.exemplo.com"
-                      className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Porta SMTP</label>
-                  <input
-                    type="text"
-                    name="smtpPort"
-                    value={config.smtpPort}
-                    onChange={handleChange}
-                    placeholder="587"
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Usuário (E-mail)</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <User className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="email"
-                      name="smtpUser"
-                      value={config.smtpUser}
-                      onChange={handleChange}
-                      placeholder="rh@empresa.com"
-                      className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Senha</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Key className="h-4 w-4 text-slate-400" />
-                    </div>
-                    <input
-                      type="password"
-                      name="smtpPass"
-                      value={config.smtpPass}
-                      onChange={handleChange}
-                      placeholder="••••••••"
-                      className="pl-10 w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-                </div>
-              </div>
+                <div className="p-6 mt-6 rounded-lg bg-slate-50 border border-slate-200">
+                  <p className="text-sm font-medium text-slate-700">Configuração segura</p>
+                  <p className="text-sm text-slate-500 mt-1">
+                    API key, remetente e demais credenciais permanecem exclusivamente no backend.
+                  </p>
+                </div>              </div>
             </div>
           )}
 
