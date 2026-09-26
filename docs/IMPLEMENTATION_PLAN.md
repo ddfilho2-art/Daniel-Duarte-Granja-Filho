@@ -806,3 +806,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Resultado esperado:** eliminar mais uma escrita administrativa privilegiada direta do frontend e manter a persistência da transferência no `admin-users`.
 - **Validação:** inspeção estática do contrato cliente/Edge Function e confirmação de que o bloco de retorno do frontend não contém mais escrita direta em `vagas`/`transferencias`. Nenhuma alteração remota no Supabase, build ou deploy foi executada.
 - **Pendência:** assim como a transferência normal, histórico e atualização da vaga continuam sendo duas escritas sequenciais; atomicidade transacional permanece pendente de entendimento do modelo de dados.
+
+
+### 2026-09-26 — SEC-004 — reforço de isolamento por tenant nas transferências
+
+- **Arquivo:** `supabase/functions/admin-users/index.ts`
+- **Ajuste:** as operações `transfer_history`, `transfer` e `auto_return` passaram a validar explicitamente `vagas.tenant_id === tenantId` antes de qualquer leitura operacional.
+- **Histórico:** `transferencias` agora é consultada com filtro explícito de `tenant_id`.
+- **Persistência:** novas linhas de histórico de transferência passam a receber o `tenant_id` autenticado/autorizado pelo servidor, evitando que uma operação privilegiada crie registro sem vínculo de tenant.
+- **Validação:** inspeção estática confirmou os filtros e os três caminhos de persistência. Nenhuma alteração remota no Supabase foi executada.
+- **Resultado:** o fluxo administrativo de transferências fica mais consistente com as políticas multi-tenant já previstas nas migrations do repositório.
