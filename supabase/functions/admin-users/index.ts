@@ -50,7 +50,9 @@ if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
   );
 }
 
-const adminClient = createClient(supabaseUrl, supabaseServiceKey);
+const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { autoRefreshToken: false, persistSession: false },
+});
 
 // Validate tenant access
 async function validateTenantAccess(
