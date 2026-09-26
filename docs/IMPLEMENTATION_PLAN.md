@@ -139,12 +139,12 @@ Ao trabalhar em qualquer item:
 | SEC-004 | 🔄 | Migrar operações administrativas para Edge Function | Criar/editar/resetar/inativar RH somente no servidor |
 | SEC-005 | ⏳ | Retirar SMTP de `settings` e do navegador | Senha removida da tabela/payload e rotacionada |
 | SEC-006 | ✅ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
-| SEC-007 | 🔄 | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
+| SEC-007 | ✅ | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
 | SEC-008 | ⏳ | Tornar buckets sensíveis privados | Currículos, provas e anexos usam URL assinada |
 | SEC-009 | ⏳ | Remover scripts com credenciais fixas | Nenhuma senha literal operacional no repositório/histórico ativo |
 | SEC-010 | ⏳ | Rotacionar segredos potencialmente expostos | Service role, Gemini, SMTP, n8n e contas seed rotacionados |
 | SEC-011 | 🔄 | Corrigir sessão baseada em `localStorage` | Autenticação deriva de sessão Supabase válida e perfil reconsultado |
-| SEC-012 | 🔄 | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
+| SEC-012 | ✅ | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
 
 ## Fase 3 — Arquitetura multi-tenant
 
