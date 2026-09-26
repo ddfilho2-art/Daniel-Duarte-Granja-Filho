@@ -111,115 +111,35 @@ export function TransferOwnerModal({ isOpen, onClose, vaga, onSuccess }: Transfe
       const newOwner = rhUsers.find(u => u.id === newOwnerId);
       if (!newOwner) throw new Error('Novo proprietário não encontrado.');
 
-      const transferData: any = {
+      const response = await executeAdminUserAction({
+        action: 'transfer',
         vaga_id: vaga.id,
-        data_execucao: new Date().toISOString(),
-        tipo: type,
-        proprietario_anterior_id: vaga.owner_id || null,
-        proprietario_anterior_nome: vaga.owner_nome || 'Sem proprietário',
-        novo_proprietario_id: newOwner.id,
-        novo_proprietario_nome: newOwner.nome,
-        justificativa: justification,
-        executado_por_id: profile?.uid || 'unknown',
-        executado_por_nome: profile?.nome || 'unknown'
-      };
-
-      if (type === 'Temporária') {
-        transferData.motivo_ausencia = absenceReason;
-        transferData.data_inicio = startDate;
-        transferData.data_retorno = endDate;
-        transferData.retorno_automatico = autoReturn;
-      } else {
-        transferData.motivo_desligamento = terminationReason;
-        transferData.data_efetivacao = effectiveDate;
-      }
-
-      console.log('[DEBUG-DB] 1. DADOS DE ENTRADA (Transferência):', transferData);
-
-      // 1. Add to history (Non-blocking as per Flow Check)
-      try {
-        const { error: historyError } = await supabase
-          .from('transferencias')
-          .insert(transferData);
-        
-        if (historyError) {
-          console.error('[ERRO-REAL] Falha no Insert de Histórico:', {
-            message: historyError.message,
-            details: historyError.details,
-            hint: historyError.hint
-          });
-          // Não lançamos erro aqui para permitir que a mudança de dono ocorra
-        } else {
-          console.log('[DEBUG-DB] SUCESSO na gravação do histórico.');
-        }
-      } catch (err) {
-        console.error('[ERRO-REAL] Exceção ao gravar histórico:', err);
-      }
-
-      // 2. Update vaga
-      const patchData = { 
-        owner_id: newOwner.id,
-        owner_nome: newOwner.nome,
-        transferencia_ativa: type === 'Temporária',
-        transferencia_tipo: type,
-        transferencia_temporaria: type === 'Temporária' ? {
-          original_owner_id: vaga.owner_id || null,
-          original_owner_nome: vaga.owner_nome || 'Sem proprietário',
-          data_retorno: endDate,
-          auto_retorno: autoReturn
-        } : null,
-        updated_at: new Date().toISOString()
-      };
-
-      console.log('[DEBUG-DB] 1. DADOS DE ENTRADA (PATCH Vaga):', patchData);
-
-      const { data, error, count } = await supabase
-        .from('vagas')
-        .update(patchData)
-        .eq('id', vaga.id)
-        .select();
-
-      if (error) {
-        console.error('[ERRO-REAL] Falha no PATCH Vagas:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
-        alert('Erro ao atualizar banco: ' + error.message);
-        return;
-      }
-      
-      console.log('[DEBUG-DB] SUCESSO no update da vaga.');
-      console.log('[DEBUG-DB] 3. RESPOSTA DO SERVIDOR (PATCH):', { data, error, count });
-
-      // [INÍCIO DO BLOCO DE INSPEÇÃO]
-      console.log('[DEBUG-QUERY] 2. A QUERY (Verificação de Sincronização): select owner_nome where id =', vaga.id);
-      const { data: verify, error: verifyError } = await supabase.from('vagas').select('owner_nome').eq('id', vaga.id).maybeSingle();
-      
-      if (verifyError) {
-        console.error('[ERRO-REAL] Falha na Verificação:', verifyError);
-      }
-
-      const syncSuccess = verify?.owner_nome === newOwner.nome;
-      console.log('[DEBUG-UI] 4. REGRA DE NEGÓCIO PARA RENDERIZAÇÃO (Sync Check):', { syncSuccess, expected: newOwner.nome, actual: verify?.owner_nome });
-
-      if (syncSuccess) {
-        alert('Sucesso: Banco sincronizado.');
-        onSuccess?.(); // Chamada explícita de refresh (via Admin.tsx)
-        onClose();
-      } else {
-        console.error('[DEBUG-UI] 6. O GARGALO DE ATUALIZAÇÃO: Falha de Persistência Detectada');
-        alert('Erro de Sincronização: O banco não refletiu a mudança. Forçando recarregamento.');
-        window.location.reload();
-      }
-      // [FIM DO BLOCO DE INSPEÇÃO]
-    } catch (error: any) {
-      console.error('[ERRO-REAL] Erro Crítico no Fluxo:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        error
+        new_owner_id: newOwner.id,
+        type,
+        justification,
+        ...(type === 'Temporária'
+          ? {
+              absence_reason: absenceReason,
+              start_date: startDate,
+              end_date: endDate,
+              auto_return: autoReturn,
+            }
+          : {
+              termination_reason: terminationReason,
+              effective_date: effectiveDate,
+            }),
       });
+
+      if (!response.data) {
+        throw new Error('O servidor não retornou a vaga atualizada.');
+      }
+
+      alert('Sucesso: transferência executada.');
+      setShowConfirmation(false);
+      onSuccess?.();
+      onClose();
+    } catch (error: any) {
+      console.error('[ERRO-REAL] Erro no fluxo server-side de transferência:', error);
       alert(error.message || 'Erro ao executar transferência. Verifique as permissões.');
     } finally {
       setLoading(false);
