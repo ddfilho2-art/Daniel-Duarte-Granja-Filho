@@ -25,7 +25,7 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
 }
 
 interface AdminUserRequest {
-  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status" | "transfer_history";
+  action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status" | "transfer_history" | "transfer";
   tenant_id: string;
   user_id?: string;
   email?: string;
@@ -34,6 +34,16 @@ interface AdminUserRequest {
   nome?: string;
   login?: string;
   password?: string;
+  vaga_id?: string;
+  new_owner_id?: string;
+  type?: "Temporária" | "Definitiva";
+  justification?: string;
+  absence_reason?: string;
+  start_date?: string;
+  end_date?: string;
+  auto_return?: boolean;
+  termination_reason?: string;
+  effective_date?: string;
 }
 
 interface AdminUserResponse {
@@ -215,6 +225,123 @@ async function listTransferHistory(
 
     if (error) throw error;
     return { success: true, data: data || [] };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+async function executeTransfer(
+  tenantId: string,
+  operatorId: string,
+  body: AdminUserRequest,
+): Promise<AdminUserResponse> {
+  const vagaId = body.vaga_id?.trim();
+  const newOwnerId = body.new_owner_id?.trim();
+  const type = body.type;
+  const justification = body.justification?.trim();
+
+  if (!vagaId || !newOwnerId || !type || !justification || justification.length < 20) {
+    return { success: false, code: "INVALID_INPUT", error: "Dados de transferência inválidos." };
+  }
+
+  try {
+    const { data: vaga, error: vagaError } = await adminClient
+      .from("vagas")
+      .select("id, owner_id, owner_nome")
+      .eq("id", vagaId)
+      .maybeSingle();
+    if (vagaError) throw vagaError;
+    if (!vaga) return { success: false, code: "VAGA_NOT_FOUND", error: "Vaga não encontrada." };
+
+    if (vaga.owner_id) {
+      const { data: oldMembership, error: oldMembershipError } = await adminClient
+        .from("tenant_memberships")
+        .select("user_id")
+        .eq("tenant_id", tenantId)
+        .eq("user_id", vaga.owner_id)
+        .maybeSingle();
+      if (oldMembershipError) throw oldMembershipError;
+      if (!oldMembership) return { success: false, code: "VAGA_NOT_IN_TENANT", error: "Vaga fora do tenant autorizado." };
+    }
+
+    const { data: newMembership, error: newMembershipError } = await adminClient
+      .from("tenant_memberships")
+      .select("user_id, status")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", newOwnerId)
+      .maybeSingle();
+    if (newMembershipError) throw newMembershipError;
+    if (!newMembership || newMembership.status !== "active") {
+      return { success: false, code: "OWNER_NOT_IN_TENANT", error: "Novo proprietário não pertence ao tenant ou está inativo." };
+    }
+
+    const { data: newOwner, error: newOwnerError } = await adminClient
+      .from("users")
+      .select("id, nome, perfil, status")
+      .eq("id", newOwnerId)
+      .eq("perfil", "RH")
+      .eq("status", "Ativo")
+      .maybeSingle();
+    if (newOwnerError) throw newOwnerError;
+    if (!newOwner) return { success: false, code: "OWNER_NOT_ELIGIBLE", error: "Novo proprietário não é um usuário RH ativo." };
+
+    const now = new Date().toISOString();
+    const transferData: Record<string, unknown> = {
+      vaga_id: vagaId,
+      data_execucao: now,
+      tipo: type,
+      proprietario_anterior_id: vaga.owner_id || null,
+      proprietario_anterior_nome: vaga.owner_nome || "Sem proprietário",
+      novo_proprietario_id: newOwner.id,
+      novo_proprietario_nome: newOwner.nome,
+      justificativa,
+      executado_por_id: operatorId,
+    };
+
+    const patchData: Record<string, unknown> = {
+      owner_id: newOwner.id,
+      owner_nome: newOwner.nome,
+      transferencia_ativa: type === "Temporária",
+      transferencia_tipo: type,
+      transferencia_temporaria: type === "Temporária"
+        ? {
+            original_owner_id: vaga.owner_id || null,
+            original_owner_nome: vaga.owner_nome || "Sem proprietário",
+            data_retorno: body.end_date || null,
+            auto_retorno: body.auto_return === true,
+          }
+        : null,
+      updated_at: now,
+    };
+
+    if (type === "Temporária") {
+      if (!body.start_date || !body.end_date || new Date(body.end_date) <= new Date(body.start_date)) {
+        return { success: false, code: "INVALID_INPUT", error: "Período de transferência temporária inválido." };
+      }
+      transferData.motivo_ausencia = body.absence_reason || null;
+      transferData.data_inicio = body.start_date;
+      transferData.data_retorno = body.end_date;
+      transferData.retorno_automatico = body.auto_return === true;
+    } else {
+      if (!body.effective_date || new Date(body.effective_date) > new Date()) {
+        return { success: false, code: "INVALID_INPUT", error: "Data de efetivação inválida." };
+      }
+      transferData.motivo_desligamento = body.termination_reason || null;
+      transferData.data_efetivacao = body.effective_date;
+    }
+
+    const { error: historyError } = await adminClient.from("transferencias").insert(transferData);
+    if (historyError) throw historyError;
+
+    const { data: updatedVaga, error: updateError } = await adminClient
+      .from("vagas")
+      .update(patchData)
+      .eq("id", vagaId)
+      .select("id, owner_id, owner_nome, transferencia_ativa, transferencia_tipo, transferencia_temporaria")
+      .single();
+    if (updateError) throw updateError;
+
+    return { success: true, data: updatedVaga, message: "Transferência executada com sucesso." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -632,6 +759,10 @@ async function handleRequest(
       case "list":
       case "get":
         result = await listMembers(tenantId);
+        break;
+
+      case "transfer":
+        result = await executeTransfer(tenantId, userData.user.id, body);
         break;
 
       case "transfer_history":
