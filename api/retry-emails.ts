@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const MAX_RETRIES = 3;
 const TIMEOUT_MS = 4000;
+const CLAIM_LEASE_MS = 15 * 60 * 1000;
 
 const supabaseUrl = process.env.SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
@@ -19,9 +20,10 @@ async function fetchWithRetry(
   while (attempt < MAX_RETRIES) {
     if (attempt > 0 && onRetry) {
       await onRetry(attempt).catch((e) =>
-        console.error("Error checking retry log:", e),
+        console.error("Error updating retry attempt:", e),
       );
     }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
@@ -86,12 +88,12 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // Busca emails com falha ou pendentes
     const { data: queuingEmails, error: fetchError } = await supabase
       .from("email_queue")
       .select("*")
       .in("status", ["pending", "failed"])
-      .lt("attempts", 3)
+      .lt("attempts", MAX_RETRIES)
+      .order("created_at", { ascending: true })
       .limit(20);
 
     if (fetchError) {
@@ -103,19 +105,73 @@ export default async function handler(req: any, res: any) {
         success: true,
         code: "NO_EMAILS_TO_RETRY",
         processed: 0,
+        claimed: 0,
+        successCount: 0,
+        failCount: 0,
         requestId,
       });
     }
 
+    let claimedCount = 0;
     let successCount = 0;
     let failCount = 0;
 
     for (const item of queuingEmails) {
-      const { id, payload } = item;
+      const id = item.id;
+      const previousAttempts = Number(item.attempts || 0);
+      const claimToken = crypto.randomUUID();
+      const claimCutoff = new Date(
+        Date.now() - CLAIM_LEASE_MS,
+      ).toISOString();
+      const claimNow = new Date().toISOString();
+
+      // Atomic optimistic claim:
+      // only the worker that successfully writes the lease may process the row.
+      // A stale lease can be recovered after 15 minutes.
+      const { data: claimedRows, error: claimError } = await supabase
+        .from("email_queue")
+        .update({
+          processing_token: claimToken,
+          processing_started_at: claimNow,
+          attempts: previousAttempts + 1,
+          updated_at: claimNow,
+        })
+        .eq("id", id)
+        .in("status", ["pending", "failed"])
+        .lt("attempts", MAX_RETRIES)
+        .or(
+          `processing_token.is.null,processing_started_at.lt.${claimCutoff}`,
+        )
+        .select("*")
+        .limit(1);
+
+      if (claimError) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "retry_email_claim_failed",
+            requestId,
+            emailId: id,
+            error: claimError.message,
+          }),
+        );
+        continue;
+      }
+
+      const claimedEmail = claimedRows?.[0];
+      if (!claimedEmail) {
+        // Another worker already owns this row.
+        continue;
+      }
+
+      claimedCount++;
+
+      const payload = claimedEmail.payload || {};
       const html =
         payload?.html ||
-        (payload?.body ? payload.body.replace(/\n/g, "<br>") : "");
+        (payload?.body ? String(payload.body).replace(/\n/g, "<br>") : "");
       const text = payload?.body || "";
+      let lastProviderAttempt = 1;
 
       try {
         await fetchWithRetry(
@@ -125,6 +181,9 @@ export default async function handler(req: any, res: any) {
             headers: {
               Authorization: `Bearer ${resendApiKey}`,
               "Content-Type": "application/json",
+              // Stable per-queue-item key protects against duplicate delivery
+              // when a worker crashes after Resend accepts the message.
+              "Idempotency-Key": `recruta-ai/email-queue/${id}`,
             },
             body: JSON.stringify({
               from: process.env.EMAIL_FROM || "onboarding@resend.dev",
@@ -135,35 +194,71 @@ export default async function handler(req: any, res: any) {
             }),
           },
           async (attempt: number) => {
+            lastProviderAttempt = attempt + 1;
             await supabase
               .from("email_queue")
               .update({
-                attempts: (item.attempts || 0) + attempt,
+                attempts: Math.min(
+                  MAX_RETRIES,
+                  previousAttempts + lastProviderAttempt,
+                ),
                 updated_at: new Date().toISOString(),
               })
-              .eq("id", id);
+              .eq("id", id)
+              .eq("processing_token", claimToken);
           },
         );
 
-        await supabase
+        const { error: sentError } = await supabase
           .from("email_queue")
           .update({
             status: "sent",
+            processing_token: null,
+            processing_started_at: null,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", id);
+          .eq("id", id)
+          .eq("processing_token", claimToken);
+
+        if (sentError) {
+          throw new Error(`Failed to finalize sent email: ${sentError.message}`);
+        }
 
         successCount++;
       } catch (err: any) {
-        await supabase
+        const attempts = Math.min(
+          MAX_RETRIES,
+          Math.max(
+            Number(claimedEmail.attempts || previousAttempts + 1),
+            previousAttempts + lastProviderAttempt,
+          ),
+        );
+        const nextStatus = attempts >= MAX_RETRIES ? "failed" : "pending";
+
+        const { error: failError } = await supabase
           .from("email_queue")
           .update({
-            status: "failed",
-            error: err.message || String(err),
-            attempts: (item.attempts || 0) + 1,
+            status: nextStatus,
+            error: err?.message || String(err),
+            processing_token: null,
+            processing_started_at: null,
+            attempts,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", id);
+          .eq("id", id)
+          .eq("processing_token", claimToken);
+
+        if (failError) {
+          console.error(
+            JSON.stringify({
+              level: "error",
+              event: "retry_email_failure_update_failed",
+              requestId,
+              emailId: id,
+              error: failError.message,
+            }),
+          );
+        }
 
         failCount++;
       }
@@ -174,7 +269,8 @@ export default async function handler(req: any, res: any) {
         level: "info",
         event: "retry_emails_completed",
         requestId,
-        processed: queuingEmails.length,
+        selected: queuingEmails.length,
+        claimed: claimedCount,
         successCount,
         failCount,
         duration: Date.now() - start,
@@ -185,8 +281,10 @@ export default async function handler(req: any, res: any) {
       success: true,
       code: "EMAILS_REPROCESSED",
       processed: queuingEmails.length,
+      claimed: claimedCount,
       successCount,
       failCount,
+      skippedConcurrent: queuingEmails.length - claimedCount,
       requestId,
     });
   } catch (error: any) {
@@ -196,7 +294,7 @@ export default async function handler(req: any, res: any) {
         event: "retry_emails_failed",
         requestId,
         duration: Date.now() - start,
-        error: error.message || String(error),
+        error: error?.message || String(error),
       }),
     );
 
