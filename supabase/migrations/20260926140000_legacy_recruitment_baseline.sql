@@ -256,7 +256,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $$
+as $recruta$
 begin
   if not exists (select 1 from public.users where id = new.id::text) then
     insert into public.users (
@@ -276,7 +276,7 @@ begin
   end if;
   return new;
 end;
-$$;
+$recruta$;
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
