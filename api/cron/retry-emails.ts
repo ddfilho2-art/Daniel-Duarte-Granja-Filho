@@ -14,7 +14,10 @@ export default async function handler(req: any, res: any) {
 
   try {
     const response = await fetch(`${baseUrl}/api/retry-emails`, {
-      method: 'POST'
+      method: 'POST',
+      headers: {
+        "x-cron-secret": process.env.CRON_SECRET || ""
+      }
     });
 
     const data = await response.json();
