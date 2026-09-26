@@ -74,12 +74,12 @@ Ao trabalhar em qualquer item:
 
 ## Resumo executivo atual
 
-**Atualizado em:** 2026-08-11
+**Atualizado em:** 2026-09-26
 
 | Fase | Situação | Progresso estimado |
 |---|---|---:|
 | 0. Governança e planejamento | 🔄 Em andamento | 80% |
-| 1. Descoberta e baseline do banco | ⛔ Bloqueada | 35% |
+| 1. Descoberta e baseline do banco | 🔄 Em andamento | 55% |
 | 2. Contenção imediata de segurança | 🔄 Em andamento | 45% |
 | 3. Arquitetura multi-tenant | 🔄 Em andamento | 25% |
 | 4. Fundação SQL multi-tenant | ✅ Concluída | 100% |
@@ -127,10 +127,7 @@ Ao trabalhar em qualquer item:
 | DB-007 | 🔄 | Criar migration baseline do schema remoto ausente | Banco novo reproduz integralmente o runtime atual |
 | DB-008 | ⏳ | Detectar e eliminar drift entre remoto e repositório | Diff declarativo sem objetos desconhecidos |
 
-**Bloqueio atual:** executar no Supabase SQL Editor os arquivos documentados em
-`docs/DATABASE_DISCOVERY.md` e fornecer os resultados. Sem isso, não é seguro
-alterar definitivamente `users`, `vagas`, `candidaturas`, `mensagens`, `settings`,
-`logs`, `provas`, `analise_ia_candidato`, `transferencias` e buckets legados.
+**Situação atual:** a descoberta do banco remoto (`DB-005`/`DB-006`) foi registrada como concluída em 2026-08-08. O bloqueio estrutural agora é transformar essa descoberta em uma baseline reproduzível (`DB-007`) e confirmar qual projeto Supabase de staging/produção está vinculado ao runtime antes de aplicar migrations.
 
 ## Fase 2 — Contenção imediata de segurança
 
@@ -489,14 +486,13 @@ Regras obrigatórias:
 
 ## Próximas ações desbloqueáveis
 
-1. **DB-005:** executar os quatro diagnósticos no Supabase remoto;
+1. **DB-007:** consolidar a baseline reproduzível do schema remoto a partir dos diagnósticos já registrados;
 2. **ARC-006:** confirmar se o currículo será global ou isolado por empresa;
-3. **SEC-005/SEC-006:** retirar SMTP e relay público do frontend;
-4. **revisar e validar** as migrations e Edge Functions já iniciadas;
-5. a fundação independente `TEN-001` a `TEN-005` e `TEN-010` a `TEN-013` pode
-   ser preparada e revisada antes do baseline, mas só será aplicada em staging
-   após o preflight; `TEN-006` a `TEN-009` continuam bloqueados pelo diagnóstico
-   do schema legado.
+3. **SEC-005/SEC-006:** retirar o relay SMTP legado e exigir fluxo de e-mail server-side autenticado;
+4. **SEC-012:** concluir CSP depois de inventariar as origens externas realmente necessárias;
+5. **revisar e validar** as migrations e Edge Functions já iniciadas no projeto Supabase correto;
+6. confirmar o projeto Supabase de staging/produção antes de qualquer aplicação de migration;
+7. a fundação independente `TEN-001` a `TEN-005` e `TEN-010` a `TEN-013` pode ser preparada e revisada antes do baseline, mas `TEN-006` a `TEN-009` continuam dependentes da validação do schema legado.
 
 ---
 
@@ -676,3 +672,15 @@ Trabalho existente que precisa ser revisado e validado antes de receber status
 
 Esses itens permanecem `⚠️ Em revisão` ou `🔄 Em andamento` porque ainda não foram
 aplicados em um banco de staging nem validados com build/testes.
+
+
+## 2026-09-26 — Retomada de manutenção
+
+- Confirmado o repositório oficial: `ddfilho2-art/Daniel-Duarte-Granja-Filho`.
+- Confirmado que o documento oficial de acompanhamento é `docs/IMPLEMENTATION_PLAN.md`.
+- Corrigida a inconsistência documental que mantinha `DB-005` como bloqueio apesar do registro de 2026-08-08 informar sua conclusão.
+- Criada a branch `maintenance/recruta-ai-security-20260926` para retomada controlada.
+- `.env.example`: removida a variável `VITE_SUPABASE_SERVICE_ROLE_KEY`; segredos server-side passaram a ser explicitamente documentados sem prefixo `VITE_`.
+- `vercel.json`: adicionados headers HTTP básicos de segurança (`nosniff`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy` e HSTS).
+- Identificado `server.ts` como superfície legada de relay SMTP que aceita credenciais SMTP no payload; permanece pendente para remoção/migração sem quebrar o fluxo atual de `api/send-email.ts`.
+- Confirmado que a conexão Supabase atualmente disponível não corresponde ao banco legado documentado pelo projeto; nenhuma migration foi aplicada por esse motivo.
