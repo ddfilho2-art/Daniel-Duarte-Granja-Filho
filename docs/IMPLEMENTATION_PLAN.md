@@ -138,13 +138,13 @@ Ao trabalhar em qualquer item:
 | SEC-003 | 🔄 | Substituir verificação vulnerável por fluxo server-side | Código nunca retorna ao cliente; fluxo de duas fases validado |
 | SEC-004 | 🔄 | Migrar operações administrativas para Edge Function | Criar/editar/resetar/inativar RH somente no servidor |
 | SEC-005 | ⏳ | Retirar SMTP de `settings` e do navegador | Senha removida da tabela/payload e rotacionada |
-| SEC-006 | ⏳ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
+| SEC-006 | ✅ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
 | SEC-007 | ⏳ | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
 | SEC-008 | ⏳ | Tornar buckets sensíveis privados | Currículos, provas e anexos usam URL assinada |
 | SEC-009 | ⏳ | Remover scripts com credenciais fixas | Nenhuma senha literal operacional no repositório/histórico ativo |
 | SEC-010 | ⏳ | Rotacionar segredos potencialmente expostos | Service role, Gemini, SMTP, n8n e contas seed rotacionados |
 | SEC-011 | 🔄 | Corrigir sessão baseada em `localStorage` | Autenticação deriva de sessão Supabase válida e perfil reconsultado |
-| SEC-012 | ⏳ | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
+| SEC-012 | 🔄 | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
 
 ## Fase 3 — Arquitetura multi-tenant
 
@@ -684,3 +684,12 @@ aplicados em um banco de staging nem validados com build/testes.
 - `vercel.json`: adicionados headers HTTP básicos de segurança (`nosniff`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy` e HSTS).
 - Identificado `server.ts` como superfície legada de relay SMTP que aceita credenciais SMTP no payload; permanece pendente para remoção/migração sem quebrar o fluxo atual de `api/send-email.ts`.
 - Confirmado que a conexão Supabase atualmente disponível não corresponde ao banco legado documentado pelo projeto; nenhuma migration foi aplicada por esse motivo.
+
+
+### 2026-09-26 — SEC-005/SEC-006/SEC-012
+
+- `server.ts`: removida a rota Express legada `POST /api/send-email` que recebia credenciais SMTP no payload.
+- Removido `nodemailer` e seus tipos do `package.json` e `package-lock.json`.
+- `api/send-email.ts`: removido CORS curinga e o payload da fila passou a ser uma whitelist explícita (`to`, `subject`, `html`, `body`), evitando persistência acidental de credenciais SMTP enviadas por clientes legados.
+- `vercel.json`: headers de segurança básicos já adicionados; CSP permanece pendente até inventário das origens externas.
+- `SEC-006` concluído. `SEC-005` permanece dependente da confirmação/remoção de configurações SMTP legadas no banco. `SEC-012` permanece em andamento por causa da CSP.
