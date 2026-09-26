@@ -1,12 +1,27 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
-};
+function getCorsHeaders(req: Request): Record<string, string> | null {
+  const origin = req.headers.get("Origin");
+  const appUrl = Deno.env.get("APP_URL")?.trim().replace(/\/$/, "");
+
+  if (!origin || !appUrl || origin !== appUrl) {
+    if (origin) return null;
+    return {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers":
+        "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
+    };
+  }
+
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
+    Vary: "Origin",
+  };
+}
 
 interface AdminUserRequest {
   action: "list" | "get" | "create" | "update" | "delete";
@@ -26,20 +41,28 @@ interface AdminUserResponse {
 
 // Initialize Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceKey) {
+  throw new Error(
+    "Missing SUPABASE_URL, SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY"
+  );
 }
 
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
 // Validate tenant access
 async function validateTenantAccess(
   tenantId: string,
-  userId: string
+  authorization: string
 ): Promise<boolean> {
-  const { data, error } = await supabase
+  const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authorization } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { data, error } = await userClient
     .rpc("can_administer_tenant", { p_tenant_id: tenantId })
     .single();
 
@@ -121,7 +144,7 @@ async function createMember(
 ): Promise<AdminUserResponse> {
   try {
     // First, get or create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin
+    const { data: authData, error: authError } = await adminClient.auth.admin
       .createUser({
         email,
         email_confirm: true,
@@ -230,9 +253,30 @@ async function deleteMember(
 async function handleRequest(
   req: Request
 ): Promise<Response> {
-  // Handle CORS
+  const corsHeaders = getCorsHeaders(req);
+
+  if (!corsHeaders) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Origin not allowed" }),
+      {
+        status: 403,
+        headers: { "Content-Type": "application/json", Vary: "Origin" },
+      }
+    );
+  }
+
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(
+      JSON.stringify({ success: false, error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
   }
 
   try {
@@ -261,8 +305,22 @@ async function handleRequest(
     }
 
     // Verify user can administer tenant
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData } = await supabase.auth.getUser(token);
+    if (!authHeader.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Invalid authorization header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const token = authHeader.slice("Bearer ".length).trim();
+    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: userData } = await userClient.auth.getUser();
 
     if (!userData.user) {
       return new Response(
@@ -274,7 +332,7 @@ async function handleRequest(
       );
     }
 
-    const hasAccess = await validateTenantAccess(tenantId, userData.user.id);
+    const hasAccess = await validateTenantAccess(tenantId, `Bearer ${token}`);
     if (!hasAccess) {
       return new Response(
         JSON.stringify({
