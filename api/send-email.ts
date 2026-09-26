@@ -48,15 +48,8 @@ async function fetchWithRetry(url: string, options: any, onRetry?: (attempt: num
   throw new Error("Max retries reached");
 }
 
-function setCors(res: any) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
-
 export default async function handler(req: any, res: any) {
-  setCors(res);
+  res.setHeader('Vary', 'Origin');
 
   if (req.method === 'OPTIONS') {
     res.status(204).end();
