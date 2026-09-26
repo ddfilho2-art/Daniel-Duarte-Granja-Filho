@@ -693,3 +693,11 @@ aplicados em um banco de staging nem validados com build/testes.
 - `api/send-email.ts`: removido CORS curinga e o payload da fila passou a ser uma whitelist explícita (`to`, `subject`, `html`, `body`), evitando persistência acidental de credenciais SMTP enviadas por clientes legados.
 - `vercel.json`: headers de segurança básicos já adicionados; CSP permanece pendente até inventário das origens externas.
 - `SEC-006` concluído. `SEC-005` permanece dependente da confirmação/remoção de configurações SMTP legadas no banco. `SEC-012` permanece em andamento por causa da CSP.
+
+
+### 2026-09-26 — SEC-007
+
+- `api/cron/retry-emails.ts` já validava `CRON_SECRET` no gatilho externo.
+- O processamento interno `POST /api/retry-emails` passou a exigir o mesmo segredo via header `x-cron-secret`.
+- O cron agora encaminha explicitamente esse header na chamada interna.
+- `SEC-007` permanece em andamento: a autenticação foi fechada, mas ainda faltam claim atômico/idempotência para impedir processamento concorrente da mesma mensagem.
