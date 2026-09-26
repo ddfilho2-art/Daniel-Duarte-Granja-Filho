@@ -26,6 +26,20 @@ async function startServer() {
         ? crypto.randomUUID()
         : Date.now().toString(36) + Math.random().toString(36).substring(2);
 
+    const cronSecret = process.env.CRON_SECRET || "";
+    const providedSecret =
+      typeof req.headers["x-cron-secret"] === "string"
+        ? req.headers["x-cron-secret"]
+        : "";
+
+    if (!cronSecret || providedSecret !== cronSecret) {
+      return res.status(401).json({
+        success: false,
+        code: "UNAUTHORIZED",
+        requestId,
+      });
+    }
+
     if (!supabase) {
       return res.status(500).json({
         success: false,
