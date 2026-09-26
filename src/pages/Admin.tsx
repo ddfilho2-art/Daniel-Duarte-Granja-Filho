@@ -119,23 +119,24 @@ export function AdminDashboard() {
         };
 
         const fetchCargaTrabalho = async () => {
-          const [vagasRes, usersRes] = await Promise.all([
+          const [vagasRes, usersResponse] = await Promise.all([
             supabase.from("vagas").select("owner_nome").eq("status", "Aberta"),
-            supabase
-              .from("users")
-              .select("nome")
-              .eq("perfil", "RH")
-              .eq("status", "Ativo"),
+            executeAdminUserAction({ action: "list" }),
           ]);
 
           if (vagasRes.error) throw vagasRes.error;
-          if (usersRes.error) throw usersRes.error;
 
-          const rhUsers = usersRes.data || [];
+          const rhUsers = Array.isArray(usersResponse.data)
+            ? usersResponse.data.filter(
+                (user: any) => user?.status === "Ativo",
+              )
+            : [];
           const cargaTrabalhoMap: { [key: string]: number } = {};
 
-          rhUsers.forEach((user) => {
-            cargaTrabalhoMap[user.nome] = 0;
+          rhUsers.forEach((user: any) => {
+            if (user?.nome) {
+              cargaTrabalhoMap[user.nome] = 0;
+            }
           });
 
           (vagasRes.data || []).forEach((v: any) => {
