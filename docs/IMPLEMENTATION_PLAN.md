@@ -695,6 +695,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - `SEC-006` concluído. `SEC-005` permanece dependente da confirmação/remoção de configurações SMTP legadas no banco. `SEC-012` permanece em andamento por causa da CSP.
 
 
+### 2026-09-26 — SEC-003/004
+
+- As rotas administrativas `api/admin-create-user.ts`, `api/admin-reset-password.ts` e `api/admin-update-user-email.ts` permanecem server-side e validam o Bearer token via Supabase Auth antes de executar operações privilegiadas com `service_role`.
+- O CORS dessas rotas deixou de aceitar `*`: agora só ecoa `Origin` quando coincide com `APP_URL`, mantendo `Vary: Origin`.
+- Isso reduz a superfície de abuso cross-origin sem alterar o fluxo same-origin da aplicação.
+- `SEC-003` e `SEC-004` continuam `🔄` porque a validação final do fluxo completo e a eliminação de qualquer operação administrativa direta remanescente no frontend ainda fazem parte da refatoração.
+
 ### 2026-09-26 — SEC-012
 
 - Inventário do frontend não encontrou scripts, fontes ou frames de terceiros necessários ao runtime; a comunicação do navegador fica restrita ao próprio site e ao Supabase.
