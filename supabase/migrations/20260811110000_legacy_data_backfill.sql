@@ -43,7 +43,8 @@ begin
   select id into v_root_tenant_id from public.tenants where slug = '<COMPANY_SLUG>';
 
   if v_root_tenant_id is null then
-    raise exception 'root_tenant_not_found — create the tenant first or update the slug';
+    raise notice 'Root tenant not configured yet; legacy backfill is deferred until tenant provisioning.';
+    return;
   end if;
 
   raise notice 'Backfill using root tenant: %', v_root_tenant_id;
