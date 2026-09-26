@@ -845,3 +845,14 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Escopo:** catálogos, integrações, eventos de instância, grupos, códigos de instância, versionamento de processos e hardening operacional/RLS.
 - **Validação:** `list_migrations` confirmou 16 migrations remotas no projeto novo, todas com execução registrada.
 - **Próximo passo:** aplicar o lote de segurança/multi-tenant e, em seguida, validar as tabelas e políticas antes das Edge Functions.
+
+
+### 2026-09-26 — DB-007 — bloqueio identificado na baseline legada do Recruta AÍ
+
+- **Migration executada:** `20260808100000_legacy_recruitment_tenant_bridge`.
+- **Resultado:** interrompida de forma segura porque o novo projeto não possui `public.vagas`; as migrations versionadas anteriores também não criam o conjunto legado de recrutamento.
+- **Diagnóstico:** o próprio `docs/DATABASE_DISCOVERY.md` registra que `users`, `vagas`, `candidaturas`, `mensagens`, `settings`, `logs`, `provas`, `analise_ia_candidato` e outros objetos pertenciam ao schema remoto anterior e não foram versionados como baseline.
+- **Decisão:** não criar tabelas por inferência. O schema de recrutamento precisa de uma baseline declarativa fiel antes de aplicar RLS, RPCs, backfill e as migrations finais.
+- **Estado remoto:** 24 migrations registradas com sucesso; a 25ª não foi registrada/aplicada integralmente. Nenhum dado de negócio foi inserido no novo projeto.
+- **Validação adicional:** inventário remoto confirmou que o projeto novo contém a fundação BPM/operacional e as tabelas multi-tenant/saúde ocupacional, mas não o legado de recrutamento.
+- **Próximo passo obrigatório:** obter/reconstruir a baseline real das tabelas legadas (colunas, tipos, constraints, índices, triggers e views) antes de continuar. Edge Functions administrativas não serão publicadas como “prontas” enquanto esse contrato de banco estiver ausente.
