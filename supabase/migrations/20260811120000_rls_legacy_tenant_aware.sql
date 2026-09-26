@@ -393,11 +393,11 @@ do $$ begin
         v.titulo,
         v.descricao,
         v.departamento,
-        v.localizacao,
+        v.local as localizacao,
         v.tipo_contrato,
         v.status,
         v.created_at,
-        v.updated_at
+        v.atualizado_em as updated_at
       from public.vagas v
       where v.status in (''Aberta'', ''aberta'', ''active'', ''ativo'')
         and v.tenant_id is not null';
