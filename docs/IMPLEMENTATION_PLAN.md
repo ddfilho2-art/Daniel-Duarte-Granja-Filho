@@ -740,3 +740,10 @@ aplicados em um banco de staging nem validados com build/testes.
 - A interface de request foi atualizada para refletir também `reset_password` e `set_status`; a resposta passou a declarar `code` usado pelo cliente.
 - Validação realizada por inspeção estática após o commit. Sem execução remota/build nesta etapa.
 
+
+### 2026-09-26 — SEC-003/SEC-004 — proteção contra reutilização de conta Auth na criação RH
+
+- `supabase/functions/admin-users/index.ts`: a ação `create` agora verifica previamente os usuários do Auth e rejeita e-mails já existentes com `EMAIL_ALREADY_EXISTS`.
+- Isso evita que o fluxo administrativo de criação reutilize uma conta Auth existente e, na sequência, altere sua senha/metadados.
+- Validação realizada por inspeção estática após o commit. Sem execução remota/build nesta etapa.
+
