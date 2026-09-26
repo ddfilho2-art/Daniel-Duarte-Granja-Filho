@@ -575,39 +575,12 @@ export function AdminTransferencias() {
     try {
       setIsProcessingReturn(true);
 
-      const { error: updateError } = await supabase
-        .from("vagas")
-        .update({
-          owner_id: vaga.transferencia_temporaria.original_owner_id || null,
-          owner_nome:
-            vaga.transferencia_temporaria.original_owner_nome ||
-            "Sem proprietário",
-          transferencia_ativa: false,
-          transferencia_tipo: null, // Limpa o tipo ao retornar ao original
-          transferencia_temporaria: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", vaga.id);
-
-      if (updateError) throw updateError;
-
-      const { error: logError } = await supabase.from("transferencias").insert({
+      const { error } = await executeAdminUserAction({
+        action: "auto_return",
         vaga_id: vaga.id,
-        tipo: "Retorno Automático",
-        data_execucao: new Date().toISOString(),
-        novo_owner_id: vaga.transferencia_temporaria.original_owner_id || null,
-        novo_owner_nome:
-          vaga.transferencia_temporaria.original_owner_nome ||
-          "Sem proprietário",
-        prev_owner_id: vaga.owner_id || null,
-        prev_owner_nome: vaga.owner_nome || "Sem proprietário",
-        justificativa:
-          "Retorno automático de propriedade após o término do período de ausência temporária.",
-        executado_por: "Sistema (Auto-retorno)",
-        executado_por_id: "system",
       });
 
-      if (logError) throw logError;
+      if (error) throw new Error(error);
 
       await logAudit(
         "Retorno Automático de Proprietário",
