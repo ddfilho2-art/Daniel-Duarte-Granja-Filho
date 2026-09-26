@@ -862,3 +862,10 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Ajuste de compatibilidade:** a tabela public.configuracoes já existia na fundação operacional com contrato diferente; a baseline foi tornada condicional para preservar o schema existente, sem inventar colunas legadas.
 - **Validado:** migration 20260926140000_legacy_recruitment_baseline aplicada com sucesso no projeto dmzagrakkduddofkqjhg; 17 tabelas legadas esperadas estão presentes, sem carga de dados de negócio.
 - **Próximo passo:** aplicar a bridge de tenancy 20260808100000_legacy_recruitment_tenant_bridge.sql e deixar o próprio banco revelar eventuais incompatibilidades contratuais antes das demais migrations.
+
+### 2026-09-26 — DB-007 — bridge e backfill de tenancy ajustados e aplicados
+- **Implementado:** corrigida a bridge para não comentar colunas de tabelas legadas opcionais ausentes; aplicada com sucesso.
+- **Implementado:** ajustada a integração RLS legada para operar sobre as tabelas realmente recuperadas, removendo dependências incondicionais de tabelas sem baseline e eliminando CHECKs inválidos com subconsultas.
+- **Implementado:** ajustado o backfill de tenant para projeto novo sem tenants e para tabelas opcionais ausentes; removida a instrução PostgreSQL inválida de COMMENT ON migration.
+- **Validado:** migrations 20260808100000, 20260809010000 e 20260809020000 aplicadas com sucesso no projeto dmzagrakkduddofkqjhg. O banco continua sem dados de negócio; o backfill permanece sem atribuição de tenant enquanto não houver tenant provisionado.
+- **Próximo passo:** aplicar e validar as migrations seguintes de backfill/RLS e, se necessário, corrigir somente incompatibilidades comprovadas pelo schema recuperado.
