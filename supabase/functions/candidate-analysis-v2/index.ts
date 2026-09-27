@@ -19,7 +19,16 @@ const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const WORKER_URL = Deno.env.get("CANDIDATE_ANALYSIS_WORKER_URL") ||
   "https://dmzagrakkduddofkqjhg.supabase.co/functions/v1/candidate-analysis-worker";
 const PROMPT_VERSION = "candidate-match-v1";
-const MODEL = "gemini-3.6-flash";
+const ALLOWED_MODELS = new Set([
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-3.6-flash",
+  "gemini-3.8-flash",
+]);
+const MODEL = (() => {
+  const configured = (Deno.env.get("CANDIDATE_ANALYSIS_MODEL") || "").trim();
+  return ALLOWED_MODELS.has(configured) ? configured : "gemini-2.5-flash";
+})();
 
 if (!supabaseUrl || !supabaseServiceKey || !supabaseAnonKey) {
   throw new Error("Missing required Supabase environment variables");
