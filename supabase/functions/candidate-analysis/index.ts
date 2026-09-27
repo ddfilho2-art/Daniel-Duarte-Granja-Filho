@@ -172,11 +172,7 @@ async function handleRequest(req: Request): Promise<Response> {
       return respond({ success: true, status: "completed", cached: true, analysis: claim.result as AnalysisResult, requestId: requestKey });
     }
 
-    if (claim?.status === "processing") {
-      return respond({ success: true, status: "processing", retryAfter: claim.retry_after ?? 2, requestId: requestKey });
-    }
-
-    // Trigger the worker without making the browser wait for Gemini.
+    // Triggering the worker is idempotent: its DB lease prevents duplicate claims.
     const workerPromise = fetch(WORKER_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json", "apikey": supabaseServiceKey, "Authorization": `Bearer ${supabaseServiceKey}` },
@@ -187,6 +183,12 @@ async function handleRequest(req: Request): Promise<Response> {
     if (typeof EdgeRuntime !== "undefined" && typeof EdgeRuntime.waitUntil === "function") {
       // @ts-ignore
       EdgeRuntime.waitUntil(workerPromise);
+    } else {
+      await workerPromise;
+    }
+
+    if (claim?.status === "processing") {
+      return respond({ success: true, status: "processing", retryAfter: claim.retry_after ?? 2, requestId: requestKey });
     }
 
     return respond({ success: true, status: "processing", retryAfter: 2, requestId: requestKey }, 202);
