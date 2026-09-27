@@ -980,3 +980,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Infra:** `get_infra_usage()` exige `legacy_has_privileged_role()`; não foi encontrado uso no código pesquisável do repositório padrão, mas não será revogado sem confirmação do branch de manutenção.
 - **Advisor:** permanece 1 alerta anônimo intencional (`get_public_tenant_context`) e 21 alertas de SECURITY DEFINER executáveis por `authenticated`; estes últimos são candidatos a revisão de contrato/uso, não correções automáticas.
 - **Conclusão:** o único bypass concreto identificado nesta etapa foi o da RPC de candidatura, corrigido em SEC-014. Não houve nova mudança remota neste SEC-015.
+
+
+## 2026-09-27 — SEC-016 — vínculo do ator nas RPCs de branding
+
+- **Implementado:** endurecidas as funções `public.create_tenant_branding_draft(uuid, uuid, jsonb, text)` e `public.publish_tenant_branding(uuid, uuid, uuid, text)` para exigir usuário autenticado e `p_actor_id = auth.uid()` antes da checagem de `platform_master_admin`.
+- **Risco corrigido:** um cliente autenticado podia informar o UUID de outro usuário Master Admin como `p_actor_id`; a função validava o UUID informado, não a identidade da sessão.
+- **Implementado:** restauração explícita de `EXECUTE` para `authenticated` após o `CREATE OR REPLACE`, preservando o fluxo legítimo do editor de identidade visual.
+- **Validado remotamente:** ambas as funções permanecem `SECURITY DEFINER`, contêm o vínculo `p_actor_id is distinct from auth.uid()` e possuem `EXECUTE` para `authenticated` e `service_role`.
+- **Migrations remotas:** `20260927140000_branding_rpc_actor_binding` e `20260927140100_branding_rpc_authenticated_grant`, ambas aplicadas com sucesso.
+- **Repositório:** migrations registradas na branch maintenance/recruta-ai-security-20260926.
