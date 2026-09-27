@@ -31,7 +31,7 @@ export async function requestCandidateAnalysis(
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const { data, error } =
       await supabase.functions.invoke<CandidateAnalysisResponse>(
-        "candidate-analysis",
+        "candidate-analysis-v2",
         {
           body: {
             candidato_id: candidatoId,
