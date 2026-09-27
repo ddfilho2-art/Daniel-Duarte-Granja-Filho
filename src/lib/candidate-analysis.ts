@@ -34,8 +34,8 @@ export async function requestCandidateAnalysis(
         "candidate-analysis",
         {
           body: {
-            candidatoId,
-            vagaId,
+            candidato_id: candidatoId,
+            vaga_id: vagaId,
             force: options.force === true && attempt === 0,
           },
         },
