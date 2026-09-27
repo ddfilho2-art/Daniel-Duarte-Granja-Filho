@@ -435,34 +435,29 @@ function CandidateProfileModal({
               const { data: existingAnalysis, error: analysisError } =
                 await supabase
                   .from("analise_ia_candidato")
-                  .select("*")
+                  .select("id,status,result,input_hash,created_at,updated_at")
                   .eq("candidato_id", candidatoIdToFetch)
                   .eq("vaga_id", vaga.id)
+                  .order("created_at", { ascending: false })
+                  .limit(1)
                   .maybeSingle();
 
-              if (existingAnalysis) {
-                setAiEvaluation({
-                  score_total: existingAnalysis.score_total,
-                  metricas: {
-                    tecnico: existingAnalysis.tecnico,
-                    experiencia: existingAnalysis.experiencia,
-                    formacao: existingAnalysis.formacao,
-                    soft_skills: existingAnalysis.soft_skills,
-                    ferramentas: existingAnalysis.ferramentas,
-                  },
-                  justificativa: existingAnalysis.justificativa,
-                });
+              if (analysisError) {
+                console.warn("Erro ao buscar análise IA existente:", analysisError);
               }
 
-              if (
-                !existingAnalysis &&
-                vaga?.id &&
-                candidatoIdToFetch &&
-                !aiTriggered
-              ) {
+              const cachedResult = existingAnalysis?.result;
+              if (existingAnalysis?.status === "completed" && cachedResult && typeof cachedResult === "object") {
+                const result = cachedResult as any;
+                setAiEvaluation({
+                  ...result,
+                  metricas: { tecnico: result.score_tecnico, experiencia: result.score_experiencia, formacao: result.score_formacao, soft_skills: result.score_soft_skills, cultura: result.score_cultura },
+                  justificativa: result.resumo_ia,
+                });
+              } else if (vaga?.id && candidatoIdToFetch && !aiTriggered) {
                 setAiTriggered(true);
                 handleAIEvaluate();
-              }
+              }}
             }
           }
         }
