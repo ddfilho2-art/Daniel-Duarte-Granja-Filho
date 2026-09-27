@@ -1003,3 +1003,5 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validação de compatibilidade:** o contrato atual de `email_queue` permanece inalterado e o processamento automático via cron continua usando o caminho de `CRON_SECRET`.
 - **Repositório:** `api/email-monitor.ts`, `api/retry-emails.ts` e `src/components/PerformanceSRE.tsx` atualizados na branch `maintenance/recruta-ai-security-20260926`.
 - **Não realizado:** deploy/merge não foram executados; a branch continua isolada para validação posterior.
+
+- **Ajuste complementar validado:** o botão de retry agora trata explicitamente respostas HTTP não-2xx do endpoint protegido e usa os campos reais `successCount`/`failCount` retornados pelo backend, evitando falso sucesso na interface.
