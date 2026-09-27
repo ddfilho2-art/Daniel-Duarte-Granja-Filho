@@ -139,7 +139,7 @@ Deno.serve(async (request) => {
       }
 
       // Verify referral access
-      const { data: accessCheck, error: accessError } = await admin.rpc(
+      const { data: accessCheck, error: accessError } = await userClient.rpc(
         "can_access_medical_referral",
         { p_referral_id: referralId },
       );
@@ -157,7 +157,7 @@ Deno.serve(async (request) => {
       }
 
       // Determine actor side
-      const { data: side, error: sideError } = await admin.rpc(
+      const { data: side, error: sideError } = await userClient.rpc(
         "medical_referral_actor_side",
         { p_referral_id: referralId },
       );
@@ -264,7 +264,7 @@ Deno.serve(async (request) => {
       }
 
       // Verify access
-      const { data: accessCheck } = await admin.rpc(
+      const { data: accessCheck } = await userClient.rpc(
         "can_access_medical_referral",
         { p_referral_id: referralId },
       );
