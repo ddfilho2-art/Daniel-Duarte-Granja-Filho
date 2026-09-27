@@ -1,12 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
-};
+import { corsHeaders, jsonResponse, readJsonBody } from "shared/http.ts";
 
 interface AnalysisRequest {
   candidato_id: string;
@@ -21,7 +15,6 @@ interface AnalysisResponse {
   status?: string;
 }
 
-// Initialize Supabase client
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
@@ -31,10 +24,7 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Get analysis status
-async function getAnalysisStatus(
-  requestKey: string
-): Promise<AnalysisResponse> {
+async function getAnalysisStatus(requestKey: string): Promise<AnalysisResponse> {
   try {
     const { data, error } = await supabase
       .from("analise_ia_candidato")
@@ -57,17 +47,14 @@ async function getAnalysisStatus(
   }
 }
 
-// Generate SHA256 hash for input
 async function generateHash(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
   const hashBuffer = await crypto.subtle.digest("SHA-256", data);
   const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-  return hashHex;
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-// Validate tenant and candidate access
 async function validateAccess(
   tenantId: string,
   candidatoId: string,
@@ -75,7 +62,6 @@ async function validateAccess(
   userToken: string
 ): Promise<{ valid: boolean; error?: string }> {
   try {
-    // Verify user is authenticated
     const { data: userData, error: userError } = await supabase.auth.getUser(
       userToken.replace("Bearer ", "")
     );
@@ -84,7 +70,6 @@ async function validateAccess(
       return { valid: false, error: "Invalid authentication token" };
     }
 
-    // Verify tenant access
     const { data: tenantAccess, error: tenantError } = await supabase.rpc(
       "get_current_tenant_access",
       { p_tenant_id: tenantId }
@@ -94,7 +79,6 @@ async function validateAccess(
       return { valid: false, error: "Not authorized for this tenant" };
     }
 
-    // Verify vaga belongs to tenant
     const { data: vaga, error: vagaError } = await supabase
       .from("vagas")
       .select("id, tenant_id")
@@ -115,67 +99,48 @@ async function validateAccess(
   }
 }
 
-// Main handler
-async function handleRequest(
-  req: Request
-): Promise<Response> {
-  // Handle CORS
+async function handleRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
 
   if (req.method !== "POST") {
-    return new Response(
-      JSON.stringify({ success: false, error: "POST method required" }),
-      {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse(req, { success: false, error: "POST method required" }, 405);
   }
 
   try {
-    // Get tenant from header
     const tenantId = req.headers.get("x-tenant-id");
     if (!tenantId) {
-      return new Response(
-        JSON.stringify({ success: false, error: "x-tenant-id header required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse(req, {
+        success: false,
+        error: "x-tenant-id header required",
+      }, 400);
     }
 
-    // Get auth token
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: "authorization header required" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse(req, {
+        success: false,
+        error: "authorization header required",
+      }, 401);
     }
 
-    // Parse request body
-    const body: AnalysisRequest = await req.json();
+    const bodyResult = await readJsonBody<AnalysisRequest>(req);
+    if (!bodyResult.ok) {
+      return jsonResponse(req, {
+        success: false,
+        error: bodyResult.error,
+      }, bodyResult.status);
+    }
 
+    const body = bodyResult.data;
     if (!body.candidato_id || !body.vaga_id) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "candidato_id and vaga_id required",
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse(req, {
+        success: false,
+        error: "candidato_id and vaga_id required",
+      }, 400);
     }
 
-    // Validate access
     const access = await validateAccess(
       tenantId,
       body.candidato_id,
@@ -184,16 +149,12 @@ async function handleRequest(
     );
 
     if (!access.valid) {
-      return new Response(
-        JSON.stringify({ success: false, error: access.error }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse(req, {
+        success: false,
+        error: access.error,
+      }, 403);
     }
 
-    // Trigger analysis via stored procedure or create request
     const { data, error } = await supabase
       .from("analise_ia_candidato")
       .insert({
@@ -202,38 +163,29 @@ async function handleRequest(
         tenant_id: tenantId,
         status: "pending",
         input_hash: await generateHash(
-          JSON.stringify({ candidato_id: body.candidato_id, vaga_id: body.vaga_id })
+          JSON.stringify({
+            candidato_id: body.candidato_id,
+            vaga_id: body.vaga_id,
+          })
         ),
       })
       .select()
       .single();
 
     if (error) {
-      return new Response(
-        JSON.stringify({ success: false, error: error.message }),
-        {
-          status: 409,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return jsonResponse(req, {
+        success: false,
+        error: error.message,
+      }, 409);
     }
 
-    return new Response(JSON.stringify({ success: true, data }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse(req, { success: true, data }, 200);
   } catch (error) {
     console.error("Error:", error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return jsonResponse(req, {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }, 500);
   }
 }
 
