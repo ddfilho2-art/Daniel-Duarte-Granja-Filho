@@ -910,3 +910,11 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validação de segurança:** não foi criado tenant, usuário administrativo ou role fictícia apenas para teste.
 - **Bloqueio externo:** o conjunto atual de ferramentas conectadas não expõe operação para cadastrar/rotacionar secrets das Edge Functions. Portanto `ALLOWED_ORIGINS`, `GEMINI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_VERIFICATION_PEPPER` e eventual `TURNSTILE_SECRET_KEY` continuam sem valores configurados pelo agente.
 - **Próximo passo:** configurar esses secrets no projeto Supabase e então executar smoke tests autenticados; depois recuperar/reconstruir somente os seis schemas opcionais ainda ausentes.
+
+
+### 2026-09-27 — DB-007 — recuperação contratual de duas estruturas opcionais comprováveis
+- **Implementado no repositório:** criada `supabase/migrations/20260927100000_recover_proven_optional_contracts.sql` para `email_queue` e `analise_ia_candidato`.
+- **Base documental:** `email_queue` é consumida por `api/send-email.ts` e `api/retry-emails.ts`; `analise_ia_candidato` é consumida por `supabase/functions/candidate-analysis/index.ts`. Os tipos das chaves legadas foram alinhados à baseline real (`text`).
+- **Hardening:** ambas as tabelas têm RLS habilitado e acesso direto revogado para `public`, `anon` e `authenticated`; somente `service_role` recebe acesso direto, coerente com os consumidores server-side atuais.
+- **Validado no Supabase:** migration aplicada com sucesso no projeto `dmzagrakkduddofkqjhg`.
+- **Pendência:** quatro estruturas opcionais (`candidatura_historico`, `provas_versoes`, `transferencias`, `unidades_negocio`) ainda não têm contrato histórico comprovado e permanecem sem criação.
