@@ -728,9 +728,17 @@ function EmailMonitor() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
       });
-      const result = await response.data;
+      if (!response.ok) {
+        throw new Error(
+          response.data?.message ||
+            response.data?.code ||
+            "Não foi possível reprocessar os e-mails.",
+        );
+      }
+
+      const result = response.data;
       alert(
-        `✅ ${result?.processed || 0} e-mails processados. Sucesso: ${result?.sent || 0}, Falhas: ${result?.failed || 0}`,
+        `✅ ${result?.processed || 0} e-mails processados. Sucesso: ${result?.successCount || 0}, Falhas: ${result?.failCount || 0}`,
       );
       await fetchEmailQueue();
     } catch (e: any) {
