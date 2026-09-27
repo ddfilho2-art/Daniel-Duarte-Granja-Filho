@@ -936,3 +936,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Resultado:** a Function não usa mais CORS wildcard; respostas e preflight passam pelo contrato compartilhado de segurança.
 - **Pendência:** `ALLOWED_ORIGINS` ainda precisa receber valor real no ambiente Supabase; sem esse secret/configuração, chamadas cross-origin não serão liberadas. Nenhum valor foi inventado.
 - **Próximo passo:** investigar individualmente `candidatura_historico`, `provas_versoes`, `transferencias` e `unidades_negocio` somente por consumidores/contratos comprováveis no histórico do repositório.
+
+
+### 2026-09-27 — DB-007 — recuperação contratual de transferencias
+
+- **Implementado no repositório:** criada `supabase/migrations/20260927110000_recover_transferencias_runtime_contract.sql`.
+- **Base contratual:** a Edge Function `admin-users` lê `transferencias` por `vaga_id` + `tenant_id` e grava dois formatos explícitos de histórico: transferência normal/temporária e retorno automático.
+- **Campos recuperados:** tenant, vaga, datas, tipo, proprietários anterior/novo, justificativa, operador, dados de ausência/desligamento e campos legados de retorno automático efetivamente usados pelo consumidor.
+- **Hardening:** RLS habilitado; acesso direto revogado para `public`, `anon` e `authenticated`; somente `service_role` possui acesso direto.
+- **Validado no Supabase:** migration aplicada; tabela existe com o contrato utilizado pela Function; RLS está habilitado; tabela permanece com 0 linhas.
+- **Pendência:** `candidatura_historico`, `provas_versoes` e `unidades_negocio` continuam sem consumidor/contrato comprovável e não serão criadas por inferência.
