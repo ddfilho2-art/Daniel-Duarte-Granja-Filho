@@ -39,9 +39,9 @@ grant all on public.email_queue to service_role;
 
 create table if not exists public.analise_ia_candidato (
   id uuid primary key default gen_random_uuid(),
-  candidato_id uuid not null references public.candidatos(id) on delete cascade,
-  vaga_id uuid not null references public.vagas(id) on delete cascade,
-  candidatura_id uuid references public.candidaturas(id) on delete set null,
+  candidato_id text not null references public.candidatos(id) on delete cascade,
+  vaga_id text not null references public.vagas(id) on delete cascade,
+  candidatura_id text references public.candidaturas(id) on delete set null,
   tenant_id uuid not null references public.tenants(id) on delete restrict,
   status text not null default 'pending'
     check (status in ('pending', 'processing', 'completed', 'failed')),
@@ -51,12 +51,6 @@ create table if not exists public.analise_ia_candidato (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint analise_ia_input_hash_nonempty check (length(trim(input_hash)) >= 16),
-  constraint analise_ia_tenant_vaga check (
-    exists (
-      select 1 from public.vagas v
-      where v.id = vaga_id and v.tenant_id = tenant_id
-    )
-  )
 );
 
 create index if not exists idx_analise_ia_candidato_candidatura
