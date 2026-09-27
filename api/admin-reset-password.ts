@@ -1,8 +1,13 @@
 import { createClient } from "@supabase/supabase-js";
 
-function setCors(res: any) {
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+function setCors(res: any, req: any) {
+  const origin = req.headers?.origin || req.headers?.Origin;
+  const appUrl = process.env.APP_URL?.replace(/\/$/, "");
+  if (origin && appUrl && origin === appUrl) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Vary", "Origin");
+  }
   res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
@@ -31,7 +36,7 @@ function getBearerToken(req: any) {
 }
 
 export default async function handler(req: any, res: any) {
-  setCors(res);
+  setCors(res, req);
 
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -108,11 +113,11 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    if (!senha || senha.length < 6) {
+    if (!senha || senha.length < 8) {
       return res.status(400).json({
         success: false,
         code: "INVALID_PASSWORD",
-        message: "Senha inválida. Use pelo menos 6 caracteres.",
+        message: "Senha inválida. Use pelo menos 8 caracteres.",
       });
     }
 
@@ -152,7 +157,7 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({
         success: false,
         code: "AUTH_PASSWORD_RESET_FAILED",
-        message: authUpdateError.message || "Falha ao resetar senha no Auth.",
+        message: "Não foi possível atualizar a senha.",
       });
     }
 
@@ -170,7 +175,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({
       success: false,
       code: "INTERNAL_ERROR",
-      message: error?.message || "Erro interno ao resetar senha do usuário RH.",
+      message: "Erro interno ao resetar senha do usuário RH.",
     });
   }
 }

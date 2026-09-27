@@ -71,7 +71,19 @@ $$;
 -- membership is the tenant linkage for authenticated users.  Do not add a
 -- tenant_id to `users` or `profiles` until the CV retention decision is made.
 
-comment on column public.vagas.tenant_id is 'Nullable during migration; populated by the controlled backfill before RLS is enabled.';
-comment on column public.candidaturas.tenant_id is 'Must match the tenant of its vacancy after the backfill.';
-comment on column public.mensagens.tenant_id is 'Must match the tenant of its candidatura/vaga after the backfill.';
-comment on column public.analise_ia_candidato.tenant_id is 'Derived from the job tenant; AI result must not cross tenants.';
+do $recruta$
+begin
+  if to_regclass('public.vagas') is not null then
+    comment on column public.vagas.tenant_id is 'Nullable during migration; populated by the controlled backfill before RLS is enabled.';
+  end if;
+  if to_regclass('public.candidaturas') is not null then
+    comment on column public.candidaturas.tenant_id is 'Must match the tenant of its vacancy after the backfill.';
+  end if;
+  if to_regclass('public.mensagens') is not null then
+    comment on column public.mensagens.tenant_id is 'Must match the tenant of its candidatura/vaga after the backfill.';
+  end if;
+  if to_regclass('public.analise_ia_candidato') is not null then
+    comment on column public.analise_ia_candidato.tenant_id is 'Derived from the job tenant; AI result must not cross tenants.';
+  end if;
+end
+$recruta$;

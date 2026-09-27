@@ -74,12 +74,12 @@ Ao trabalhar em qualquer item:
 
 ## Resumo executivo atual
 
-**Atualizado em:** 2026-08-11
+**Atualizado em:** 2026-09-26
 
 | Fase | Situação | Progresso estimado |
 |---|---|---:|
 | 0. Governança e planejamento | 🔄 Em andamento | 80% |
-| 1. Descoberta e baseline do banco | ⛔ Bloqueada | 35% |
+| 1. Descoberta e baseline do banco | 🔄 Em andamento | 55% |
 | 2. Contenção imediata de segurança | 🔄 Em andamento | 45% |
 | 3. Arquitetura multi-tenant | 🔄 Em andamento | 25% |
 | 4. Fundação SQL multi-tenant | ✅ Concluída | 100% |
@@ -127,10 +127,7 @@ Ao trabalhar em qualquer item:
 | DB-007 | 🔄 | Criar migration baseline do schema remoto ausente | Banco novo reproduz integralmente o runtime atual |
 | DB-008 | ⏳ | Detectar e eliminar drift entre remoto e repositório | Diff declarativo sem objetos desconhecidos |
 
-**Bloqueio atual:** executar no Supabase SQL Editor os arquivos documentados em
-`docs/DATABASE_DISCOVERY.md` e fornecer os resultados. Sem isso, não é seguro
-alterar definitivamente `users`, `vagas`, `candidaturas`, `mensagens`, `settings`,
-`logs`, `provas`, `analise_ia_candidato`, `transferencias` e buckets legados.
+**Situação atual:** a descoberta do banco remoto (`DB-005`/`DB-006`) foi registrada como concluída em 2026-08-08. O bloqueio estrutural agora é transformar essa descoberta em uma baseline reproduzível (`DB-007`) e confirmar qual projeto Supabase de staging/produção está vinculado ao runtime antes de aplicar migrations.
 
 ## Fase 2 — Contenção imediata de segurança
 
@@ -141,13 +138,13 @@ alterar definitivamente `users`, `vagas`, `candidaturas`, `mensagens`, `settings
 | SEC-003 | 🔄 | Substituir verificação vulnerável por fluxo server-side | Código nunca retorna ao cliente; fluxo de duas fases validado |
 | SEC-004 | 🔄 | Migrar operações administrativas para Edge Function | Criar/editar/resetar/inativar RH somente no servidor |
 | SEC-005 | ⏳ | Retirar SMTP de `settings` e do navegador | Senha removida da tabela/payload e rotacionada |
-| SEC-006 | ⏳ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
-| SEC-007 | ⏳ | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
+| SEC-006 | ✅ | Substituir relay público de e-mail | Somente eventos/templates de negócio autenticados são aceitos |
+| SEC-007 | ✅ | Proteger retry/cron de e-mail | Claim atômico, idempotência e segredo interno |
 | SEC-008 | ⏳ | Tornar buckets sensíveis privados | Currículos, provas e anexos usam URL assinada |
 | SEC-009 | ⏳ | Remover scripts com credenciais fixas | Nenhuma senha literal operacional no repositório/histórico ativo |
 | SEC-010 | ⏳ | Rotacionar segredos potencialmente expostos | Service role, Gemini, SMTP, n8n e contas seed rotacionados |
 | SEC-011 | 🔄 | Corrigir sessão baseada em `localStorage` | Autenticação deriva de sessão Supabase válida e perfil reconsultado |
-| SEC-012 | ⏳ | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
+| SEC-012 | ✅ | Adicionar headers de segurança e CSP | Produção restringe scripts, frames e conexões externas |
 
 ## Fase 3 — Arquitetura multi-tenant
 
@@ -489,14 +486,13 @@ Regras obrigatórias:
 
 ## Próximas ações desbloqueáveis
 
-1. **DB-005:** executar os quatro diagnósticos no Supabase remoto;
+1. **DB-007:** consolidar a baseline reproduzível do schema remoto a partir dos diagnósticos já registrados;
 2. **ARC-006:** confirmar se o currículo será global ou isolado por empresa;
-3. **SEC-005/SEC-006:** retirar SMTP e relay público do frontend;
-4. **revisar e validar** as migrations e Edge Functions já iniciadas;
-5. a fundação independente `TEN-001` a `TEN-005` e `TEN-010` a `TEN-013` pode
-   ser preparada e revisada antes do baseline, mas só será aplicada em staging
-   após o preflight; `TEN-006` a `TEN-009` continuam bloqueados pelo diagnóstico
-   do schema legado.
+3. **SEC-005/SEC-006:** retirar o relay SMTP legado e exigir fluxo de e-mail server-side autenticado;
+4. **SEC-012:** concluir CSP depois de inventariar as origens externas realmente necessárias;
+5. **revisar e validar** as migrations e Edge Functions já iniciadas no projeto Supabase correto;
+6. confirmar o projeto Supabase de staging/produção antes de qualquer aplicação de migration;
+7. a fundação independente `TEN-001` a `TEN-005` e `TEN-010` a `TEN-013` pode ser preparada e revisada antes do baseline, mas `TEN-006` a `TEN-009` continuam dependentes da validação do schema legado.
 
 ---
 
@@ -676,3 +672,347 @@ Trabalho existente que precisa ser revisado e validado antes de receber status
 
 Esses itens permanecem `⚠️ Em revisão` ou `🔄 Em andamento` porque ainda não foram
 aplicados em um banco de staging nem validados com build/testes.
+
+
+## 2026-09-26 — Retomada de manutenção
+
+- Confirmado o repositório oficial: `ddfilho2-art/Daniel-Duarte-Granja-Filho`.
+- Confirmado que o documento oficial de acompanhamento é `docs/IMPLEMENTATION_PLAN.md`.
+- Corrigida a inconsistência documental que mantinha `DB-005` como bloqueio apesar do registro de 2026-08-08 informar sua conclusão.
+- Criada a branch `maintenance/recruta-ai-security-20260926` para retomada controlada.
+- `.env.example`: removida a variável `VITE_SUPABASE_SERVICE_ROLE_KEY`; segredos server-side passaram a ser explicitamente documentados sem prefixo `VITE_`.
+- `vercel.json`: adicionados headers HTTP básicos de segurança (`nosniff`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy` e HSTS).
+- Identificado `server.ts` como superfície legada de relay SMTP que aceita credenciais SMTP no payload; permanece pendente para remoção/migração sem quebrar o fluxo atual de `api/send-email.ts`.
+- Confirmado que a conexão Supabase atualmente disponível não corresponde ao banco legado documentado pelo projeto; nenhuma migration foi aplicada por esse motivo.
+
+
+### 2026-09-26 — SEC-005/SEC-006/SEC-012
+
+- `server.ts`: removida a rota Express legada `POST /api/send-email` que recebia credenciais SMTP no payload.
+- Removido `nodemailer` e seus tipos do `package.json` e `package-lock.json`.
+- `api/send-email.ts`: removido CORS curinga e o payload da fila passou a ser uma whitelist explícita (`to`, `subject`, `html`, `body`), evitando persistência acidental de credenciais SMTP enviadas por clientes legados.
+- `vercel.json`: headers de segurança básicos já adicionados; CSP permanece pendente até inventário das origens externas.
+- `SEC-006` concluído. `SEC-005` permanece dependente da confirmação/remoção de configurações SMTP legadas no banco. `SEC-012` permanece em andamento por causa da CSP.
+
+
+### 2026-09-26 — SEC-003/004
+
+- As rotas administrativas `api/admin-create-user.ts`, `api/admin-reset-password.ts` e `api/admin-update-user-email.ts` permanecem server-side e validam o Bearer token via Supabase Auth antes de executar operações privilegiadas com `service_role`.
+- O CORS dessas rotas deixou de aceitar `*`: agora só ecoa `Origin` quando coincide com `APP_URL`, mantendo `Vary: Origin`.
+- Isso reduz a superfície de abuso cross-origin sem alterar o fluxo same-origin da aplicação.
+- `SEC-003` e `SEC-004` continuam `🔄` porque a validação final do fluxo completo e a eliminação de qualquer operação administrativa direta remanescente no frontend ainda fazem parte da refatoração.
+
+### 2026-09-26 — SEC-012
+
+- Inventário do frontend não encontrou scripts, fontes ou frames de terceiros necessários ao runtime; a comunicação do navegador fica restrita ao próprio site e ao Supabase.
+- `vercel.json` passou a enviar CSP com `script-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, `form-action 'self'`, recursos de imagem limitados ao próprio site/Supabase e `connect-src` limitado ao próprio site/Supabase (HTTPS/WSS).
+- Resend permanece deliberadamente fora do `connect-src`: o navegador não deve falar diretamente com o provedor de e-mail.
+- `SEC-012` permanece `🔄 Em andamento` até validação em preview/produção e confirmação de que nenhum asset/integração legítima adicional é bloqueado.
+
+### 2026-09-26 — SEC-007
+
+- `api/cron/retry-emails.ts` valida `CRON_SECRET` no gatilho externo e encaminha o segredo ao processamento interno via `x-cron-secret`.
+- `api/retry-emails.ts` passou a fazer claim atômico por lease (`processing_token` + `processing_started_at`) antes de enviar cada mensagem; uma segunda execução concorrente não consegue assumir a mesma mensagem enquanto o lease estiver válido.
+- O lease expirado pode ser recuperado após 15 minutos, evitando mensagens presas indefinidamente por uma execução encerrada.
+- O envio ao Resend passou a usar uma `Idempotency-Key` estável derivada do `email_queue.id`, reduzindo o risco de duplicidade quando o worker cai depois que o provedor aceita a mensagem. O Resend mantém essas chaves por 24 horas. citeturn2search0turn2search3
+- Criada `supabase/migrations/20260926130000_email_queue_retry_claim.sql`, defensiva para não criar a estrutura se `public.email_queue` ainda não existir no ambiente alvo.
+- `SEC-007` permanece `🔄 Em andamento`: falta aplicar/replay da migration no banco correto e executar teste concorrente real. Nenhuma migration foi aplicada remotamente nesta retomada porque o projeto Supabase conectado não foi confirmado como o banco legado do Recruta AÍ.
+
+### 2026-09-26 — SEC-003/SEC-004 — endurecimento adicional do admin-users
+
+- `supabase/functions/admin-users/index.ts`: o cliente Supabase com `service_role` usado exclusivamente no backend agora desabilita `autoRefreshToken` e `persistSession`, evitando persistência/renovação de sessão em execução server-side.
+- Mantida a separação entre `userClient` (Bearer do operador, anon key) para autenticação/autorização e `adminClient` (service role) somente após autorização tenant-aware.
+- Nenhuma alteração foi aplicada remotamente no Supabase e nenhum deploy/merge foi executado nesta etapa.
+
+### 2026-09-26 — SEC-003/SEC-004 — alinhamento do admin-users com o frontend
+
+- `supabase/functions/admin-users/index.ts`: alinhadas as ações da Edge Function ao contrato efetivamente usado por `src/lib/admin-users.ts` e `src/pages/Admin.tsx`.
+- Adicionadas operações server-side para `reset_password` e `set_status`, sempre condicionadas à autorização tenant-aware e à existência do usuário em `tenant_memberships`.
+- A ação `update` passou a atualizar os dados do usuário RH e o e-mail do Auth no servidor.
+- A ação `create` passou a aceitar nome, login, e-mail e senha do fluxo atual e concluir a criação server-side, sem retornar service_role ao cliente.
+- O cliente frontend já existente usa `supabase.functions.invoke('admin-users')`; portanto o fluxo administrativo deixa de depender conceitualmente das três APIs Vercel legadas para essas ações.
+- Validação realizada por inspeção estática do contrato entre `src/lib/admin-users.ts`, `src/pages/Admin.tsx` e `admin-users/index.ts`. Build/execução remota ainda não foram realizados nesta etapa.
+
+### 2026-09-26 — SEC-003/SEC-004 — limite e validação do payload do admin-users
+
+- `supabase/functions/admin-users/index.ts`: substituída a leitura direta de `req.json()` pelo helper compartilhado `readJsonBody`.
+- O endpoint administrativo agora exige `application/json`, limita o corpo a 16 KiB e retorna `400`, `413` ou `415` conforme o erro de parsing/tamanho/media type.
+- A interface de request foi atualizada para refletir também `reset_password` e `set_status`; a resposta passou a declarar `code` usado pelo cliente.
+- Validação realizada por inspeção estática após o commit. Sem execução remota/build nesta etapa.
+
+
+### 2026-09-26 — SEC-003/SEC-004 — proteção contra reutilização de conta Auth na criação RH
+
+- `supabase/functions/admin-users/index.ts`: a ação `create` agora verifica previamente os usuários do Auth e rejeita e-mails já existentes com `EMAIL_ALREADY_EXISTS`.
+- Isso evita que o fluxo administrativo de criação reutilize uma conta Auth existente e, na sequência, altere sua senha/metadados.
+- Validação realizada por inspeção estática após o commit. Sem execução remota/build nesta etapa.
+### 2026-09-26 — SEC-004 — listagem de RH movida para o admin-users
+
+- `supabase/functions/admin-users/index.ts`: a ação `list` deixou de retornar somente `tenant_memberships` e passou a compor a resposta com os registros de `users` pertencentes ao tenant, restringindo o conjunto ao perfil `RH`.
+- A resposta preserva os campos usados pela tela administrativa e inclui `tenant_membership` como metadado server-side do vínculo.
+- A consulta é feita exclusivamente depois da validação do Bearer token e de `can_administer_tenant`, usando o `tenant_id` derivado do header validado.
+- Esta alteração prepara a remoção da consulta direta `.from("users")` da tela `AdminGestaoUsuarios`, eliminando mais uma leitura administrativa direta do frontend.
+- Validação realizada por inspeção estática do fluxo. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
+
+
+### 2026-09-26 — SEC-004 — remoção da leitura direta de usuários RH no frontend
+
+- `src/lib/admin-users.ts`: adicionada a ação `list` ao contrato do cliente e suporte ao campo `data` retornado pela Edge Function.
+- `src/pages/Admin.tsx`: `AdminGestaoUsuarios.fetchUsers()` deixou de consultar diretamente `users` com o cliente Supabase e passou a chamar `executeAdminUserAction({ action: "list" })`.
+- Com isso, a listagem administrativa de RH passa pelo mesmo fluxo server-side já usado para criar, editar, redefinir senha e alterar status.
+- O `x-tenant-id` continua sendo aplicado pelo `tenantAwareFetch` do cliente Supabase, derivado do `TenantContext`; a Edge Function valida esse tenant antes de consultar os dados com `service_role`.
+- Validação realizada por inspeção estática dos três pontos do fluxo: cliente, página e Edge Function. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
+
+
+
+
+
+### 2026-09-26 — SEC-004 — execução da transferência de vaga movida para fluxo server-side
+- **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/components/TransferOwnerModal.tsx`
+- **Ajuste:** a criação do histórico em `transferencias` e a atualização de `vagas` deixaram de ser executadas diretamente pelo frontend. O modal agora chama a ação `transfer` do `admin-users`.
+- **Proteções:** o servidor valida a vaga, o vínculo do proprietário atual com o tenant quando aplicável, o novo proprietário como membro ativo do tenant e como RH ativo. O identificador de quem executou a operação vem do token autenticado, não do payload do navegador.
+- **Resultado esperado:** retirar a escrita administrativa direta do cliente e concentrar autorização e persistência no servidor.
+- **Observação:** a operação ainda utiliza duas escritas sequenciais (histórico e vaga); atomicidade transacional poderá ser tratada em etapa própria após confirmação do modelo de dados.
+- **Validação:** inspeção estática do contrato cliente/Edge Function; sem alteração remota no Supabase, build ou deploy nesta etapa.
+
+### 2026-09-26 — SEC-004 — histórico de transferências movido para fluxo server-side
+- **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/components/TransferOwnerModal.tsx`
+- **Ajuste:** o histórico de transferências de uma vaga passou a ser obtido pela ação `transfer_history` do `admin-users`, em vez de consulta direta a `transferencias` pelo frontend.
+- **Proteção:** a Edge Function valida o tenant autorizado, verifica a existência da vaga e, quando há proprietário atual, confirma que ele pertence ao tenant antes de retornar o histórico.
+- **Resultado esperado:** retirar mais uma leitura administrativa privilegiada do cliente e manter a autorização centralizada no servidor.
+- **Validação:** inspeção estática do contrato cliente/Edge Function; sem alteração remota no Supabase, build ou deploy nesta etapa.
+
+### 2026-09-26 — SEC-004 — remoção da leitura direta de RH no modal de transferência
+- **Arquivo:** `src/components/TransferOwnerModal.tsx`
+- **Ajuste:** a lista de usuários RH ativos usada para transferência de vagas deixou de consultar diretamente `users` pelo frontend e passou a usar `executeAdminUserAction({ action: "list" })`.
+- **Resultado esperado:** centralizar também esse ponto de leitura administrativa no fluxo server-side do `admin-users`, mantendo a filtragem visual de RH ativo e exclusão do proprietário atual no cliente.
+- **Validação:** inspeção estática do contrato entre cliente e Edge Function; nenhuma alteração remota no Supabase, build ou deploy nesta etapa.
+
+### 2026-09-26 — SEC-004 — remoção da segunda leitura direta de RH no dashboard
+
+- `src/pages/Admin.tsx`: o cálculo de carga de trabalho deixou de consultar diretamente `users` para obter os RH ativos.
+- O dashboard agora reutiliza `executeAdminUserAction({ action: "list" })`, mantendo a listagem de RH dentro do fluxo server-side tenant-aware já criado.
+- O filtro `status === "Ativo"` continua sendo aplicado no frontend apenas para o cálculo visual da carga; a origem dos usuários passa pela autorização do `admin-users`.
+- A consulta de vagas abertas permanece separada, pois envolve outro domínio de dados e exige avaliação própria de escopo/tenant antes de ser migrada.
+- Validação realizada por inspeção estática. Nenhuma chamada ao Supabase remoto, deploy ou merge foi executada.
+
+
+### 2026-09-26 — SEC-004 — retorno automático de transferência movido para fluxo server-side
+
+- **Arquivos:** `supabase/functions/admin-users/index.ts`, `src/lib/admin-users.ts`, `src/pages/Admin.tsx`
+- **Ajuste:** o retorno automático de uma transferência temporária deixou de atualizar `vagas` e inserir `transferencias` diretamente pelo navegador; a tela agora chama a ação server-side `auto_return`.
+- **Proteções:** o servidor valida a vaga, confirma o vínculo do proprietário atual quando existente e exige que o proprietário original pertença ao tenant autorizado antes de restaurar a propriedade.
+- **Identidade:** o histórico usa o usuário autenticado como `executado_por_id`; o cliente não pode mais informar arbitrariamente esse identificador.
+- **Resultado esperado:** eliminar mais uma escrita administrativa privilegiada direta do frontend e manter a persistência da transferência no `admin-users`.
+- **Validação:** inspeção estática do contrato cliente/Edge Function e confirmação de que o bloco de retorno do frontend não contém mais escrita direta em `vagas`/`transferencias`. Nenhuma alteração remota no Supabase, build ou deploy foi executada.
+- **Pendência:** assim como a transferência normal, histórico e atualização da vaga continuam sendo duas escritas sequenciais; atomicidade transacional permanece pendente de entendimento do modelo de dados.
+
+
+### 2026-09-26 — SEC-004 — reforço de isolamento por tenant nas transferências
+
+- **Arquivo:** `supabase/functions/admin-users/index.ts`
+- **Ajuste:** as operações `transfer_history`, `transfer` e `auto_return` passaram a validar explicitamente `vagas.tenant_id === tenantId` antes de qualquer leitura operacional.
+- **Histórico:** `transferencias` agora é consultada com filtro explícito de `tenant_id`.
+- **Persistência:** novas linhas de histórico de transferência passam a receber o `tenant_id` autenticado/autorizado pelo servidor, evitando que uma operação privilegiada crie registro sem vínculo de tenant.
+- **Validação:** inspeção estática confirmou os filtros e os três caminhos de persistência. Nenhuma alteração remota no Supabase foi executada.
+- **Resultado:** o fluxo administrativo de transferências fica mais consistente com as políticas multi-tenant já previstas nas migrations do repositório.
+
+
+### 2026-09-26 — SEC-005/SEC-006 — remoção das credenciais de transporte de e-mail da configuração administrativa
+
+- **Arquivo:** `src/pages/AdminConfiguracoes.tsx`
+- **Ajuste:** a tela administrativa deixou de exibir e armazenar campos de credenciais de transporte de e-mail no estado/configuração do navegador.
+- **Teste de e-mail:** o botão de teste agora envia somente `to`, assunto e corpo para `/api/send-email`; não envia configuração de transporte pelo navegador.
+- **Interface:** a aba foi renomeada para serviço de e-mail e passa a informar que API key, remetente e credenciais permanecem exclusivamente no backend.
+- **Resultado:** elimina da interface administrativa a antiga superfície de configuração de credenciais SMTP e alinha o teste com o relay server-side protegido já implementado.
+- **Validação:** inspeção estática confirmou ausência de referências aos campos antigos e ausência de `smtpConfig` no payload do teste. Nenhuma alteração remota no Supabase, build ou deploy foi executada.
+- **Pendência:** a tabela `settings` ainda possui fluxo de persistência legado para demais configurações; a remoção/limpeza definitiva de registros antigos de credenciais depende da estratégia de dados e será tratada separadamente.
+
+
+### 2026-09-26 — DB-007 — criação do projeto Supabase remoto e aplicação do primeiro lote de migrations
+
+- **Projeto:** Supabase `Recruta AÍ` — ref `dmzagrakkduddofkqjhg` — região `sa-east-1`.
+- **Ajuste remoto:** projeto novo criado na organização `wqhcrrbkkfyibzelpnxk`; banco inicialmente vazio.
+- **Migrations aplicadas:** primeiro lote histórico, da `20260423170831_d6090254-9aed-463b-9e68-2e0e9b516b73` até `20260426001601_7cb4f188-57c7-4b50-9ea5-f888ee9603f5`, total de 8 migrations.
+- **Validação:** `list_migrations` confirmou as 8 execuções remotas com sucesso.
+- **Observação:** o mecanismo remoto registra a versão pela data/hora de execução, preservando o nome da migration; portanto a versão remota não replica literalmente o timestamp do arquivo Git.
+- **Próximo passo:** continuar a aplicação cronológica das migrations restantes e validar o schema antes do deploy das Edge Functions.
+
+
+### 2026-09-26 — DB-007 — segundo lote de migrations aplicado e validado
+
+- **Migrations aplicadas:** da `20260427095220_f93e18c0-1831-4f1e-891b-8d963cedf41e` até `20260528101500_complete_operational_schema_hardening`, total de 8 migrations adicionais.
+- **Escopo:** catálogos, integrações, eventos de instância, grupos, códigos de instância, versionamento de processos e hardening operacional/RLS.
+- **Validação:** `list_migrations` confirmou 16 migrations remotas no projeto novo, todas com execução registrada.
+- **Próximo passo:** aplicar o lote de segurança/multi-tenant e, em seguida, validar as tabelas e políticas antes das Edge Functions.
+
+
+### 2026-09-26 — DB-007 — bloqueio identificado na baseline legada do Recruta AÍ
+
+- **Migration executada:** `20260808100000_legacy_recruitment_tenant_bridge`.
+- **Resultado:** interrompida de forma segura porque o novo projeto não possui `public.vagas`; as migrations versionadas anteriores também não criam o conjunto legado de recrutamento.
+- **Diagnóstico:** o próprio `docs/DATABASE_DISCOVERY.md` registra que `users`, `vagas`, `candidaturas`, `mensagens`, `settings`, `logs`, `provas`, `analise_ia_candidato` e outros objetos pertenciam ao schema remoto anterior e não foram versionados como baseline.
+- **Decisão:** não criar tabelas por inferência. O schema de recrutamento precisa de uma baseline declarativa fiel antes de aplicar RLS, RPCs, backfill e as migrations finais.
+- **Estado remoto:** 24 migrations registradas com sucesso; a 25ª não foi registrada/aplicada integralmente. Nenhum dado de negócio foi inserido no novo projeto.
+- **Validação adicional:** inventário remoto confirmou que o projeto novo contém a fundação BPM/operacional e as tabelas multi-tenant/saúde ocupacional, mas não o legado de recrutamento.
+- **Próximo passo obrigatório:** obter/reconstruir a baseline real das tabelas legadas (colunas, tipos, constraints, índices, triggers e views) antes de continuar. Edge Functions administrativas não serão publicadas como “prontas” enquanto esse contrato de banco estiver ausente.
+
+### 2026-09-26 — DB-007 — baseline legada recuperada do histórico e aplicada
+- **Implementado:** recuperada do Git histórico a supabase_setup.sql original (commit 642b5f84e09b5b3a5ea042e936188e507bfe7a77) e o trigger create_user_trigger.sql; criada a migration versionada 20260926140000_legacy_recruitment_baseline.sql na branch de manutenção.
+- **Ajuste de compatibilidade:** a tabela public.configuracoes já existia na fundação operacional com contrato diferente; a baseline foi tornada condicional para preservar o schema existente, sem inventar colunas legadas.
+- **Validado:** migration 20260926140000_legacy_recruitment_baseline aplicada com sucesso no projeto dmzagrakkduddofkqjhg; 17 tabelas legadas esperadas estão presentes, sem carga de dados de negócio.
+- **Próximo passo:** aplicar a bridge de tenancy 20260808100000_legacy_recruitment_tenant_bridge.sql e deixar o próprio banco revelar eventuais incompatibilidades contratuais antes das demais migrations.
+
+### 2026-09-26 — DB-007 — bridge e backfill de tenancy ajustados e aplicados
+- **Implementado:** corrigida a bridge para não comentar colunas de tabelas legadas opcionais ausentes; aplicada com sucesso.
+- **Implementado:** ajustada a integração RLS legada para operar sobre as tabelas realmente recuperadas, removendo dependências incondicionais de tabelas sem baseline e eliminando CHECKs inválidos com subconsultas.
+- **Implementado:** ajustado o backfill de tenant para projeto novo sem tenants e para tabelas opcionais ausentes; removida a instrução PostgreSQL inválida de COMMENT ON migration.
+- **Validado:** migrations 20260808100000, 20260809010000 e 20260809020000 aplicadas com sucesso no projeto dmzagrakkduddofkqjhg. O banco continua sem dados de negócio; o backfill permanece sem atribuição de tenant enquanto não houver tenant provisionado.
+- **Próximo passo:** aplicar e validar as migrations seguintes de backfill/RLS e, se necessário, corrigir somente incompatibilidades comprovadas pelo schema recuperado.
+
+### 2026-09-26 — DB-007 — backfill/RLS legados concluídos no schema recuperado
+- **Implementado:** migration de backfill 20260811110000 ajustada para projeto novo sem root tenant; quando não há tenant, a operação é explicitamente adiada, sem criar empresa fictícia.
+- **Implementado:** migration RLS 20260811120000 ajustada para usar os nomes reais da baseline na view pública (`local` → `localizacao` e `atualizado_em` → `updated_at`).
+- **Validado:** migrations 20260811110000 e 20260811120000 aplicadas com sucesso. O banco segue sem tenant e sem dados de negócio; as tabelas legadas críticas permanecem vazias.
+- **Próximo passo:** aplicar o hardening final da fila de e-mail e executar a validação estrutural completa do Supabase (migrations, RLS/policies, views, funções e advisors).
+
+### 2026-09-26 — SEC-008 — hardening estrutural da baseline recuperada
+- **Implementado:** RLS habilitado nas tabelas legadas recuperadas que estavam expostas sem proteção; políticas adicionadas para candidatos, histórico de processo, resultados de prova, catálogos, transferências, visualizações RH e banco de talentos.
+- **Implementado:** view public.vagas_publica ajustada para `security_invoker=true`; acesso anônimo limitado a vagas abertas; função trigger-only handle_new_user deixou de ser executável pela API.
+- **Implementado:** processo_instancia_counters passou a ficar inacessível para anon/authenticated, preservando uso interno/service_role.
+- **Validado:** 18 tabelas legadas/relacionadas verificadas com RLS habilitado; a view pública está com security_invoker=true; não há usuários, vagas, candidatos, candidaturas, mensagens ou provas no projeto. Permanecem apenas as configurações padrão da baseline (1 settings, 2 configuracoes) e nenhum tenant.
+- **Advisors:** os erros críticos de RLS desabilitado nas tabelas recuperadas e de security-definer view foram eliminados. Permanecem avisos de funções SECURITY DEFINER da fundação operacional e otimizações/performance que exigem avaliação por contrato, não correção cega.
+- **Bloqueio funcional restante:** a baseline histórica recuperada não contém as tabelas opcionais `candidatura_historico`, `analise_ia_candidato`, `provas_versoes`, `transferencias`, `unidades_negocio` e `email_queue`. As migrations agora tratam essas estruturas como opcionais, mas as funcionalidades que dependem delas ainda não devem ser declaradas prontas até a recuperação de seus schemas reais.
+
+### 2026-09-26 — EDGE-001 — Edge Functions publicadas no novo Supabase
+- **Implementado:** `admin-users` publicada na versão 2 com JWT obrigatório e import map explícito para o helper compartilhado; `candidate-analysis` publicada na versão 1 com JWT obrigatório; `email-verification` publicada na versão 1 com JWT desabilitado conforme contrato existente de autenticação própria; `storage-authorize` publicada na versão 1 com JWT obrigatório.
+- **Implementado no repositório:** normalizado o import de `admin-users` para `shared/http.ts` e adicionada configuração `supabase/functions/admin-users/deno.json`, sem duplicar o helper de segurança.
+- **Bloqueio:** `tenant-provisioning` não foi publicado nesta tentativa porque o conector bloqueou a operação; nenhuma alteração de código foi feita para contornar o bloqueio. Deve ser retomado separadamente.
+- **Validação:** projeto `dmzagrakkduddofkqjhg` agora lista 4 Edge Functions ativas. Nenhuma secret foi inventada/configurada; funções que dependem de `GEMINI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `TURNSTILE_SECRET_KEY`, `EMAIL_VERIFICATION_PEPPER` ou `ALLOWED_ORIGINS` continuam aguardando configuração real.
+- **Bloqueio funcional mantido:** schemas opcionais `candidatura_historico`, `analise_ia_candidato`, `provas_versoes`, `transferencias`, `unidades_negocio` e `email_queue` não foram inventados. A busca no histórico Git e na Library não encontrou uma definição SQL confiável para eles.
+
+
+### 2026-09-27 — EDGE-001 — desbloqueio do tenant-provisioning por import map
+- **Implementado:** criado `supabase/functions/tenant-provisioning/deno.json` na branch de manutenção, mapeando `shared/` para `../_shared/`.
+- **Motivo:** a Function importa `shared/http.ts`, mas não possuía import map declarativo; a tentativa de publicação foi rejeitada pelo conector por essa inconsistência de empacotamento.
+- **Validação:** arquivo criado no commit `4e551149bc40794d98395cb90ad20d69ac1a5ae1`. A publicação remota ainda será validada separadamente.
+
+
+### 2026-09-27 — EDGE-001 — tenant-provisioning publicada e validada
+- **Implementado:** `tenant-provisioning` publicada no Supabase `dmzagrakkduddofkqjhg` com JWT obrigatório e import map ativo.
+- **Validação remota:** Function `tenant-provisioning` está `ACTIVE`, versão 1, `verify_jwt=true` e `import_map=true`.
+- **Resultado:** as 5 Edge Functions previstas nesta etapa agora estão publicadas no projeto novo: `admin-users`, `candidate-analysis`, `email-verification`, `storage-authorize` e `tenant-provisioning`.
+- **Pendência:** secrets reais e teste funcional autenticado continuam necessários; nenhuma credencial foi inventada ou configurada.
+
+
+### 2026-09-27 — EDGE-002 — contrato remoto de provisionamento validado; secrets pendentes
+- **Validado no banco:** `provision_tenant(uuid, tenant_kind, text, text, text, text, uuid)` existe; `tenants`, `tenant_memberships` e `tenant_audit_logs` existem; o projeto permanece sem tenants e sem `platform_user_roles`.
+- **Validação de segurança:** não foi criado tenant, usuário administrativo ou role fictícia apenas para teste.
+- **Bloqueio externo:** o conjunto atual de ferramentas conectadas não expõe operação para cadastrar/rotacionar secrets das Edge Functions. Portanto `ALLOWED_ORIGINS`, `GEMINI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_VERIFICATION_PEPPER` e eventual `TURNSTILE_SECRET_KEY` continuam sem valores configurados pelo agente.
+- **Próximo passo:** configurar esses secrets no projeto Supabase e então executar smoke tests autenticados; depois recuperar/reconstruir somente os seis schemas opcionais ainda ausentes.
+
+
+### 2026-09-27 — DB-007 — recuperação contratual de duas estruturas opcionais comprováveis
+- **Implementado no repositório:** criada `supabase/migrations/20260927100000_recover_proven_optional_contracts.sql` para `email_queue` e `analise_ia_candidato`.
+- **Base documental:** `email_queue` é consumida por `api/send-email.ts` e `api/retry-emails.ts`; `analise_ia_candidato` é consumida por `supabase/functions/candidate-analysis/index.ts`. Os tipos das chaves legadas foram alinhados à baseline real (`text`).
+- **Hardening:** ambas as tabelas têm RLS habilitado e acesso direto revogado para `public`, `anon` e `authenticated`; somente `service_role` recebe acesso direto, coerente com os consumidores server-side atuais.
+- **Validado no Supabase:** migration aplicada com sucesso no projeto `dmzagrakkduddofkqjhg`.
+- **Pendência:** quatro estruturas opcionais (`candidatura_historico`, `provas_versoes`, `transferencias`, `unidades_negocio`) ainda não têm contrato histórico comprovado e permanecem sem criação.
+
+
+### 2026-09-27 — DB-007 — validação estrutural das duas estruturas recuperadas
+- **Validado:** `email_queue` e `analise_ia_candidato` existem no projeto remoto com as colunas necessárias aos consumidores atuais.
+- **Segurança:** ambas permanecem sem acesso direto para `anon`/`authenticated`; o advisor reporta apenas o aviso informativo `rls_enabled_no_policy`, coerente com o desenho server-side/service-role.
+- **Sem carga:** nenhuma linha de fila ou análise foi criada durante o teste.
+- **Pendência mantida:** não foram criadas as quatro estruturas cujo contrato histórico ainda não foi comprovado.
+
+
+### 2026-09-27 — EDGE-003 — hardening da candidate-analysis
+
+- **Implementado no repositório:** `supabase/functions/candidate-analysis/index.ts` deixou de declarar `Access-Control-Allow-Origin: *` e passou a usar `shared/http.ts` para CORS e respostas JSON.
+- **Implementado no repositório:** criado `supabase/functions/candidate-analysis/deno.json` para mapear `shared/` para `../_shared/`.
+- **Hardening adicional:** o parser manual de `req.json()` foi substituído por `readJsonBody`, herdando limite de tamanho, exigência de `application/json` e validação de objeto.
+- **Validado remotamente:** `candidate-analysis` está `ACTIVE`, versão 2, com `verify_jwt=true` e `import_map=true` no projeto `dmzagrakkduddofkqjhg`.
+- **Resultado:** a Function não usa mais CORS wildcard; respostas e preflight passam pelo contrato compartilhado de segurança.
+- **Pendência:** `ALLOWED_ORIGINS` ainda precisa receber valor real no ambiente Supabase; sem esse secret/configuração, chamadas cross-origin não serão liberadas. Nenhum valor foi inventado.
+- **Próximo passo:** investigar individualmente `candidatura_historico`, `provas_versoes`, `transferencias` e `unidades_negocio` somente por consumidores/contratos comprováveis no histórico do repositório.
+
+
+### 2026-09-27 — DB-007 — recuperação contratual de transferencias
+
+- **Implementado no repositório:** criada `supabase/migrations/20260927110000_recover_transferencias_runtime_contract.sql`.
+- **Base contratual:** a Edge Function `admin-users` lê `transferencias` por `vaga_id` + `tenant_id` e grava dois formatos explícitos de histórico: transferência normal/temporária e retorno automático.
+- **Campos recuperados:** tenant, vaga, datas, tipo, proprietários anterior/novo, justificativa, operador, dados de ausência/desligamento e campos legados de retorno automático efetivamente usados pelo consumidor.
+- **Hardening:** RLS habilitado; acesso direto revogado para `public`, `anon` e `authenticated`; somente `service_role` possui acesso direto.
+- **Validado no Supabase:** migration aplicada; tabela existe com o contrato utilizado pela Function; RLS está habilitado; tabela permanece com 0 linhas.
+- **Pendência:** `candidatura_historico`, `provas_versoes` e `unidades_negocio` continuam sem consumidor/contrato comprovável e não serão criadas por inferência.
+
+
+### 2026-09-27 — SEC-013 — hardening de funções SECURITY DEFINER e search_path
+
+- **Implementado no Supabase:** `normalize_prefixo_instancia` e `generate_codigo_instancia` passaram a declarar `search_path = public, pg_temp`.
+- **Implementado no Supabase:** execução anônima foi removida de helpers privilegiados (`can_administer_tenant`, `has_tenant_role`, `is_platform_master_admin`, `is_tenant_member`, `has_role`, `is_member_of`, `is_member_of_text`).
+- **Implementado no Supabase:** `validate_tenant_admin_delegation()` ficou restrita ao uso interno de trigger, sem EXECUTE para `public`, `anon` ou `authenticated`.
+- **Implementado no repositório:** migrations `20260927120000`, `20260927123000` e `20260927124000` registram exatamente as alterações aplicadas.
+- **Validado:** o advisor eliminou o aviso de `function_search_path_mutable`.
+- **Validado:** o aviso de `anon_security_definer_function_executable` caiu de 9 para 1. O único restante é `get_public_tenant_context(p_slug)`, mantido intencionalmente público porque a aplicação precisa resolver branding/contexto de uma empresa antes do login.
+- **Observação:** permanecem avisos para funções SECURITY DEFINER chamadas por usuários autenticados. Elas são usadas como RPCs de autorização/fluxos médicos e não foram convertidas cegamente para INVOKER; a próxima revisão deve verificar cada contrato de autorização antes de restringir execução.
+- **RLS:** os 12 avisos `rls_enabled_no_policy` são de tabelas deliberadamente server-side/service-role ou ainda sem política cliente definida; não foram mascarados com policies permissivas.
+
+
+### 2026-09-27 — SEC-014 — isolamento tenant da RPC de atualização de candidatura
+
+- **Problema identificado:** `rpc_atualizar_candidatura_processo` exigia apenas `legacy_has_privileged_role()`. Isso validava que o usuário era Admin/RH legado, mas não garantia que a candidatura pertencia ao tenant atual.
+- **Correção aplicada no Supabase:** a RPC agora resolve o `tenant_id` através de `candidaturas -> vagas`, exige que esse tenant seja o `current_tenant_id()` e valida `tenant_admin`, `tenant_admin_substitute`, `hr` ou `platform_master_admin`.
+- **Hardening mantido:** `SECURITY DEFINER` continua com `search_path = public, pg_temp`; execução anônima permanece bloqueada.
+- **Validado:** definição remota contém a checagem de tenant; `anon_execute=false` e `authenticated_execute=true`.
+- **Implementado no repositório:** migration `20260927130000_rpc_candidatura_tenant_isolation.sql`.
+- **Impacto:** uma conta Admin/RH de outro tenant não consegue mais usar essa RPC para alterar candidatura fora do próprio contexto autorizado.
+
+
+### 2026-09-27 — SEC-015 — revisão das RPCs SECURITY DEFINER autenticadas
+
+- **Revisão executada:** RPCs privilegiadas com `actor_id`, `tenant_id`, operações de IA, branding, provisionamento e fluxo ocupacional.
+- **Resultado:** não foi aplicada alteração adicional nesta rodada porque os contratos inspecionados já possuem validação de ator/tenant apropriada ou são funções internas sem `EXECUTE` para `authenticated`.
+- **IA:** `claim_ai_analysis_request` e `complete_ai_analysis_request` não são executáveis por `authenticated`; permanecem protegidas para uso server-side.
+- **Branding/provisionamento:** `create_tenant_branding_draft`, `publish_tenant_branding` e `provision_tenant` não são executáveis por `authenticated` diretamente e validam `platform_master_admin` quando executadas pelo backend.
+- **Saúde ocupacional:** funções de leitura/escrita revisadas usam `auth.uid()`, tenant atual, membership/role ou vínculo de clínica antes de acessar/alterar dados.
+- **Infra:** `get_infra_usage()` exige `legacy_has_privileged_role()`; não foi encontrado uso no código pesquisável do repositório padrão, mas não será revogado sem confirmação do branch de manutenção.
+- **Advisor:** permanece 1 alerta anônimo intencional (`get_public_tenant_context`) e 21 alertas de SECURITY DEFINER executáveis por `authenticated`; estes últimos são candidatos a revisão de contrato/uso, não correções automáticas.
+- **Conclusão:** o único bypass concreto identificado nesta etapa foi o da RPC de candidatura, corrigido em SEC-014. Não houve nova mudança remota neste SEC-015.
+
+
+## 2026-09-27 — SEC-016 — vínculo do ator nas RPCs de branding
+
+- **Implementado:** endurecidas as funções `public.create_tenant_branding_draft(uuid, uuid, jsonb, text)` e `public.publish_tenant_branding(uuid, uuid, uuid, text)` para exigir usuário autenticado e `p_actor_id = auth.uid()` antes da checagem de `platform_master_admin`.
+- **Risco corrigido:** um cliente autenticado podia informar o UUID de outro usuário Master Admin como `p_actor_id`; a função validava o UUID informado, não a identidade da sessão.
+- **Implementado:** restauração explícita de `EXECUTE` para `authenticated` após o `CREATE OR REPLACE`, preservando o fluxo legítimo do editor de identidade visual.
+- **Validado remotamente:** ambas as funções permanecem `SECURITY DEFINER`, contêm o vínculo `p_actor_id is distinct from auth.uid()` e possuem `EXECUTE` para `authenticated` e `service_role`.
+- **Migrations remotas:** `20260927140000_branding_rpc_actor_binding` e `20260927140100_branding_rpc_authenticated_grant`, ambas aplicadas com sucesso.
+- **Repositório:** migrations registradas na branch maintenance/recruta-ai-security-20260926.
+
+
+## 2026-09-27 — SEC-017 — isolamento do monitoramento e retry da fila de e-mails
+
+- **Problema identificado:** `PerformanceSRE.tsx` consultava `email_queue` diretamente pelo cliente Supabase, mas a tabela foi corretamente endurecida como service-role-only. O mesmo componente tentava chamar `POST /api/retry-emails` sem o `CRON_SECRET`, que é segredo de servidor.
+- **Correção implementada:** criada `api/email-monitor.ts`, com autenticação por Bearer token, validação da sessão e verificação do usuário em `public.users` como perfil `admin` ou `rh` ativo antes de consultar a fila via service role.
+- **Minimização de dados:** o endpoint retorna somente os campos necessários ao monitor e reduz o `payload` para `to` e `subject`; o acesso direto à `email_queue` continua bloqueado para `anon`/`authenticated`.
+- **Correção implementada:** `PerformanceSRE.tsx` deixou de consultar `email_queue` diretamente e passou a consumir `/api/email-monitor`; o retry agora obtém o access token da sessão Supabase e o envia em `Authorization: Bearer ...`.
+- **Correção implementada:** `api/retry-emails.ts` passou a aceitar, além do fluxo protegido por `x-cron-secret` usado pelo cron, uma sessão Bearer de usuário autenticado com perfil `admin`/`rh` ativo. O segredo do cron continua exclusivamente server-side.
+- **Validação de segurança:** o backend valida a sessão antes de consultar `users`/`email_queue`; nenhuma credencial de service role ou `CRON_SECRET` foi exposta no frontend.
+- **Validação de compatibilidade:** o contrato atual de `email_queue` permanece inalterado e o processamento automático via cron continua usando o caminho de `CRON_SECRET`.
+- **Repositório:** `api/email-monitor.ts`, `api/retry-emails.ts` e `src/components/PerformanceSRE.tsx` atualizados na branch `maintenance/recruta-ai-security-20260926`.
+- **Não realizado:** deploy/merge não foram executados; a branch continua isolada para validação posterior.
+
+- **Ajuste complementar validado:** o botão de retry agora trata explicitamente respostas HTTP não-2xx do endpoint protegido e usa os campos reais `successCount`/`failCount` retornados pelo backend, evitando falso sucesso na interface.
+
+
+## 2026-09-27 — SEC-018 — isolamento e contrato do candidate-analysis
+
+- **Problema identificado:** o frontend enviava `candidatoId`/`vagaId`, enquanto a Edge Function exigia `candidato_id`/`vaga_id`; além disso, a Function executava `get_current_tenant_access()` através do cliente service-role sem repassar o JWT do usuário, o que não preservava corretamente o contexto de sessão usado pela RPC.
+- **Correção implementada:** o frontend passou a enviar os nomes de campos compatíveis com o contrato da Function.
+- **Correção implementada:** criada uma instância Supabase com a chave pública e o Bearer do usuário para executar `get_current_tenant_access`, mantendo o cliente service-role separado para operações internas.
+- **Correção implementada:** a autorização agora exige uma `candidatura` pertencente ao mesmo `tenant_id`, `vaga_id` e `candidato_id` solicitados; a análise passa a registrar também o `candidatura_id` validado.
+- **Risco corrigido:** reduzida a possibilidade de criar análises associadas a uma vaga/tenant sem uma candidatura correspondente e corrigido o uso incorreto do contexto de autenticação na RPC de autorização.
+- **Validação de código:** confirmados payload `candidato_id`/`vaga_id`, cliente autenticado para `get_current_tenant_access`, validação tenant/vaga/candidato/candidatura e vínculo `candidatura_id` no insert.
+- **Não realizado:** a Edge Function não foi implantada nesta etapa; deploy/cutover continuam fora do escopo sem autorização explícita.

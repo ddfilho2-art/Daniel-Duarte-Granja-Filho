@@ -119,23 +119,24 @@ export function AdminDashboard() {
         };
 
         const fetchCargaTrabalho = async () => {
-          const [vagasRes, usersRes] = await Promise.all([
+          const [vagasRes, usersResponse] = await Promise.all([
             supabase.from("vagas").select("owner_nome").eq("status", "Aberta"),
-            supabase
-              .from("users")
-              .select("nome")
-              .eq("perfil", "RH")
-              .eq("status", "Ativo"),
+            executeAdminUserAction({ action: "list" }),
           ]);
 
           if (vagasRes.error) throw vagasRes.error;
-          if (usersRes.error) throw usersRes.error;
 
-          const rhUsers = usersRes.data || [];
+          const rhUsers = Array.isArray(usersResponse.data)
+            ? usersResponse.data.filter(
+                (user: any) => user?.status === "Ativo",
+              )
+            : [];
           const cargaTrabalhoMap: { [key: string]: number } = {};
 
-          rhUsers.forEach((user) => {
-            cargaTrabalhoMap[user.nome] = 0;
+          rhUsers.forEach((user: any) => {
+            if (user?.nome) {
+              cargaTrabalhoMap[user.nome] = 0;
+            }
           });
 
           (vagasRes.data || []).forEach((v: any) => {
@@ -574,39 +575,12 @@ export function AdminTransferencias() {
     try {
       setIsProcessingReturn(true);
 
-      const { error: updateError } = await supabase
-        .from("vagas")
-        .update({
-          owner_id: vaga.transferencia_temporaria.original_owner_id || null,
-          owner_nome:
-            vaga.transferencia_temporaria.original_owner_nome ||
-            "Sem proprietário",
-          transferencia_ativa: false,
-          transferencia_tipo: null, // Limpa o tipo ao retornar ao original
-          transferencia_temporaria: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", vaga.id);
-
-      if (updateError) throw updateError;
-
-      const { error: logError } = await supabase.from("transferencias").insert({
+      const { error } = await executeAdminUserAction({
+        action: "auto_return",
         vaga_id: vaga.id,
-        tipo: "Retorno Automático",
-        data_execucao: new Date().toISOString(),
-        novo_owner_id: vaga.transferencia_temporaria.original_owner_id || null,
-        novo_owner_nome:
-          vaga.transferencia_temporaria.original_owner_nome ||
-          "Sem proprietário",
-        prev_owner_id: vaga.owner_id || null,
-        prev_owner_nome: vaga.owner_nome || "Sem proprietário",
-        justificativa:
-          "Retorno automático de propriedade após o término do período de ausência temporária.",
-        executado_por: "Sistema (Auto-retorno)",
-        executado_por_id: "system",
       });
 
-      if (logError) throw logError;
+      if (error) throw new Error(error);
 
       await logAudit(
         "Retorno Automático de Proprietário",
@@ -845,16 +819,11 @@ export function AdminGestaoUsuarios() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .eq("perfil", "RH")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setUsers(data || []);
+      const response = await executeAdminUserAction({ action: "list" });
+      const data = Array.isArray(response.data) ? response.data : [];
+      setUsers(data as any[]);
     } catch (err) {
-      console.error("Erro ao buscar usuários:", err);
+      console.error("Erro ao buscar usuários RH:", err);
     } finally {
       setLoading(false);
     }

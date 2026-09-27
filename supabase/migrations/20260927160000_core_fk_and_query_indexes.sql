@@ -1,0 +1,45 @@
+-- Core relational indexes for the main recruitment and workflow paths.
+-- Targets FK columns used for entity traversal without removing existing indexes.
+
+create index if not exists idx_candidaturas_vaga_id on public.candidaturas (vaga_id);
+create index if not exists idx_candidaturas_candidato_id on public.candidaturas (candidato_id);
+create index if not exists idx_fases_processo_candidatura_id on public.fases_processo (candidatura_id);
+create index if not exists idx_resultados_provas_vaga_id on public.resultados_provas (vaga_id);
+create index if not exists idx_resultados_provas_candidatura_id on public.resultados_provas (candidatura_id);
+create index if not exists idx_resultados_provas_prova_id on public.resultados_provas (prova_id);
+create index if not exists idx_candidatura_eventos_candidatura_id on public.candidatura_eventos (candidatura_id);
+create index if not exists idx_mensagens_candidatura_id on public.mensagens (candidatura_id);
+create index if not exists idx_mensagens_vaga_id on public.mensagens (vaga_id);
+create index if not exists idx_vagas_proprietario_id on public.vagas (proprietario_id);
+create index if not exists idx_profiles_gestor_id on public.profiles (gestor_id);
+create index if not exists idx_transferencias_vaga_id on public.transferencias (vaga_id);
+create index if not exists idx_transferencias_proprietario_vaga_id on public.transferencias_proprietario (vaga_id);
+create index if not exists idx_transferencias_proprietario_anterior_id on public.transferencias_proprietario (proprietario_anterior_id);
+create index if not exists idx_transferencias_proprietario_novo_id on public.transferencias_proprietario (novo_proprietario_id);
+create index if not exists idx_tenant_audit_logs_actor_id on public.tenant_audit_logs (actor_id);
+create index if not exists idx_medical_referral_messages_sender_id on public.medical_referral_messages (sender_id);
+create index if not exists idx_medical_referral_attachments_sender_id on public.medical_referral_attachments (sender_id);
+create index if not exists idx_occupational_health_contracts_created_by on public.occupational_health_contracts (created_by);
+create index if not exists idx_tenant_memberships_invited_by on public.tenant_memberships (invited_by);
+create index if not exists idx_tenant_admin_delegations_created_by on public.tenant_admin_delegations (created_by);
+create index if not exists idx_tenant_admin_delegations_primary_admin on public.tenant_admin_delegations (primary_admin_user_id);
+create index if not exists idx_platform_user_roles_granted_by on public.platform_user_roles (granted_by);
+create index if not exists idx_platform_user_roles_revoked_by on public.platform_user_roles (revoked_by);
+create index if not exists idx_tenant_branding_versions_created_by on public.tenant_branding_versions (created_by);
+create index if not exists idx_tenant_branding_versions_published_by on public.tenant_branding_versions (published_by);
+create index if not exists idx_tenants_created_by on public.tenants (created_by);
+create index if not exists idx_tenants_published_branding on public.tenants (published_branding_id);
+create index if not exists idx_medical_referrals_contract_id on public.medical_referrals (contract_id);
+create index if not exists idx_medical_referrals_referred_by on public.medical_referrals (referred_by);
+create index if not exists idx_medical_referrals_result_reported_by on public.medical_referrals (result_reported_by);
+create index if not exists idx_medical_referrals_cancelled_by on public.medical_referrals (cancelled_by);
+create index if not exists idx_analise_ia_candidato_vaga_id on public.analise_ia_candidato (vaga_id);
+create index if not exists idx_analise_ia_candidato_candidato_id on public.analise_ia_candidato (candidato_id);
+create index if not exists idx_banco_talentos_candidato_id on public.banco_talentos (candidato_id);
+create index if not exists idx_banco_talentos_adicionado_por on public.banco_talentos (adicionado_por);
+create index if not exists idx_provas_vaga_id on public.provas (vaga_id);
+create index if not exists idx_fases_processo_responsavel_id on public.fases_processo (responsavel_id);
+create index if not exists idx_resultados_provas_avaliado_por on public.resultados_provas (avaliado_por);
+create index if not exists idx_candidatura_eventos_usuario_id on public.candidatura_eventos (usuario_id);
+create index if not exists idx_mensagens_remetente_id on public.mensagens (remetente_id);
+create index if not exists idx_analise_ia_candidato_vaga_created on public.analise_ia_candidato (vaga_id, created_at desc);

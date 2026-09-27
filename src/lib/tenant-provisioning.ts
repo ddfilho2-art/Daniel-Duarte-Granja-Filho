@@ -107,22 +107,19 @@ export async function activateTenant(tenantId: string): Promise<void> {
   await callEdge("activate", { tenantId });
 }
 
-// ── Branding (direct RPC via service_role through Edge Function) ───────────────
+// ── Branding ───────────────────────────────────────────────────────────────
 
 export async function createBrandingDraft(
   tenantId: string,
   theme: BrandingDraftPayload,
   reason: string,
 ): Promise<Record<string, unknown>> {
-  const { data, error } = await supabase.rpc("create_tenant_branding_draft", {
-    p_actor_id: (await supabase.auth.getUser()).data.user?.id,
-    p_tenant_id: tenantId,
-    p_theme: theme,
-    p_reason: reason,
+  const data = await callEdge("create_branding_draft", {
+    tenantId,
+    theme,
+    reason,
   });
-
-  if (error) throw new Error(error.message);
-  return data;
+  return data.result || {};
 }
 
 export async function publishBranding(
@@ -130,15 +127,12 @@ export async function publishBranding(
   brandingId: string,
   reason: string,
 ): Promise<Record<string, unknown>> {
-  const { data, error } = await supabase.rpc("publish_tenant_branding", {
-    p_actor_id: (await supabase.auth.getUser()).data.user?.id,
-    p_tenant_id: tenantId,
-    p_branding_id: brandingId,
-    p_reason: reason,
+  const data = await callEdge("publish_branding", {
+    tenantId,
+    brandingId,
+    reason,
   });
-
-  if (error) throw new Error(error.message);
-  return data;
+  return data.result || {};
 }
 
 export async function getBrandingVersions(

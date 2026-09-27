@@ -31,6 +31,18 @@ type ProvisionAction =
   | {
       action: "get_tenant";
       tenantId?: string;
+    }
+  | {
+      action: "create_branding_draft";
+      tenantId?: string;
+      theme?: Record<string, unknown>;
+      reason?: string;
+    }
+  | {
+      action: "publish_branding";
+      tenantId?: string;
+      brandingId?: string;
+      reason?: string;
     };
 
 const UUID_PATTERN =
@@ -270,6 +282,57 @@ Deno.serve(async (request) => {
     }
 
     // ── PROVISION TENANT ──────────────────────────────────────────────────
+    // ── CREATE BRANDING DRAFT ─────────────────────────────────────────────
+    if (body.action === "create_branding_draft") {
+      const tenantId = String(body.tenantId || "").trim();
+      const reason = String(body.reason || "").trim();
+      if (!UUID_PATTERN.test(tenantId) || !reason || reason.length > 500) {
+        return jsonResponse(
+          { success: false, code: "INVALID_INPUT", requestId: currentRequestId },
+          400,
+          cors,
+        );
+      }
+      const { data, error } = await admin.rpc("create_tenant_branding_draft", {
+        p_actor_id: authData.user.id,
+        p_tenant_id: tenantId,
+        p_theme: body.theme || {},
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return jsonResponse(
+        { success: true, code: "BRANDING_DRAFT_CREATED", requestId: currentRequestId, result: data },
+        200,
+        cors,
+      );
+    }
+
+    // ── PUBLISH BRANDING ──────────────────────────────────────────────────
+    if (body.action === "publish_branding") {
+      const tenantId = String(body.tenantId || "").trim();
+      const brandingId = String(body.brandingId || "").trim();
+      const reason = String(body.reason || "").trim();
+      if (!UUID_PATTERN.test(tenantId) || !UUID_PATTERN.test(brandingId) || !reason || reason.length > 500) {
+        return jsonResponse(
+          { success: false, code: "INVALID_INPUT", requestId: currentRequestId },
+          400,
+          cors,
+        );
+      }
+      const { data, error } = await admin.rpc("publish_tenant_branding", {
+        p_actor_id: authData.user.id,
+        p_tenant_id: tenantId,
+        p_branding_id: brandingId,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      return jsonResponse(
+        { success: true, code: "BRANDING_PUBLISHED", requestId: currentRequestId, result: data },
+        200,
+        cors,
+      );
+    }
+
     if (body.action === "provision") {
       const kind = body.kind === "occupational_health_provider"
         ? "occupational_health_provider"
