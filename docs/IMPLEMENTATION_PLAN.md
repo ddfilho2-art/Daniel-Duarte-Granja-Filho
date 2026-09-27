@@ -890,3 +890,9 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Bloqueio:** `tenant-provisioning` não foi publicado nesta tentativa porque o conector bloqueou a operação; nenhuma alteração de código foi feita para contornar o bloqueio. Deve ser retomado separadamente.
 - **Validação:** projeto `dmzagrakkduddofkqjhg` agora lista 4 Edge Functions ativas. Nenhuma secret foi inventada/configurada; funções que dependem de `GEMINI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `TURNSTILE_SECRET_KEY`, `EMAIL_VERIFICATION_PEPPER` ou `ALLOWED_ORIGINS` continuam aguardando configuração real.
 - **Bloqueio funcional mantido:** schemas opcionais `candidatura_historico`, `analise_ia_candidato`, `provas_versoes`, `transferencias`, `unidades_negocio` e `email_queue` não foram inventados. A busca no histórico Git e na Library não encontrou uma definição SQL confiável para eles.
+
+
+### 2026-09-27 — EDGE-001 — desbloqueio do tenant-provisioning por import map
+- **Implementado:** criado `supabase/functions/tenant-provisioning/deno.json` na branch de manutenção, mapeando `shared/` para `../_shared/`.
+- **Motivo:** a Function importa `shared/http.ts`, mas não possuía import map declarativo; a tentativa de publicação foi rejeitada pelo conector por essa inconsistência de empacotamento.
+- **Validação:** arquivo criado no commit `4e551149bc40794d98395cb90ad20d69ac1a5ae1`. A publicação remota ainda será validada separadamente.
