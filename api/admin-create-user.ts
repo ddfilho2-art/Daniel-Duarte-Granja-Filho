@@ -135,11 +135,11 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    if (!senha || senha.length < 6) {
+    if (!senha || senha.length < 8) {
       return res.status(400).json({
         success: false,
         code: "INVALID_PASSWORD",
-        message: "Senha inválida. Use pelo menos 6 caracteres.",
+        message: "Senha inválida. Use pelo menos 8 caracteres.",
       });
     }
 
@@ -197,7 +197,7 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({
         success: false,
         code: "AUTH_CREATE_FAILED",
-        message: createAuthError?.message || "Falha ao criar usuário no Auth.",
+        message: "Não foi possível criar o usuário.",
       });
     }
 
@@ -240,7 +240,7 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({
       success: false,
       code: "INTERNAL_ERROR",
-      message: error?.message || "Erro interno ao criar usuário RH.",
+      message: "Erro interno ao criar usuário RH.",
     });
   }
 }
