@@ -925,3 +925,14 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Segurança:** ambas permanecem sem acesso direto para `anon`/`authenticated`; o advisor reporta apenas o aviso informativo `rls_enabled_no_policy`, coerente com o desenho server-side/service-role.
 - **Sem carga:** nenhuma linha de fila ou análise foi criada durante o teste.
 - **Pendência mantida:** não foram criadas as quatro estruturas cujo contrato histórico ainda não foi comprovado.
+
+
+### 2026-09-27 — EDGE-003 — hardening da candidate-analysis
+
+- **Implementado no repositório:** `supabase/functions/candidate-analysis/index.ts` deixou de declarar `Access-Control-Allow-Origin: *` e passou a usar `shared/http.ts` para CORS e respostas JSON.
+- **Implementado no repositório:** criado `supabase/functions/candidate-analysis/deno.json` para mapear `shared/` para `../_shared/`.
+- **Hardening adicional:** o parser manual de `req.json()` foi substituído por `readJsonBody`, herdando limite de tamanho, exigência de `application/json` e validação de objeto.
+- **Validado remotamente:** `candidate-analysis` está `ACTIVE`, versão 2, com `verify_jwt=true` e `import_map=true` no projeto `dmzagrakkduddofkqjhg`.
+- **Resultado:** a Function não usa mais CORS wildcard; respostas e preflight passam pelo contrato compartilhado de segurança.
+- **Pendência:** `ALLOWED_ORIGINS` ainda precisa receber valor real no ambiente Supabase; sem esse secret/configuração, chamadas cross-origin não serão liberadas. Nenhum valor foi inventado.
+- **Próximo passo:** investigar individualmente `candidatura_historico`, `provas_versoes`, `transferencias` e `unidades_negocio` somente por consumidores/contratos comprováveis no histórico do repositório.
