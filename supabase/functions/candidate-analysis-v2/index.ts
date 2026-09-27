@@ -152,13 +152,14 @@ async function handleRequest(req: Request): Promise<Response> {
     const snapshot = await buildSnapshot(tenantId, body.candidato_id, body.vaga_id, access.candidaturaId);
     const inputHash = await generateHash(JSON.stringify({ prompt_version: PROMPT_VERSION, model: MODEL, snapshot }));
 
-    const requestKey = `candidate-analysis:${tenantId}:${body.candidato_id}:${body.vaga_id}`;
+    const requestKey = `candidate-analysis:${tenantId}:${access.candidaturaId}`;
     const { data: claim, error: claimError } = await supabase.rpc("claim_ai_analysis_request", {
       p_request_key: requestKey,
       p_tenant_id: tenantId,
       p_actor_id: access.userId,
       p_candidato_id: body.candidato_id,
       p_vaga_id: body.vaga_id,
+      p_candidatura_id: access.candidaturaId,
       p_prompt_version: PROMPT_VERSION,
       p_model: MODEL,
       p_input_hash: inputHash,
