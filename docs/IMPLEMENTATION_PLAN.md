@@ -896,3 +896,10 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Implementado:** criado `supabase/functions/tenant-provisioning/deno.json` na branch de manutenção, mapeando `shared/` para `../_shared/`.
 - **Motivo:** a Function importa `shared/http.ts`, mas não possuía import map declarativo; a tentativa de publicação foi rejeitada pelo conector por essa inconsistência de empacotamento.
 - **Validação:** arquivo criado no commit `4e551149bc40794d98395cb90ad20d69ac1a5ae1`. A publicação remota ainda será validada separadamente.
+
+
+### 2026-09-27 — EDGE-001 — tenant-provisioning publicada e validada
+- **Implementado:** `tenant-provisioning` publicada no Supabase `dmzagrakkduddofkqjhg` com JWT obrigatório e import map ativo.
+- **Validação remota:** Function `tenant-provisioning` está `ACTIVE`, versão 1, `verify_jwt=true` e `import_map=true`.
+- **Resultado:** as 5 Edge Functions previstas nesta etapa agora estão publicadas no projeto novo: `admin-users`, `candidate-analysis`, `email-verification`, `storage-authorize` e `tenant-provisioning`.
+- **Pendência:** secrets reais e teste funcional autenticado continuam necessários; nenhuma credencial foi inventada ou configurada.
