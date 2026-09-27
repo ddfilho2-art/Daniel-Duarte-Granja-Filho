@@ -60,7 +60,7 @@ async function validateAccess(
   candidatoId: string,
   vagaId: string,
   userToken: string
-): Promise<{ valid: boolean; error?: string }> {
+): Promise<{ valid: boolean; error?: string; candidaturaId?: string }> {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser(
       userToken.replace("Bearer ", "")
@@ -90,7 +90,7 @@ async function validateAccess(
       return { valid: false, error: "Job posting not found in tenant" };
     }
 
-    return { valid: true };
+    return { valid: true, candidaturaId: candidatura.id };
   } catch (error) {
     return {
       valid: false,
@@ -161,6 +161,7 @@ async function handleRequest(req: Request): Promise<Response> {
         candidato_id: body.candidato_id,
         vaga_id: body.vaga_id,
         tenant_id: tenantId,
+        candidatura_id: access.candidaturaId,
         status: "pending",
         input_hash: await generateHash(
           JSON.stringify({
