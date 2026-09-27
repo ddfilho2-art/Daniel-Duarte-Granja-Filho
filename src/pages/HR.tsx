@@ -4968,6 +4968,7 @@ export function HRCandidatos() {
           candidato.candidato,
           vaga,
           candidato.vagaId,
+          candidato.id,
         ).catch((err) => {
           console.error("Erro ao avaliar candidato:", candidato.nome, err);
         });
@@ -4992,8 +4993,7 @@ export function HRCandidatos() {
         .from("analise_ia_candidato")
         .select("id,status,result,input_hash,created_at,updated_at")
         .eq("tenant_id", vaga?.tenant_id)
-        .eq("candidato_id", candidatoId)
-        .eq("vaga_id", vagaId)
+        .eq("candidatura_id", candidaturaId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
