@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { corsHeaders, jsonResponse, readJsonBody } from "./_shared/http.ts";
+const DEFAULT_HEADERS={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"} as const;
+function corsHeaders(req:Request){const origin=req.headers.get("Origin");const allowed=new Set((Deno.env.get("ALLOWED_ORIGINS")||"").split(",").map(x=>x.trim()).filter(Boolean));if(!origin)return {"Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, idempotency-key, x-tenant-id","Access-Control-Allow-Methods":"POST, OPTIONS"};if(!allowed.has(origin))return null;return {"Access-Control-Allow-Origin":origin,"Access-Control-Allow-Headers":"authorization, apikey, content-type, x-client-info, idempotency-key, x-tenant-id","Access-Control-Allow-Methods":"POST, OPTIONS","Access-Control-Max-Age":"86400",Vary:"Origin"};}
+function jsonResponse(body:unknown,status=200,extraHeaders:Record<string,string>={}){return new Response(JSON.stringify(body),{status,headers:{...DEFAULT_HEADERS,...extraHeaders}})}
+async function readJsonBody<T>(req:Request,maxBytes=16384):Promise<T>{const ct=req.headers.get("content-type")||"";if(!ct.toLowerCase().includes("application/json"))throw Error("unsupported_media_type");const len=Number(req.headers.get("content-length")||"0");if(Number.isFinite(len)&&len>maxBytes)throw Error("payload_too_large");const reader=req.body?.getReader();if(!reader)throw Error("invalid_json");const chunks:Uint8Array[]=[];let n=0;while(true){const x=await reader.read();if(x.done)break;n+=x.value.byteLength;if(n>maxBytes){await reader.cancel("payload_too_large");throw Error("payload_too_large")}chunks.push(x.value)}const body=new Uint8Array(n);let o=0;for(const x of chunks){body.set(x,o);o+=x.byteLength}try{return JSON.parse(new TextDecoder().decode(body)) as T}catch{throw Error("invalid_json")}}
 
 interface AnalysisRequest { candidato_id: string; vaga_id: string; force?: boolean; }
 interface AnalysisResult {
