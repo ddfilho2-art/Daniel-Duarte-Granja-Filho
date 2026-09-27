@@ -41,11 +41,21 @@ export default async function handler(req: any, res: any) {
     return res.status(401).json({ success: false, code: "INVALID_SESSION" });
   }
 
-  const { data: privileged, error: roleError } = await authClient.rpc(
-    "legacy_has_privileged_role",
-  );
+  const { data: privilegedUser, error: privilegedUserError } = await serviceClient
+    .from("users")
+    .select("id,uid,perfil,status")
+    .or(`id.eq.${userData.user.id},uid.eq.${userData.user.id}`)
+    .maybeSingle();
 
-  if (roleError || privileged !== true) {
+  const privileged =
+    !privilegedUserError &&
+    privilegedUser &&
+    ["admin", "rh"].includes(String(privilegedUser.perfil || "").toLowerCase()) &&
+    !["inativo", "inactive", "suspended"].includes(
+      String(privilegedUser.status || "ativo").toLowerCase(),
+    );
+
+  if (!privileged) {
     return res.status(403).json({ success: false, code: "FORBIDDEN" });
   }
 
