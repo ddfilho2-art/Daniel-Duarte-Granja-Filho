@@ -657,8 +657,7 @@ function CandidateProfileModal({
       const { data: existingAnalysis, error: fetchError } = await supabase
         .from("analise_ia_candidato")
         .select("id,status,result,input_hash,created_at,updated_at")
-        .eq("candidato_id", candidatoId)
-        .eq("vaga_id", vagaId)
+        .eq("candidatura_id", candidaturaId)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -690,7 +689,7 @@ function CandidateProfileModal({
         return;
       }
 
-      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, {
+      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, candidaturaId, {
         waitForResult: true,
       });
       if (!evaluation) {
@@ -4983,6 +4982,7 @@ export function HRCandidatos() {
     candidatoData: any,
     vaga: any,
     vagaId: string,
+    candidaturaId: string,
   ) => {
     try {
       const candidatoId = candidatoData.id;
@@ -5010,7 +5010,7 @@ export function HRCandidatos() {
         return;
       }
 
-      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, {
+      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, candidaturaId, {
         waitForResult: true,
       });
       if (!evaluation) return;
