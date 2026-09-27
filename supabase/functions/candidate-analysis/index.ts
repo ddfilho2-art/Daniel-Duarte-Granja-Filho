@@ -41,7 +41,7 @@ async function getAnalysisStatus(requestKey: string): Promise<AnalysisResponse> 
 
     const { data: authData, error: authError } = await supabase.auth.getUser(userId);
     if (authError || !authData.user) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: "Invalid authentication token",
       }, 401);
@@ -63,14 +63,14 @@ async function getAnalysisStatus(requestKey: string): Promise<AnalysisResponse> 
 
     if (rateLimitError) {
       console.error("candidate-analysis rate limit failed:", rateLimitError.message);
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: "Rate limit service unavailable",
       }, 503);
     }
 
     if (!rateLimit?.allowed) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: "Too many analysis requests",
       }, 429, {
@@ -90,7 +90,7 @@ async function getAnalysisStatus(requestKey: string): Promise<AnalysisResponse> 
       .maybeSingle();
 
     if (existingPending) {
-      return jsonResponse(req, {
+      return respond( {
         success: true,
         data: existingPending,
         status: "ALREADY_QUEUED",
@@ -185,18 +185,33 @@ async function validateAccess(
 }
 
 async function handleRequest(req: Request): Promise<Response> {
+  const cors = corsHeaders(req);
+
+  if (!cors) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Origin not allowed" }),
+      { status: 403, headers: { "Content-Type": "application/json", Vary: "Origin" } },
+    );
+  }
+
+  const respond = (
+    body: unknown,
+    status = 200,
+    extraHeaders: Record<string, string> = {},
+  ) => jsonResponse(body, status, { ...cors, ...extraHeaders });
+
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(req) });
+    return new Response(null, { status: 204, headers: cors });
   }
 
   if (req.method !== "POST") {
-    return jsonResponse(req, { success: false, error: "POST method required" }, 405);
+    return respond( { success: false, error: "POST method required" }, 405);
   }
 
   try {
     const tenantId = req.headers.get("x-tenant-id");
     if (!tenantId) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: "x-tenant-id header required",
       }, 400);
@@ -204,7 +219,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: "authorization header required",
       }, 401);
@@ -212,7 +227,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
     const bodyResult = await readJsonBody<AnalysisRequest>(req);
     if (!bodyResult.ok) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: bodyResult.error,
       }, bodyResult.status);
@@ -220,7 +235,7 @@ async function handleRequest(req: Request): Promise<Response> {
 
     const body = bodyResult.data;
     if (!body.candidato_id || !body.vaga_id) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: "candidato_id and vaga_id required",
       }, 400);
@@ -234,7 +249,7 @@ async function handleRequest(req: Request): Promise<Response> {
     );
 
     if (!access.valid) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: access.error,
       }, 403);
@@ -259,16 +274,16 @@ async function handleRequest(req: Request): Promise<Response> {
       .single();
 
     if (error) {
-      return jsonResponse(req, {
+      return respond( {
         success: false,
         error: error.message,
       }, 409);
     }
 
-    return jsonResponse(req, { success: true, data }, 200);
+    return respond( { success: true, data }, 200);
   } catch (error) {
     console.error("Error:", error);
-    return jsonResponse(req, {
+    return respond( {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     }, 500);
