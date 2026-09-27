@@ -670,17 +670,24 @@ function CandidateProfileModal({
         console.warn("Erro ao verificar análise existente:", fetchError);
       }
 
-      if (existingAnalysis) {
+      const cachedResult = existingAnalysis?.result;
+      if (
+        existingAnalysis?.status === "completed" &&
+        cachedResult &&
+        typeof cachedResult === "object"
+      ) {
+        const result = cachedResult as any;
         setAiEvaluation({
-          score_total: existingAnalysis.score_total,
+          ...result,
+          score_total: result.score_total,
           metricas: {
-            tecnico: existingAnalysis.tecnico,
-            experiencia: existingAnalysis.experiencia,
-            formacao: existingAnalysis.formacao,
-            soft_skills: existingAnalysis.soft_skills,
-            ferramentas: existingAnalysis.ferramentas,
+            tecnico: result.score_tecnico,
+            experiencia: result.score_experiencia,
+            formacao: result.score_formacao,
+            soft_skills: result.score_soft_skills,
+            cultura: result.score_cultura,
           },
-          justificativa: existingAnalysis.justificativa,
+          justificativa: result.resumo_ia,
         });
         setIsEvaluatingAI(false);
         return;
@@ -4986,12 +4993,23 @@ export function HRCandidatos() {
       // Verificar novamente se já existe análise (evitar duplicatas)
       const { data: existingAnalysis } = await supabase
         .from("analise_ia_candidato")
-        .select("*")
+        .select("id,status,result,input_hash,created_at,updated_at")
+        .eq("tenant_id", vaga?.tenant_id)
         .eq("candidato_id", candidatoId)
         .eq("vaga_id", vagaId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (existingAnalysis) {
+      if (existingAnalysis?.status === "completed" && existingAnalysis.result) {
+        const result = existingAnalysis.result as any;
+        setCandidatos((prev) =>
+          prev.map((item) =>
+            item.candidato?.id === candidatoId && item.vagaId === vagaId
+              ? { ...item, score_total: result.score_total }
+              : item,
+          ),
+        );
         return;
       }
 
