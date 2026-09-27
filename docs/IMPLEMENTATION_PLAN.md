@@ -958,3 +958,13 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validado:** o aviso de `anon_security_definer_function_executable` caiu de 9 para 1. O único restante é `get_public_tenant_context(p_slug)`, mantido intencionalmente público porque a aplicação precisa resolver branding/contexto de uma empresa antes do login.
 - **Observação:** permanecem avisos para funções SECURITY DEFINER chamadas por usuários autenticados. Elas são usadas como RPCs de autorização/fluxos médicos e não foram convertidas cegamente para INVOKER; a próxima revisão deve verificar cada contrato de autorização antes de restringir execução.
 - **RLS:** os 12 avisos `rls_enabled_no_policy` são de tabelas deliberadamente server-side/service-role ou ainda sem política cliente definida; não foram mascarados com policies permissivas.
+
+
+### 2026-09-27 — SEC-014 — isolamento tenant da RPC de atualização de candidatura
+
+- **Problema identificado:** `rpc_atualizar_candidatura_processo` exigia apenas `legacy_has_privileged_role()`. Isso validava que o usuário era Admin/RH legado, mas não garantia que a candidatura pertencia ao tenant atual.
+- **Correção aplicada no Supabase:** a RPC agora resolve o `tenant_id` através de `candidaturas -> vagas`, exige que esse tenant seja o `current_tenant_id()` e valida `tenant_admin`, `tenant_admin_substitute`, `hr` ou `platform_master_admin`.
+- **Hardening mantido:** `SECURITY DEFINER` continua com `search_path = public, pg_temp`; execução anônima permanece bloqueada.
+- **Validado:** definição remota contém a checagem de tenant; `anon_execute=false` e `authenticated_execute=true`.
+- **Implementado no repositório:** migration `20260927130000_rpc_candidatura_tenant_isolation.sql`.
+- **Impacto:** uma conta Admin/RH de outro tenant não consegue mais usar essa RPC para alterar candidatura fora do próprio contexto autorizado.
