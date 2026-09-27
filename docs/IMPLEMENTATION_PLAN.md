@@ -990,3 +990,16 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validado remotamente:** ambas as funções permanecem `SECURITY DEFINER`, contêm o vínculo `p_actor_id is distinct from auth.uid()` e possuem `EXECUTE` para `authenticated` e `service_role`.
 - **Migrations remotas:** `20260927140000_branding_rpc_actor_binding` e `20260927140100_branding_rpc_authenticated_grant`, ambas aplicadas com sucesso.
 - **Repositório:** migrations registradas na branch maintenance/recruta-ai-security-20260926.
+
+
+## 2026-09-27 — SEC-017 — isolamento do monitoramento e retry da fila de e-mails
+
+- **Problema identificado:** `PerformanceSRE.tsx` consultava `email_queue` diretamente pelo cliente Supabase, mas a tabela foi corretamente endurecida como service-role-only. O mesmo componente tentava chamar `POST /api/retry-emails` sem o `CRON_SECRET`, que é segredo de servidor.
+- **Correção implementada:** criada `api/email-monitor.ts`, com autenticação por Bearer token, validação da sessão e verificação do usuário em `public.users` como perfil `admin` ou `rh` ativo antes de consultar a fila via service role.
+- **Minimização de dados:** o endpoint retorna somente os campos necessários ao monitor e reduz o `payload` para `to` e `subject`; o acesso direto à `email_queue` continua bloqueado para `anon`/`authenticated`.
+- **Correção implementada:** `PerformanceSRE.tsx` deixou de consultar `email_queue` diretamente e passou a consumir `/api/email-monitor`; o retry agora obtém o access token da sessão Supabase e o envia em `Authorization: Bearer ...`.
+- **Correção implementada:** `api/retry-emails.ts` passou a aceitar, além do fluxo protegido por `x-cron-secret` usado pelo cron, uma sessão Bearer de usuário autenticado com perfil `admin`/`rh` ativo. O segredo do cron continua exclusivamente server-side.
+- **Validação de segurança:** o backend valida a sessão antes de consultar `users`/`email_queue`; nenhuma credencial de service role ou `CRON_SECRET` foi exposta no frontend.
+- **Validação de compatibilidade:** o contrato atual de `email_queue` permanece inalterado e o processamento automático via cron continua usando o caminho de `CRON_SECRET`.
+- **Repositório:** `api/email-monitor.ts`, `api/retry-emails.ts` e `src/components/PerformanceSRE.tsx` atualizados na branch `maintenance/recruta-ai-security-20260926`.
+- **Não realizado:** deploy/merge não foram executados; a branch continua isolada para validação posterior.
