@@ -946,3 +946,15 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Hardening:** RLS habilitado; acesso direto revogado para `public`, `anon` e `authenticated`; somente `service_role` possui acesso direto.
 - **Validado no Supabase:** migration aplicada; tabela existe com o contrato utilizado pela Function; RLS está habilitado; tabela permanece com 0 linhas.
 - **Pendência:** `candidatura_historico`, `provas_versoes` e `unidades_negocio` continuam sem consumidor/contrato comprovável e não serão criadas por inferência.
+
+
+### 2026-09-27 — SEC-013 — hardening de funções SECURITY DEFINER e search_path
+
+- **Implementado no Supabase:** `normalize_prefixo_instancia` e `generate_codigo_instancia` passaram a declarar `search_path = public, pg_temp`.
+- **Implementado no Supabase:** execução anônima foi removida de helpers privilegiados (`can_administer_tenant`, `has_tenant_role`, `is_platform_master_admin`, `is_tenant_member`, `has_role`, `is_member_of`, `is_member_of_text`).
+- **Implementado no Supabase:** `validate_tenant_admin_delegation()` ficou restrita ao uso interno de trigger, sem EXECUTE para `public`, `anon` ou `authenticated`.
+- **Implementado no repositório:** migrations `20260927120000`, `20260927123000` e `20260927124000` registram exatamente as alterações aplicadas.
+- **Validado:** o advisor eliminou o aviso de `function_search_path_mutable`.
+- **Validado:** o aviso de `anon_security_definer_function_executable` caiu de 9 para 1. O único restante é `get_public_tenant_context(p_slug)`, mantido intencionalmente público porque a aplicação precisa resolver branding/contexto de uma empresa antes do login.
+- **Observação:** permanecem avisos para funções SECURITY DEFINER chamadas por usuários autenticados. Elas são usadas como RPCs de autorização/fluxos médicos e não foram convertidas cegamente para INVOKER; a próxima revisão deve verificar cada contrato de autorização antes de restringir execução.
+- **RLS:** os 12 avisos `rls_enabled_no_policy` são de tabelas deliberadamente server-side/service-role ou ainda sem política cliente definida; não foram mascarados com policies permissivas.
