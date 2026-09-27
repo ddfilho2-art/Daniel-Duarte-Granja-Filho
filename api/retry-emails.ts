@@ -4,11 +4,18 @@ const MAX_RETRIES = 3;
 const TIMEOUT_MS = 4000;
 const CLAIM_LEASE_MS = 15 * 60 * 1000;
 
-const supabaseUrl = process.env.SUPABASE_URL || "";
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const supabaseAnonKey =
+  process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
 
 const supabase =
   supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+
+const authClient =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey)
+    : null;
 
 async function fetchWithRetry(
   url: string,
@@ -75,6 +82,37 @@ export default async function handler(req: any, res: any) {
       return res.status(500).json({
         success: false,
         code: "SUPABASE_NOT_CONFIGURED",
+        requestId,
+      });
+    }
+
+    const cronSecret = process.env.CRON_SECRET || "";
+    const providedCronSecret =
+      typeof req.headers?.["x-cron-secret"] === "string"
+        ? req.headers["x-cron-secret"]
+        : "";
+    const authorization =
+      typeof req.headers?.authorization === "string"
+        ? req.headers.authorization
+        : "";
+
+    let authorized = Boolean(cronSecret && providedCronSecret === cronSecret);
+
+    if (!authorized && authClient && authorization.startsWith("Bearer ")) {
+      const token = authorization.slice("Bearer ".length).trim();
+      const { data: userData } = await authClient.auth.getUser(token);
+      if (userData.user) {
+        const { data: privileged } = await authClient.rpc(
+          "legacy_has_privileged_role",
+        );
+        authorized = privileged === true;
+      }
+    }
+
+    if (!authorized) {
+      return res.status(401).json({
+        success: false,
+        code: "UNAUTHORIZED",
         requestId,
       });
     }
