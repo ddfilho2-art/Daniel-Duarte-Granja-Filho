@@ -23,6 +23,17 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+
+if (!supabaseAnonKey) {
+  throw new Error("Missing SUPABASE_ANON_KEY");
+}
+
+function createUserClient(userToken: string) {
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: userToken } },
+  });
+}
 
 async function getAnalysisStatus(requestKey: string): Promise<AnalysisResponse> {
   try {
@@ -70,7 +81,8 @@ async function validateAccess(
       return { valid: false, error: "Invalid authentication token" };
     }
 
-    const { data: tenantAccess, error: tenantError } = await supabase.rpc(
+    const userClient = createUserClient(userToken);
+    const { data: tenantAccess, error: tenantError } = await userClient.rpc(
       "get_current_tenant_access",
       { p_tenant_id: tenantId }
     );
@@ -88,6 +100,19 @@ async function validateAccess(
 
     if (vagaError || !vaga) {
       return { valid: false, error: "Job posting not found in tenant" };
+    }
+
+    const { data: candidatura, error: candidaturaError } = await supabase
+      .from("candidaturas")
+      .select("id, candidato_id, vaga_id, tenant_id")
+      .eq("candidato_id", candidatoId)
+      .eq("vaga_id", vagaId)
+      .eq("tenant_id", tenantId)
+      .limit(1)
+      .maybeSingle();
+
+    if (candidaturaError || !candidatura) {
+      return { valid: false, error: "Candidate application not found in tenant" };
     }
 
     return { valid: true, candidaturaId: candidatura.id };
