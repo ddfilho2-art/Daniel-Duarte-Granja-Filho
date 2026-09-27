@@ -5,7 +5,7 @@ function corsHeaders(req:Request){const origin=req.headers.get("Origin");const a
 function jsonResponse(body:unknown,status=200,extraHeaders:Record<string,string>={}){return new Response(JSON.stringify(body),{status,headers:{...DEFAULT_HEADERS,...extraHeaders}})}
 async function readJsonBody<T>(req:Request,maxBytes=16384):Promise<T>{const ct=req.headers.get("content-type")||"";if(!ct.toLowerCase().includes("application/json"))throw Error("unsupported_media_type");const len=Number(req.headers.get("content-length")||"0");if(Number.isFinite(len)&&len>maxBytes)throw Error("payload_too_large");const reader=req.body?.getReader();if(!reader)throw Error("invalid_json");const chunks:Uint8Array[]=[];let n=0;while(true){const x=await reader.read();if(x.done)break;n+=x.value.byteLength;if(n>maxBytes){await reader.cancel("payload_too_large");throw Error("payload_too_large")}chunks.push(x.value)}const body=new Uint8Array(n);let o=0;for(const x of chunks){body.set(x,o);o+=x.byteLength}try{return JSON.parse(new TextDecoder().decode(body)) as T}catch{throw Error("invalid_json")}}
 
-interface AnalysisRequest { candidato_id: string; vaga_id: string; force?: boolean; }
+interface AnalysisRequest { candidato_id: string; vaga_id: string; candidatura_id: string; force?: boolean; }
 interface AnalysisResult {
   score_total: number; score_tecnico: number; score_experiencia: number;
   score_formacao: number; score_soft_skills: number; score_cultura: number;
@@ -55,7 +55,7 @@ function sanitizeResume(value: unknown): Record<string, unknown> {
   return Object.fromEntries(allowed.filter((key) => key in source).map((key) => [key, source[key]]));
 }
 async function validateAccess(
-  tenantId: string, candidatoId: string, vagaId: string, userToken: string,
+  tenantId: string, candidatoId: string, vagaId: string, candidaturaId: string, userToken: string,
 ): Promise<{ valid: boolean; userId?: string; error?: string; candidaturaId?: string }> {
   try {
     const token = userToken.replace(/^Bearer\s+/i, "").trim();
@@ -72,8 +72,8 @@ async function validateAccess(
 
     const { data: candidatura, error: candidaturaError } = await supabase.from("candidaturas")
       .select("id, candidato_id, vaga_id, tenant_id, fase, status")
-      .eq("candidato_id", candidatoId).eq("vaga_id", vagaId).eq("tenant_id", tenantId)
-      .limit(1).maybeSingle();
+      .eq("id", candidaturaId).eq("candidato_id", candidatoId).eq("vaga_id", vagaId).eq("tenant_id", tenantId)
+      .maybeSingle();
     if (candidaturaError || !candidatura) return { valid: false, error: "Candidate application not found in tenant" };
 
     return { valid: true, userId: userData.user.id, candidaturaId: candidatura.id };
@@ -144,9 +144,9 @@ async function handleRequest(req: Request): Promise<Response> {
       const status = message === "payload_too_large" ? 413 : message === "unsupported_media_type" ? 415 : 400;
       return respond({ success: false, error: message }, status);
     }
-    if (!body.candidato_id || !body.vaga_id) return respond({ success: false, error: "candidato_id and vaga_id required" }, 400);
+    if (!body.candidato_id || !body.vaga_id || !body.candidatura_id) return respond({ success: false, error: "candidato_id, vaga_id and candidatura_id required" }, 400);
 
-    const access = await validateAccess(tenantId, body.candidato_id, body.vaga_id, authHeader);
+    const access = await validateAccess(tenantId, body.candidato_id, body.vaga_id, body.candidatura_id, authHeader);
     if (!access.valid || !access.userId || !access.candidaturaId) return respond({ success: false, error: access.error || "Forbidden" }, 403);
 
     const snapshot = await buildSnapshot(tenantId, body.candidato_id, body.vaga_id, access.candidaturaId);
