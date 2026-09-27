@@ -656,9 +656,11 @@ function CandidateProfileModal({
       // 1. Verificar se já existe análise para o candidato e vaga antes de chamar IA
       const { data: existingAnalysis, error: fetchError } = await supabase
         .from("analise_ia_candidato")
-        .select("*")
+        .select("id,status,result,input_hash,created_at,updated_at")
         .eq("candidato_id", candidatoId)
         .eq("vaga_id", vagaId)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (fetchError) {
