@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { corsHeaders, jsonResponse, readJsonBody } from "shared/http.ts";
+import { corsHeaders, jsonResponse, readJsonBody } from "./_shared/http.ts";
 
 interface AnalysisRequest { candidato_id: string; vaga_id: string; force?: boolean; }
 interface AnalysisResult {
