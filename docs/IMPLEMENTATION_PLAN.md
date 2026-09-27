@@ -903,3 +903,10 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validação remota:** Function `tenant-provisioning` está `ACTIVE`, versão 1, `verify_jwt=true` e `import_map=true`.
 - **Resultado:** as 5 Edge Functions previstas nesta etapa agora estão publicadas no projeto novo: `admin-users`, `candidate-analysis`, `email-verification`, `storage-authorize` e `tenant-provisioning`.
 - **Pendência:** secrets reais e teste funcional autenticado continuam necessários; nenhuma credencial foi inventada ou configurada.
+
+
+### 2026-09-27 — EDGE-002 — contrato remoto de provisionamento validado; secrets pendentes
+- **Validado no banco:** `provision_tenant(uuid, tenant_kind, text, text, text, text, uuid)` existe; `tenants`, `tenant_memberships` e `tenant_audit_logs` existem; o projeto permanece sem tenants e sem `platform_user_roles`.
+- **Validação de segurança:** não foi criado tenant, usuário administrativo ou role fictícia apenas para teste.
+- **Bloqueio externo:** o conjunto atual de ferramentas conectadas não expõe operação para cadastrar/rotacionar secrets das Edge Functions. Portanto `ALLOWED_ORIGINS`, `GEMINI_API_KEY`, `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_VERIFICATION_PEPPER` e eventual `TURNSTILE_SECRET_KEY` continuam sem valores configurados pelo agente.
+- **Próximo passo:** configurar esses secrets no projeto Supabase e então executar smoke tests autenticados; depois recuperar/reconstruir somente os seis schemas opcionais ainda ausentes.
