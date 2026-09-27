@@ -683,14 +683,15 @@ function EmailMonitor() {
     try {
       setLoadingEmails(true);
 
-      const { data: queueData, error: queueError } = await supabase
-        .from("email_queue")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (queueError) throw queueError;
-      setEmailQueue(queueData || []);
+      const queueResponse = await safeFetch("/api/email-monitor");
+      if (!queueResponse.ok) {
+        throw new Error(
+          queueResponse.data?.message ||
+            queueResponse.data?.code ||
+            "Não foi possível carregar a fila de e-mails.",
+        );
+      }
+      setEmailQueue(queueResponse.data?.queue || []);
 
       const { data: logData, error: logError } = await supabase
         .from("logs")
@@ -717,7 +718,16 @@ function EmailMonitor() {
   async function handleRetry() {
     try {
       setLoadingEmails(true);
-      const response = await safeFetch("/api/retry-emails", { method: "POST" });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+
+      const response = await safeFetch("/api/retry-emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       const result = await response.data;
       alert(
         `✅ ${result?.processed || 0} e-mails processados. Sucesso: ${result?.sent || 0}, Falhas: ${result?.failed || 0}`,
