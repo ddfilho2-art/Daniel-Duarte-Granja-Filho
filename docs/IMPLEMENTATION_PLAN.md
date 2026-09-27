@@ -918,3 +918,10 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Hardening:** ambas as tabelas têm RLS habilitado e acesso direto revogado para `public`, `anon` e `authenticated`; somente `service_role` recebe acesso direto, coerente com os consumidores server-side atuais.
 - **Validado no Supabase:** migration aplicada com sucesso no projeto `dmzagrakkduddofkqjhg`.
 - **Pendência:** quatro estruturas opcionais (`candidatura_historico`, `provas_versoes`, `transferencias`, `unidades_negocio`) ainda não têm contrato histórico comprovado e permanecem sem criação.
+
+
+### 2026-09-27 — DB-007 — validação estrutural das duas estruturas recuperadas
+- **Validado:** `email_queue` e `analise_ia_candidato` existem no projeto remoto com as colunas necessárias aos consumidores atuais.
+- **Segurança:** ambas permanecem sem acesso direto para `anon`/`authenticated`; o advisor reporta apenas o aviso informativo `rls_enabled_no_policy`, coerente com o desenho server-side/service-role.
+- **Sem carga:** nenhuma linha de fila ou análise foi criada durante o teste.
+- **Pendência mantida:** não foram criadas as quatro estruturas cujo contrato histórico ainda não foi comprovado.
