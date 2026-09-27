@@ -37,6 +37,66 @@ function createUserClient(userToken: string) {
 
 async function getAnalysisStatus(requestKey: string): Promise<AnalysisResponse> {
   try {
+    const userId = authHeader.slice("Bearer ".length).trim();
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(userId);
+    if (authError || !authData.user) {
+      return jsonResponse(req, {
+        success: false,
+        error: "Invalid authentication token",
+      }, 401);
+    }
+
+    const subjectHash = await generateHash(
+      `candidate-analysis:${tenantId}:${authData.user.id}`
+    );
+
+    const { data: rateLimit, error: rateLimitError } = await supabase.rpc(
+      "consume_edge_rate_limit",
+      {
+        p_scope: "candidate_analysis",
+        p_subject_hash: subjectHash,
+        p_limit: 30,
+        p_window_seconds: 3600,
+      },
+    );
+
+    if (rateLimitError) {
+      console.error("candidate-analysis rate limit failed:", rateLimitError.message);
+      return jsonResponse(req, {
+        success: false,
+        error: "Rate limit service unavailable",
+      }, 503);
+    }
+
+    if (!rateLimit?.allowed) {
+      return jsonResponse(req, {
+        success: false,
+        error: "Too many analysis requests",
+      }, 429, {
+        "Retry-After": String(rateLimit.retry_after ?? 3600),
+      });
+    }
+
+    const { data: existingPending } = await supabase
+      .from("analise_ia_candidato")
+      .select("id,status,created_at")
+      .eq("tenant_id", tenantId)
+      .eq("candidato_id", body.candidato_id)
+      .eq("vaga_id", body.vaga_id)
+      .in("status", ["pending", "processing"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPending) {
+      return jsonResponse(req, {
+        success: true,
+        data: existingPending,
+        status: "ALREADY_QUEUED",
+      }, 200);
+    }
+
     const { data, error } = await supabase
       .from("analise_ia_candidato")
       .select("*")
