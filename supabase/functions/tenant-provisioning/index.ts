@@ -271,7 +271,18 @@ Deno.serve(async (request) => {
         action: "platform.tenant.activated",
         resource_type: "tenant",
         resource_id: tenantId,
-       // ── CREATE BRANDING DRAFT ─────────────────────────────────────────────
+        details: {},
+      });
+
+      return jsonResponse(
+        { success: true, code: "TENANT_ACTIVATED", requestId: currentRequestId },
+        200,
+        cors,
+      );
+    }
+
+    // ── PROVISION TENANT ──────────────────────────────────────────────────
+    // ── CREATE BRANDING DRAFT ─────────────────────────────────────────────
     if (body.action === "create_branding_draft") {
       const tenantId = String(body.tenantId || "").trim();
       const reason = String(body.reason || "").trim();
@@ -322,17 +333,6 @@ Deno.serve(async (request) => {
       );
     }
 
-     details: {},
-      });
-
-      return jsonResponse(
-        { success: true, code: "TENANT_ACTIVATED", requestId: currentRequestId },
-        200,
-        cors,
-      );
-    }
-
-    // ── PROVISION TENANT ──────────────────────────────────────────────────
     if (body.action === "provision") {
       const kind = body.kind === "occupational_health_provider"
         ? "occupational_health_provider"
