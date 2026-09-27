@@ -1096,8 +1096,8 @@ function CandidateProfileModal({
                             fullMark: 100,
                           },
                           {
-                            subject: "Ferramentas",
-                            value: aiEvaluation.metricas.ferramentas || 0,
+                            subject: "Cultura",
+                            value: aiEvaluation.metricas.cultura,
                             fullMark: 100,
                           },
                         ]}
