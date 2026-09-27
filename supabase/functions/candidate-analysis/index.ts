@@ -142,15 +142,19 @@ async function handleRequest(req: Request): Promise<Response> {
       }, 401);
     }
 
-    const bodyResult = await readJsonBody<AnalysisRequest>(req);
-    if (!bodyResult.ok) {
-      return respond( {
-        success: false,
-        error: bodyResult.error,
-      }, bodyResult.status);
+    let body: AnalysisRequest;
+    try {
+      body = await readJsonBody<AnalysisRequest>(req);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const status =
+        message === "payload_too_large"
+          ? 413
+          : message === "unsupported_media_type"
+            ? 415
+            : 400;
+      return respond({ success: false, error: message }, status);
     }
-
-    const body = bodyResult.data;
     if (!body.candidato_id || !body.vaga_id) {
       return respond( {
         success: false,
