@@ -1,0 +1,9 @@
+alter table public.ai_analysis_requests add column if not exists attempt_count integer not null default 0;
+
+create or replace function public.claim_next_ai_analysis_request() returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$ declare v_row public.ai_analysis_requests%rowtype; v_token uuid:=gen_random_uuid(); begin select * into v_row from public.ai_analysis_requests where status='queued' or(status='processing' and(lease_expires_at is null or lease_expires_at<=now())) order by updated_at asc for update skip locked limit 1; if not found then return null; end if; update public.ai_analysis_requests set claim_token=v_token,lease_expires_at=now()+interval '2 minutes',status='processing',attempt_count=attempt_count+1,started_at=now(),updated_at=now() where id=v_row.id; return jsonb_build_object('id',v_row.id,'request_key',v_row.request_key,'tenant_id',v_row.tenant_id,'actor_id',v_row.actor_id,'candidato_id',v_row.candidato_id,'vaga_id',v_row.vaga_id,'prompt_version',v_row.prompt_version,'model',v_row.model,'input_hash',v_row.input_hash,'input_snapshot',v_row.input_snapshot,'claim_token',v_token,'attempt_count',v_row.attempt_count+1); end; $$;
+
+create or replace function public.requeue_ai_analysis_request(p_request_key text,p_claim_token uuid,p_error_code text) returns boolean language plpgsql security definer set search_path=public,pg_temp as $$ begin update public.ai_analysis_requests set status='queued',error_code=left(coalesce(p_error_code,'retryable_error'),100),claim_token=null,lease_expires_at=null,completed_at=null,updated_at=now() where request_key=p_request_key and claim_token=p_claim_token and status='processing' and attempt_count<3; return found; end; $$;
+
+revoke all on function public.requeue_ai_analysis_request(text,uuid,text) from public,anon,authenticated;
+
+grant execute on function public.requeue_ai_analysis_request(text,uuid,text) to service_role;
