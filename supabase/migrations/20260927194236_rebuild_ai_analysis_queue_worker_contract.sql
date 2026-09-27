@@ -19,3 +19,34 @@ create or replace function public.claim_next_ai_analysis_request() returns jsonb
 create index if not exists idx_ai_analysis_requests_worker on public.ai_analysis_requests(status,updated_at);
 
 create index if not exists idx_ai_analysis_requests_tenant_lookup on public.ai_analysis_requests(tenant_id,candidato_id,vaga_id,input_hash);
+
+create or replace function public.complete_ai_analysis_request(p_request_key text,p_claim_token uuid,p_result jsonb) returns boolean language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_row public.ai_analysis_requests%rowtype;
+begin
+ select * into v_row from public.ai_analysis_requests where request_key=p_request_key and claim_token=p_claim_token and status='processing' for update;
+ if not found then return false; end if;
+ update public.ai_analysis_requests set status='completed',result=p_result,error_code=null,lease_expires_at=null,completed_at=now(),updated_at=now() where id=v_row.id;
+ insert into public.analise_ia_candidato(candidato_id,vaga_id,candidatura_id,tenant_id,status,input_hash,result,error,created_at,updated_at)
+ select v_row.candidato_id::text,v_row.vaga_id::text,c.id::text,v_row.tenant_id,'completed',v_row.input_hash,p_result,null,now(),now()
+ from public.candidaturas c where c.tenant_id=v_row.tenant_id and c.candidato_id::text=v_row.candidato_id::text and c.vaga_id::text=v_row.vaga_id::text order by c.created_at desc nulls last limit 1
+ on conflict do nothing;
+ update public.analise_ia_candidato set status='completed',result=p_result,error=null,updated_at=now()
+ where tenant_id=v_row.tenant_id and candidato_id=v_row.candidato_id::text and vaga_id=v_row.vaga_id::text and input_hash=v_row.input_hash;
+ return true;
+end; $$;
+
+create or replace function public.fail_ai_analysis_request(p_request_key text,p_claim_token uuid,p_error_code text) returns boolean language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ update public.ai_analysis_requests set status='failed',error_code=left(coalesce(p_error_code,'unknown'),100),lease_expires_at=null,completed_at=now(),updated_at=now()
+ where request_key=p_request_key and claim_token=p_claim_token and status='processing';
+ return found;
+end; $$;
+
+revoke all on function public.claim_ai_analysis_request(text,uuid,uuid,uuid,uuid,text,text,text,jsonb,boolean) from public,anon,authenticated;
+revoke all on function public.claim_next_ai_analysis_request() from public,anon,authenticated;
+revoke all on function public.complete_ai_analysis_request(text,uuid,jsonb) from public,anon,authenticated;
+revoke all on function public.fail_ai_analysis_request(text,uuid,text) from public,anon,authenticated;
+grant execute on function public.claim_ai_analysis_request(text,uuid,uuid,uuid,uuid,text,text,text,jsonb,boolean) to service_role;
+grant execute on function public.claim_next_ai_analysis_request() to service_role;
+grant execute on function public.complete_ai_analysis_request(text,uuid,jsonb) to service_role;
+grant execute on function public.fail_ai_analysis_request(text,uuid,text) to service_role;
