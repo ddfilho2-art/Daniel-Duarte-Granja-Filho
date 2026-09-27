@@ -968,3 +968,15 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Validado:** definição remota contém a checagem de tenant; `anon_execute=false` e `authenticated_execute=true`.
 - **Implementado no repositório:** migration `20260927130000_rpc_candidatura_tenant_isolation.sql`.
 - **Impacto:** uma conta Admin/RH de outro tenant não consegue mais usar essa RPC para alterar candidatura fora do próprio contexto autorizado.
+
+
+### 2026-09-27 — SEC-015 — revisão das RPCs SECURITY DEFINER autenticadas
+
+- **Revisão executada:** RPCs privilegiadas com `actor_id`, `tenant_id`, operações de IA, branding, provisionamento e fluxo ocupacional.
+- **Resultado:** não foi aplicada alteração adicional nesta rodada porque os contratos inspecionados já possuem validação de ator/tenant apropriada ou são funções internas sem `EXECUTE` para `authenticated`.
+- **IA:** `claim_ai_analysis_request` e `complete_ai_analysis_request` não são executáveis por `authenticated`; permanecem protegidas para uso server-side.
+- **Branding/provisionamento:** `create_tenant_branding_draft`, `publish_tenant_branding` e `provision_tenant` não são executáveis por `authenticated` diretamente e validam `platform_master_admin` quando executadas pelo backend.
+- **Saúde ocupacional:** funções de leitura/escrita revisadas usam `auth.uid()`, tenant atual, membership/role ou vínculo de clínica antes de acessar/alterar dados.
+- **Infra:** `get_infra_usage()` exige `legacy_has_privileged_role()`; não foi encontrado uso no código pesquisável do repositório padrão, mas não será revogado sem confirmação do branch de manutenção.
+- **Advisor:** permanece 1 alerta anônimo intencional (`get_public_tenant_context`) e 21 alertas de SECURITY DEFINER executáveis por `authenticated`; estes últimos são candidatos a revisão de contrato/uso, não correções automáticas.
+- **Conclusão:** o único bypass concreto identificado nesta etapa foi o da RPC de candidatura, corrigido em SEC-014. Não houve nova mudança remota neste SEC-015.
