@@ -243,7 +243,7 @@ async function handleRequest(req: Request): Promise<Response> {
       );
     }
 
-    if (existing?.status === "completed" && existing.result) {
+    if (!body.force && existing?.status === "completed" && existing.result) {
       return respond({
         success: true,
         status: "completed",
