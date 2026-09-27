@@ -1005,3 +1005,14 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Não realizado:** deploy/merge não foram executados; a branch continua isolada para validação posterior.
 
 - **Ajuste complementar validado:** o botão de retry agora trata explicitamente respostas HTTP não-2xx do endpoint protegido e usa os campos reais `successCount`/`failCount` retornados pelo backend, evitando falso sucesso na interface.
+
+
+## 2026-09-27 — SEC-018 — isolamento e contrato do candidate-analysis
+
+- **Problema identificado:** o frontend enviava `candidatoId`/`vagaId`, enquanto a Edge Function exigia `candidato_id`/`vaga_id`; além disso, a Function executava `get_current_tenant_access()` através do cliente service-role sem repassar o JWT do usuário, o que não preservava corretamente o contexto de sessão usado pela RPC.
+- **Correção implementada:** o frontend passou a enviar os nomes de campos compatíveis com o contrato da Function.
+- **Correção implementada:** criada uma instância Supabase com a chave pública e o Bearer do usuário para executar `get_current_tenant_access`, mantendo o cliente service-role separado para operações internas.
+- **Correção implementada:** a autorização agora exige uma `candidatura` pertencente ao mesmo `tenant_id`, `vaga_id` e `candidato_id` solicitados; a análise passa a registrar também o `candidatura_id` validado.
+- **Risco corrigido:** reduzida a possibilidade de criar análises associadas a uma vaga/tenant sem uma candidatura correspondente e corrigido o uso incorreto do contexto de autenticação na RPC de autorização.
+- **Validação de código:** confirmados payload `candidato_id`/`vaga_id`, cliente autenticado para `get_current_tenant_access`, validação tenant/vaga/candidato/candidatura e vínculo `candidatura_id` no insert.
+- **Não realizado:** a Edge Function não foi implantada nesta etapa; deploy/cutover continuam fora do escopo sem autorização explícita.
