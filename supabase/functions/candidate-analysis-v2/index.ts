@@ -149,13 +149,6 @@ async function handleRequest(req: Request): Promise<Response> {
     const access = await validateAccess(tenantId, body.candidato_id, body.vaga_id, authHeader);
     if (!access.valid || !access.userId || !access.candidaturaId) return respond({ success: false, error: access.error || "Forbidden" }, 403);
 
-    const subjectHash = await generateHash(`candidate-analysis:${tenantId}:${access.userId}`);
-    const { data: rateLimit, error: rateLimitError } = await supabase.rpc("consume_edge_rate_limit", {
-      p_scope: "candidate_analysis", p_subject_hash: subjectHash, p_limit: 30, p_window_seconds: 3600,
-    });
-    if (rateLimitError) return respond({ success: false, error: "Rate limit service unavailable" }, 503);
-    if (!rateLimit?.allowed) return respond({ success: false, error: "Too many analysis requests" }, 429, { "Retry-After": String(rateLimit?.retry_after ?? 3600) });
-
     const snapshot = await buildSnapshot(tenantId, body.candidato_id, body.vaga_id, access.candidaturaId);
     const inputHash = await generateHash(JSON.stringify({ prompt_version: PROMPT_VERSION, model: MODEL, snapshot }));
 
@@ -181,6 +174,26 @@ async function handleRequest(req: Request): Promise<Response> {
       return respond({ success: true, status: "completed", cached: true, analysis: claim.result as AnalysisResult, requestId: requestKey });
     }
 
+    if (claim?.status === "processing") {
+      return respond({ success: true, status: "processing", retryAfter: claim.retry_after ?? 2, requestId: requestKey });
+    }
+
+    // Only a genuinely new queue item consumes the AI generation rate limit.
+    // Cached results and in-flight requests are reads of existing work and must
+    // not exhaust the operator's hourly generation quota.
+    const subjectHash = await generateHash(`candidate-analysis:${tenantId}:${access.userId}`);
+    const { data: rateLimit, error: rateLimitError } = await supabase.rpc("consume_edge_rate_limit", {
+      p_scope: "candidate_analysis", p_subject_hash: subjectHash, p_limit: 30, p_window_seconds: 3600,
+    });
+    if (rateLimitError) return respond({ success: false, error: "Rate limit service unavailable" }, 503);
+    if (!rateLimit?.allowed) {
+      return respond(
+        { success: false, error: "Too many analysis requests", status: "rate_limited", requestId: requestKey },
+        429,
+        { "Retry-After": String(rateLimit?.retry_after ?? 3600) },
+      );
+    }
+
     // Triggering the worker is idempotent: its DB lease prevents duplicate claims.
     const workerPromise = fetch(WORKER_URL, {
       method: "POST",
@@ -194,10 +207,6 @@ async function handleRequest(req: Request): Promise<Response> {
       EdgeRuntime.waitUntil(workerPromise);
     } else {
       await workerPromise;
-    }
-
-    if (claim?.status === "processing") {
-      return respond({ success: true, status: "processing", retryAfter: claim.retry_after ?? 2, requestId: requestKey });
     }
 
     return respond({ success: true, status: "processing", retryAfter: 2, requestId: requestKey }, 202);
