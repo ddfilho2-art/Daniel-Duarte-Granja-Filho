@@ -102,10 +102,21 @@ export default async function handler(req: any, res: any) {
       const token = authorization.slice("Bearer ".length).trim();
       const { data: userData } = await authClient.auth.getUser(token);
       if (userData.user) {
-        const { data: privileged } = await authClient.rpc(
-          "legacy_has_privileged_role",
+        const { data: privilegedUser } = await supabase
+          .from("users")
+          .select("id,uid,perfil,status")
+          .or(`id.eq.${userData.user.id},uid.eq.${userData.user.id}`)
+          .maybeSingle();
+
+        authorized = Boolean(
+          privilegedUser &&
+            ["admin", "rh"].includes(
+              String(privilegedUser.perfil || "").toLowerCase(),
+            ) &&
+            !["inativo", "inactive", "suspended"].includes(
+              String(privilegedUser.status || "ativo").toLowerCase(),
+            ),
         );
-        authorized = privileged === true;
       }
     }
 
