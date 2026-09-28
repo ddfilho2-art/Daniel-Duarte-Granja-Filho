@@ -1693,7 +1693,11 @@ export function CandidateVagas() {
   const handleApply = async () => {
     if (!selectedVaga) return;
 
-    if (selectedVaga.status_vaga !== "ABERTA") {
+    const vagaStatus = String(
+      selectedVaga.status || selectedVaga.status_vaga || "",
+    ).toUpperCase();
+
+    if (vagaStatus !== "ABERTA") {
       alert("Esta vaga não está disponível para candidatura");
       return;
     }
