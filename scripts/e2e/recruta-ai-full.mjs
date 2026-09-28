@@ -151,6 +151,24 @@ try {
   checks.candidate_record = true;
   checks.application = true;
 
+  const queueRequest = await must("queue binding", admin.from("ai_analysis_requests")
+    .select("request_key,candidatura_id,candidato_id,vaga_id,tenant_id,status,input_hash")
+    .eq("request_key", requestKey)
+    .single());
+  if (String(queueRequest.candidatura_id) !== candidaturaId ||
+      String(queueRequest.candidato_id) !== String(candidateId) ||
+      String(queueRequest.vaga_id) !== String(vagaId) ||
+      String(queueRequest.tenant_id) !== String(tenantId)) {
+    throw new Error("fila não está vinculada à candidatura/candidato/vaga/tenant esperados");
+  }
+  checks.queue_binding = {
+    candidatura_id: queueRequest.candidatura_id,
+    candidato_id: queueRequest.candidato_id,
+    vaga_id: queueRequest.vaga_id,
+    tenant_id: queueRequest.tenant_id,
+    status: queueRequest.status,
+  };
+
   // O endpoint real já dispara o worker. A chamada explícita abaixo torna
   // o teste determinístico quando waitUntil não executa imediatamente.
   for (let attempt = 0; attempt < 5; attempt++) {
