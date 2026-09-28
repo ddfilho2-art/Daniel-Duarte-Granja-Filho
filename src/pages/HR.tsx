@@ -4954,22 +4954,22 @@ export function HRCandidatos() {
         return;
       }
 
-      // Processar em background (não bloqueia a UI)
+      // Processar em fila, sem disparar centenas de Edge Functions simultaneamente.
+      // O worker já possui batching/lease; aqui mantemos a pressão do frontend baixa.
       for (const candidato of candidatosSemAnalise) {
         const vaga = vagas.find((v) => v.id === candidato.vagaId);
-        if (!vaga || !candidato.candidato) {
-          continue;
-        }
+        if (!vaga || !candidato.candidato) continue;
 
-        // Executar avaliação em background (sem await para não bloquear)
-        evaluateSingleCandidate(
-          candidato.candidato,
-          vaga,
-          candidato.vagaId,
-          candidato.id,
-        ).catch((err) => {
+        try {
+          await evaluateSingleCandidate(
+            candidato.candidato,
+            vaga,
+            candidato.vagaId,
+            candidato.id,
+          );
+        } catch (err) {
           console.error("Erro ao avaliar candidato:", candidato.nome, err);
-        });
+        }
       }
     } finally {
       setIsEvaluating(false);
