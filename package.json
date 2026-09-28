@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "lint": "tsc --noEmit",
     "e2e:recruta": "node scripts/e2e/recruta-ai-full.mjs",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "e2e:recruta:queue": "node scripts/e2e/recruta-ai-queue-load.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
