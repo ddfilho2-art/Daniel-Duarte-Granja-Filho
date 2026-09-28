@@ -1783,20 +1783,6 @@ export function CandidateVagas() {
     try {
       setIsApplying(true);
 
-      // Check if already applied
-      const { data: existing } = await supabase
-        .from("candidaturas")
-        .select("id")
-        .eq("vaga_id", selectedVaga.id)
-        .eq("candidato_id", profile.uid)
-        .maybeSingle();
-
-      if (existing) {
-        alert("Você já se candidatou a esta vaga.");
-        setShowApplyModal(false);
-        return;
-      }
-
       const { data: applicationResult, error: applicationError } =
         await supabase.functions.invoke("apply-to-vacancy", {
           body: {
