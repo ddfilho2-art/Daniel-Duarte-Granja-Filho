@@ -1,0 +1,77 @@
+-- Fix completion persistence for the legacy text primary key on candidaturas.
+-- ai_analysis_requests.candidatura_id is uuid; candidaturas.id is text.
+-- The completion path must compare the canonical application id as text.
+
+create or replace function public.complete_ai_analysis_request(
+  p_request_key text,
+  p_claim_token uuid,
+  p_result jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_row public.ai_analysis_requests%rowtype;
+  v_score_total numeric(5,2);
+begin
+  select *
+    into v_row
+  from public.ai_analysis_requests
+  where request_key = p_request_key
+    and claim_token = p_claim_token
+    and status = 'processing'
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  v_score_total := round((
+    coalesce((p_result->>'score_tecnico')::numeric, 0) +
+    coalesce((p_result->>'score_experiencia')::numeric, 0) +
+    coalesce((p_result->>'score_formacao')::numeric, 0) +
+    coalesce((p_result->>'score_soft_skills')::numeric, 0) +
+    coalesce((p_result->>'score_cultura')::numeric, 0)
+  ) / 5.0, 2);
+
+  p_result := jsonb_set(
+    p_result,
+    '{score_total}',
+    to_jsonb(v_score_total),
+    true
+  );
+
+  update public.ai_analysis_requests
+  set status='completed',
+      result=p_result,
+      error_code=null,
+      lease_expires_at=null,
+      completed_at=now(),
+      updated_at=now()
+  where id=v_row.id;
+
+  insert into public.analise_ia_candidato(
+    candidato_id,vaga_id,candidatura_id,tenant_id,status,input_hash,result,error,created_at,updated_at
+  )
+  values(
+    v_row.candidato_id::text,v_row.vaga_id::text,v_row.candidatura_id::text,
+    v_row.tenant_id,'completed',v_row.input_hash,p_result,null,now(),now()
+  )
+  on conflict (tenant_id,candidatura_id,input_hash)
+  do update set
+    status='completed',
+    result=excluded.result,
+    error=null,
+    updated_at=now();
+
+  update public.candidaturas
+  set score_ia = v_score_total,
+      updated_at = now()
+  where id = v_row.candidatura_id::text
+    and tenant_id = v_row.tenant_id;
+
+  return true;
+end;
+$$;
