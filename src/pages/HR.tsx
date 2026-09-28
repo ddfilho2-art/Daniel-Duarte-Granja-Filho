@@ -4904,9 +4904,7 @@ export function HRCandidatos() {
         const resumeData = getResumeData(userData.resume_data);
 
         const iaScore = (iaData || []).find(
-          (ia) =>
-            ia.candidato_id === cData.candidato_id &&
-            ia.vaga_id === cData.vaga_id,
+          (ia) => ia.candidatura_id === cData.id,
         );
 
         return {
