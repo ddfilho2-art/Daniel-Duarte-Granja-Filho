@@ -12,6 +12,7 @@
     "start": "tsx server.ts",
     "preview": "vite preview",
     "lint": "tsc --noEmit",
+    "e2e:recruta": "node scripts/e2e/recruta-ai-full.mjs",
     "clean": "rm -rf dist"
   },
   "dependencies": {
