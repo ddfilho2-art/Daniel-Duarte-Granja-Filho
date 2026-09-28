@@ -1797,34 +1797,6 @@ export function CandidateVagas() {
         return;
       }
 
-      const candidaturaData = {
-        vaga_id: selectedVaga.id,
-        candidato_id: profile.uid,
-        fase: "Triagem",
-        status: "NOVO",
-        origem: comoSoube,
-        como_soube: comoSoube,
-        indicacao_nome:
-          comoSoube === "Indicação de colaborador" ? indicacaoNome : "",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        data_candidatura: new Date().toISOString(),
-        historico: [
-          {
-            status: "Triagem",
-            data: new Date().toISOString(),
-            entradaFase: new Date().toISOString(),
-            usuarioNome: "Candidato",
-          },
-        ],
-      };
-
-      const { error: insertError } = await supabase
-        .from("candidaturas")
-        .insert(candidaturaData);
-
-      if (insertError) throw insertError;
-
       const { data: applicationResult, error: applicationError } =
         await supabase.functions.invoke("apply-to-vacancy", {
           body: {
