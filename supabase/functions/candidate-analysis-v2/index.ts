@@ -182,9 +182,9 @@ async function handleRequest(req: Request): Promise<Response> {
     // Only a genuinely new queue item consumes the AI generation rate limit.
     // Cached results and in-flight requests are reads of existing work and must
     // not exhaust the operator's hourly generation quota.
-    const subjectHash = await generateHash(`candidate-analysis:${tenantId}:${access.userId}`);
+    const subjectHash = await generateHash(`candidate-analysis:${tenantId}`);
     const { data: rateLimit, error: rateLimitError } = await supabase.rpc("consume_edge_rate_limit", {
-      p_scope: "candidate_analysis", p_subject_hash: subjectHash, p_limit: 30, p_window_seconds: 3600,
+      p_scope: "candidate_analysis", p_subject_hash: subjectHash, p_limit: 300, p_window_seconds: 3600,
     });
     if (rateLimitError) return respond({ success: false, error: "Rate limit service unavailable" }, 503);
     if (!rateLimit?.allowed) {
