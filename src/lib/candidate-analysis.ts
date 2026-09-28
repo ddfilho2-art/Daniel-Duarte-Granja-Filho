@@ -26,6 +26,7 @@ interface CandidateAnalysisResponse {
 export async function requestCandidateAnalysis(
   candidatoId: string,
   vagaId: string,
+  candidaturaId: string,
   options: { force?: boolean; waitForResult?: boolean } = {},
 ): Promise<CandidateAnalysis | null> {
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -36,6 +37,7 @@ export async function requestCandidateAnalysis(
           body: {
             candidato_id: candidatoId,
             vaga_id: vagaId,
+            candidatura_id: candidaturaId,
             force: options.force === true && attempt === 0,
           },
         },
