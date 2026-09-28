@@ -1,4 +1,5 @@
 import "dotenv/config";
+import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
