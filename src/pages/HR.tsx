@@ -51,7 +51,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { uploadFiles } from "../lib/upload";
-import { requestCandidateAnalysis } from "../lib/candidate-analysis";
 import { safeFetch } from "../lib/api";
 import { TransferOwnerModal } from "../components/TransferOwnerModal";
 import {
@@ -304,8 +303,6 @@ function CandidateProfileModal({
   const chatEndRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
   const [aiEvaluation, setAiEvaluation] = useState<any>(null);
-  const [isEvaluatingAI, setIsEvaluatingAI] = useState(false);
-  const [aiTriggered, setAiTriggered] = useState(false);
   const [isReferring, setIsReferring] = useState(false);
   const [referralSuccess, setReferralSuccess] = useState(false);
 
@@ -430,14 +427,14 @@ function CandidateProfileModal({
           if (!fullError && resolvedCandidatoData) {
             setFullCandidatoData(resolvedCandidatoData);
 
-            // Buscar análise IA existente se tivermos vaga e candidato
-            if (vaga?.id) {
+            // A análise é criada no momento da candidatura. O RH apenas
+            // lê o resultado persistido e nunca dispara uma nova geração.
+            if (candidaturaId) {
               const { data: existingAnalysis, error: analysisError } =
                 await supabase
                   .from("analise_ia_candidato")
                   .select("id,status,result,input_hash,created_at,updated_at")
-                  .eq("candidato_id", candidatoIdToFetch)
-                  .eq("vaga_id", vaga.id)
+                  .eq("candidatura_id", candidaturaId)
                   .order("created_at", { ascending: false })
                   .limit(1)
                   .maybeSingle();
@@ -447,17 +444,24 @@ function CandidateProfileModal({
               }
 
               const cachedResult = existingAnalysis?.result;
-              if (existingAnalysis?.status === "completed" && cachedResult && typeof cachedResult === "object") {
+              if (
+                existingAnalysis?.status === "completed" &&
+                cachedResult &&
+                typeof cachedResult === "object"
+              ) {
                 const result = cachedResult as any;
                 setAiEvaluation({
                   ...result,
-                  metricas: { tecnico: result.score_tecnico, experiencia: result.score_experiencia, formacao: result.score_formacao, soft_skills: result.score_soft_skills, cultura: result.score_cultura },
+                  metricas: {
+                    tecnico: result.score_tecnico,
+                    experiencia: result.score_experiencia,
+                    formacao: result.score_formacao,
+                    soft_skills: result.score_soft_skills,
+                    cultura: result.score_cultura,
+                  },
                   justificativa: result.resumo_ia,
                 });
-              } else if (vaga?.id && candidatoIdToFetch && !aiTriggered) {
-                setAiTriggered(true);
-                handleAIEvaluate();
-              }}
+              }
             }
           }
         }
@@ -634,90 +638,6 @@ function CandidateProfileModal({
   const currentFase = candidatura?.fase || "Triagem";
   const currentStatus = candidatura?.status;
   const isVisualizado = candidatura?.visualizado || false;
-
-  const handleAIEvaluate = async () => {
-    if (!vaga || (!candidato && !fullCandidatoData)) return;
-
-    const candidatoId =
-      candidato?.id ||
-      candidato?.candidatoId ||
-      candidatura?.candidato_id ||
-      fullCandidatoData?.id ||
-      fullCandidatoData?.uid;
-    const vagaId = vaga.id;
-
-    if (!candidatoId) {
-      alert("Não foi possível identificar o candidato para a avaliação.");
-      return;
-    }
-
-    setIsEvaluatingAI(true);
-    try {
-      // 1. Verificar se já existe análise para o candidato e vaga antes de chamar IA
-      const { data: existingAnalysis, error: fetchError } = await supabase
-        .from("analise_ia_candidato")
-        .select("id,status,result,input_hash,created_at,updated_at")
-        .eq("candidatura_id", candidaturaId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (fetchError) {
-        console.warn("Erro ao verificar análise existente:", fetchError);
-      }
-
-      const cachedResult = existingAnalysis?.result;
-      if (
-        existingAnalysis?.status === "completed" &&
-        cachedResult &&
-        typeof cachedResult === "object"
-      ) {
-        const result = cachedResult as any;
-        setAiEvaluation({
-          ...result,
-          score_total: result.score_total,
-          metricas: {
-            tecnico: result.score_tecnico,
-            experiencia: result.score_experiencia,
-            formacao: result.score_formacao,
-            soft_skills: result.score_soft_skills,
-            cultura: result.score_cultura,
-          },
-          justificativa: result.resumo_ia,
-        });
-        setIsEvaluatingAI(false);
-        return;
-      }
-
-      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, candidaturaId, {
-        waitForResult: true,
-      });
-      if (!evaluation) {
-        throw new Error("A análise ainda está sendo processada. Tente novamente.");
-      }
-
-      // Mapeia para o formato que a interface espera
-      setAiEvaluation({
-        ...evaluation,
-        score_total: evaluation.score_total,
-        metricas: {
-          tecnico: evaluation.score_tecnico,
-          experiencia: evaluation.score_experiencia,
-          formacao: evaluation.score_formacao,
-          soft_skills: evaluation.score_soft_skills,
-          cultura: evaluation.score_cultura,
-        },
-        justificativa: evaluation.resumo_ia,
-      });
-
-
-    } catch (error: any) {
-      console.error("Erro na avaliação AI:", error);
-      alert("Erro ao avaliar com IA: " + error.message);
-    } finally {
-      setIsEvaluatingAI(false);
-    }
-  };
 
   const handleAction = async (action: "Aprovar" | "Reprovar" | "Reserva") => {
     if (!candidaturaId) return;
@@ -4822,7 +4742,6 @@ export function HRCandidatos() {
   const [candidatos, setCandidatos] = useState<any[]>([]);
   const [vagas, setVagas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEvaluating, setIsEvaluating] = useState(false);
 
   const { profile } = useAuth();
 
@@ -4885,32 +4804,49 @@ export function HRCandidatos() {
         new Set(candidaturasTriagem.map((c) => c.candidato_id)),
       );
 
-      const [usersDataRes, iaDataRes] = await Promise.all([
+      const [candidatosRes, iaDataRes] = await Promise.all([
         supabase
-          .from("users")
-          .select("id, nome, email, resume_data")
+          .from("candidatos")
+          .select("id,user_id,nome,resume_data")
           .in("id", candidatoIds),
         supabase
           .from("analise_ia_candidato")
-          .select("candidato_id, vaga_id, score_total")
-          .in("candidato_id", candidatoIds),
+          .select("candidatura_id,status,result,created_at,updated_at")
+          .in("candidatura_id", candidaturasTriagem.map((c) => c.id)),
       ]);
-      const usersData = usersDataRes.data;
-      const iaData = iaDataRes.data;
+      const candidatosDb = candidatosRes.data || [];
+      const iaData = iaDataRes.data || [];
+
+      const userIds = Array.from(
+        new Set(candidatosDb.map((c) => c.user_id).filter(Boolean)),
+      );
+      const { data: usersData } = userIds.length
+        ? await supabase
+            .from("users")
+            .select("id,uid,nome,email,resume_data")
+            .in("id", userIds)
+        : { data: [] as any[] };
 
       const candidatosData = candidaturasTriagem.map((cData) => {
+        const candidatoDb: any =
+          candidatosDb.find((c) => c.id === cData.candidato_id) || {};
         const userData: any =
-          (usersData || []).find((u) => u.id === cData.candidato_id) || {};
-        const resumeData = getResumeData(userData.resume_data);
-
-        const iaScore = (iaData || []).find(
-          (ia) => ia.candidatura_id === cData.id,
+          (usersData || []).find((u) => u.id === candidatoDb.user_id) || {};
+        const resumeData = getResumeData(
+          userData.resume_data || candidatoDb.resume_data,
         );
+        const iaScore: any = iaData.find(
+          (ia) => ia.candidatura_id === cData.id && ia.status === "completed",
+        );
+        const result =
+          iaScore?.result && typeof iaScore.result === "object"
+            ? (iaScore.result as any)
+            : null;
 
         return {
           id: cData.id,
           vagaId: cData.vaga_id,
-          nome: userData.nome || "Desconhecido",
+          nome: userData.nome || candidatoDb.nome || "Desconhecido",
           formacao: resumeData.formacao || "Não informada",
           status: cData.status,
           fase: cData.fase || "Triagem",
@@ -4919,114 +4855,14 @@ export function HRCandidatos() {
             resumeData.dataNascimento || resumeData.data_nascimento,
           ),
           localizacao: getLocalizacao(resumeData),
-          candidato: userData,
+          candidato: { ...candidatoDb, ...userData },
           visualizado: cData.visualizado,
           rhVisualizouRecrutamento: cData.rh_visualizou_recrutamento,
-          score_total: iaScore?.score_total ?? null,
+          score_total: result?.score_total ?? null,
+          ai_status: iaScore?.status || "pending",
         } as any;
       });
       setCandidatos(candidatosData);
-
-      // CORREÇÃO 3: Avaliar candidatos sem análise IA em background
-      if (!isEvaluating) {
-        setIsEvaluating(true);
-        evaluateCandidatesInBackground(candidatosData, vagasRes.data || []);
-      }
-    } catch (error) {
-      console.error("Erro ao buscar dados:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Função para avaliar candidatos em background
-  const evaluateCandidatesInBackground = async (
-    candidatos: any[],
-    vagas: any[],
-  ) => {
-    try {
-      // Filtrar candidatos sem análise IA
-      const candidatosSemAnalise = candidatos.filter(
-        (c) => c.score_total === null,
-      );
-
-      if (candidatosSemAnalise.length === 0) {
-        return;
-      }
-
-      // Processar em fila, sem disparar centenas de Edge Functions simultaneamente.
-      // O worker já possui batching/lease; aqui mantemos a pressão do frontend baixa.
-      for (const candidato of candidatosSemAnalise) {
-        const vaga = vagas.find((v) => v.id === candidato.vagaId);
-        if (!vaga || !candidato.candidato) continue;
-
-        try {
-          await evaluateSingleCandidate(
-            candidato.candidato,
-            vaga,
-            candidato.vagaId,
-            candidato.id,
-          );
-        } catch (err) {
-          console.error("Erro ao avaliar candidato:", candidato.nome, err);
-        }
-      }
-    } finally {
-      setIsEvaluating(false);
-    }
-  };
-
-  // Função para avaliar um único candidato
-  const evaluateSingleCandidate = async (
-    candidatoData: any,
-    vaga: any,
-    vagaId: string,
-    candidaturaId: string,
-  ) => {
-    try {
-      const candidatoId = candidatoData.id;
-
-      // Verificar novamente se já existe análise (evitar duplicatas)
-      const { data: existingAnalysis } = await supabase
-        .from("analise_ia_candidato")
-        .select("id,status,result,input_hash,created_at,updated_at")
-        .eq("tenant_id", vaga?.tenant_id)
-        .eq("candidatura_id", candidaturaId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (existingAnalysis?.status === "completed" && existingAnalysis.result) {
-        const result = existingAnalysis.result as any;
-        setCandidatos((prev) =>
-          prev.map((item) =>
-            item.candidato?.id === candidatoId && item.vagaId === vagaId
-              ? { ...item, score_total: result.score_total }
-              : item,
-          ),
-        );
-        return;
-      }
-
-      const evaluation = await requestCandidateAnalysis(candidatoId, vagaId, candidaturaId, {
-        waitForResult: true,
-      });
-      if (!evaluation) return;
-
-      setCandidatos((prev) =>
-        prev.map((item) =>
-          item.candidato?.id === candidatoId && item.vagaId === vagaId
-            ? {
-                ...item,
-                score_total: evaluation.score_total,
-              }
-            : item,
-        ),
-      );
-    } catch (error: any) {
-      console.error("Erro na avaliação IA:", error);
-    }
-  };
 
   useEffect(() => {
     fetchData();
