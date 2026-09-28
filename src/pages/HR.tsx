@@ -3827,6 +3827,31 @@ export function HRGestaoVagas() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-3">
+            <label htmlFor="score-min-filter" className="text-sm font-medium text-slate-700">
+              Score IA mínimo
+            </label>
+            <select
+              id="score-min-filter"
+              value={scoreMinFilter}
+              onChange={(e) => setScoreMinFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Todos</option>
+              <option value="40">40+</option>
+              <option value="60">60+</option>
+              <option value="80">80+</option>
+            </select>
+            {scoreMinFilter !== "" && (
+              <button
+                type="button"
+                onClick={() => setScoreMinFilter("")}
+                className="text-xs font-medium text-slate-500 hover:text-slate-700"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
@@ -4737,6 +4762,7 @@ export function HRCandidatos() {
     key: string;
     direction: "asc" | "desc";
   } | null>(null);
+  const [scoreMinFilter, setScoreMinFilter] = useState("");
 
   const [candidaturas, setCandidaturas] = useState<any[]>([]);
   const [candidatos, setCandidatos] = useState<any[]>([]);
@@ -5009,11 +5035,14 @@ export function HRCandidatos() {
     );
   };
 
+  const scoreMin = scoreMinFilter === "" ? null : Number(scoreMinFilter);
   const filteredCandidatos = selectedVaga
     ? candidatos.filter(
         (c) =>
           c.vagaId === selectedVaga &&
-          (filterEducation === "Todos" || c.formacao === filterEducation),
+          (filterEducation === "Todos" || c.formacao === filterEducation) &&
+          (scoreMin === null ||
+            (c.score_total != null && Number(c.score_total) >= scoreMin)),
       )
     : [];
 
