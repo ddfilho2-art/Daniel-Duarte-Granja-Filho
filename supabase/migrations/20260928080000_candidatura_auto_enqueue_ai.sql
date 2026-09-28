@@ -55,14 +55,22 @@ begin
 
   if coalesce(nullif(trim(v_resume->>'nome'), ''), nullif(trim(v_user.nome), '')) is null
      or nullif(trim(v_resume->>'telefone'), '') is null
-     or jsonb_typeof(v_resume->'experiencias') <> 'array'
-     or jsonb_array_length(v_resume->'experiencias') = 0
+     or (
+       case
+         when jsonb_typeof(v_resume->'experiencias') = 'array'
+           then jsonb_array_length(v_resume->'experiencias')
+         else 0
+       end
+     ) = 0
      or (
        nullif(trim(v_resume->>'escolaridade'), '') is null
        and (
-         jsonb_typeof(v_resume->'formacoes') <> 'array'
-         or jsonb_array_length(v_resume->'formacoes') = 0
-       )
+         case
+           when jsonb_typeof(v_resume->'formacoes') = 'array'
+             then jsonb_array_length(v_resume->'formacoes')
+           else 0
+         end
+       ) = 0
      ) then
     raise exception using errcode = '22023', message = 'resume_incomplete';
   end if;
