@@ -135,9 +135,20 @@ try {
     throw new Error("apply-to-vacancy: " + JSON.stringify(applyBody));
   }
 
-  candidaturaId = String(applyBody.candidatura?.id || "");
-  requestKey = String(applyBody.analysis?.request_key || `candidate-analysis:${tenantId}:${candidaturaId}`);
-  if (!candidaturaId) throw new Error("apply-to-vacancy não retornou candidatura");
+  candidaturaId = String(applyBody.candidatura_id || "");
+  requestKey = String(
+    applyBody.analysis_request_key ||
+    `candidate-analysis:${tenantId}:${candidaturaId}`,
+  );
+  if (!candidaturaId) throw new Error("apply-to-vacancy não retornou candidatura_id");
+  const createdCandidate = await must("candidate", admin.from("candidatos")
+    .select("id,user_id")
+    .eq("user_id", candidateUserId)
+    .eq("nome", resumeData.nome)
+    .maybeSingle());
+  if (!createdCandidate?.id) throw new Error("candidatos não foi sincronizado pela candidatura");
+  candidateId = createdCandidate.id;
+  checks.candidate_record = true;
   checks.application = true;
 
   // O endpoint real já dispara o worker. A chamada explícita abaixo torna
@@ -220,6 +231,11 @@ try {
 
   if (!checks.score) throw new Error("score persistido não corresponde à média do radar");
   if (!checks.duplicate.rejected) throw new Error("segunda candidatura não foi bloqueada");
+
+  const failedChecks = Object.entries(checks)
+    .filter(([key, value]) => key === "score" ? value !== true : false)
+    .map(([key]) => key);
+  if (failedChecks.length) throw new Error("checks failed: " + failedChecks.join(", "));
 
   console.log(JSON.stringify({ ok: true, runId, checks }, null, 2));
 } finally {
