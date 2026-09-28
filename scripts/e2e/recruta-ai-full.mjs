@@ -27,6 +27,11 @@ let candidaturaId = null;
 let requestKey = null;
 
 const checks = {};
+const FETCH_TIMEOUT_MS = Number(process.env.E2E_FETCH_TIMEOUT_MS || 60000);
+
+async function fetchWithTimeout(url, options = {}) {
+  return fetch(url, { ...options, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
 
 async function must(label, operation) {
   const { data, error } = await operation;
@@ -121,7 +126,7 @@ try {
   }
   checks.auth = true;
 
-  const apply = await fetch(`${supabaseUrl}/functions/v1/apply-to-vacancy`, {
+  const apply = await fetchWithTimeout(`${supabaseUrl}/functions/v1/apply-to-vacancy`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -172,7 +177,7 @@ try {
   // O endpoint real já dispara o worker. A chamada explícita abaixo torna
   // o teste determinístico quando waitUntil não executa imediatamente.
   for (let attempt = 0; attempt < 5; attempt++) {
-    const worker = await fetch(`${supabaseUrl}/functions/v1/candidate-analysis-worker`, {
+    const worker = await fetchWithTimeout(`${supabaseUrl}/functions/v1/candidate-analysis-worker`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -231,7 +236,7 @@ try {
     }
   }
 
-  const duplicate = await fetch(`${supabaseUrl}/functions/v1/apply-to-vacancy`, {
+  const duplicate = await fetchWithTimeout(`${supabaseUrl}/functions/v1/apply-to-vacancy`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
