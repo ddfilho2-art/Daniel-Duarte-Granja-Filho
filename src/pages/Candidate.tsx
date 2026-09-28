@@ -30,7 +30,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { ChatInput } from "../components/ChatInput";
 import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
-import { requestCandidateAnalysis } from "../lib/candidate-analysis";
 
 export function CandidateDashboard() {
   const { profile, updateProfile } = useAuth();
@@ -1822,16 +1821,23 @@ export function CandidateVagas() {
 
       if (insertError) throw insertError;
 
-      const evaluateCandidateWithAI = async (
-        userId: string,
-        vagaId: string,
-      ) => {
-        try {
-          await requestCandidateAnalysis(userId, vagaId);
-        } catch (error) {
-          console.error("Erro na avaliação automática:", error);
-        }
-      };
+      const { data: applicationResult, error: applicationError } =
+        await supabase.functions.invoke("apply-to-vacancy", {
+          body: {
+            vaga_id: selectedVaga.id,
+            origem: comoSoube,
+            indicacao_nome:
+              comoSoube === "Indicação de colaborador" ? indicacaoNome : null,
+          },
+        });
+
+      if (applicationError || !applicationResult?.success) {
+        throw new Error(
+          applicationResult?.error ||
+            applicationError?.message ||
+            "Não foi possível concluir a candidatura.",
+        );
+      }
 
       try {
         await logAudit(
@@ -1842,11 +1848,6 @@ export function CandidateVagas() {
       } catch (err) {
         console.warn("Erro no log audit (ignorado):", err);
       }
-
-      await evaluateCandidateWithAI(
-        user?.id || profile?.uid || "",
-        selectedVaga.id,
-      );
 
       // Update local state to show "Já se candidatou"
       setVagas((prev) =>
