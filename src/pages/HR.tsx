@@ -4811,7 +4811,7 @@ export function HRCandidatos() {
           .in("id", candidatoIds),
         supabase
           .from("analise_ia_candidato")
-          .select("candidatura_id,status,result,created_at,updated_at")
+          .select("candidatura_id,status")
           .in("candidatura_id", candidaturasTriagem.map((c) => c.id)),
       ]);
       const candidatosDb = candidatosRes.data || [];
@@ -4836,12 +4836,8 @@ export function HRCandidatos() {
           userData.resume_data || candidatoDb.resume_data,
         );
         const iaScore: any = iaData.find(
-          (ia) => ia.candidatura_id === cData.id && ia.status === "completed",
+          (ia) => ia.candidatura_id === cData.id,
         );
-        const result =
-          iaScore?.result && typeof iaScore.result === "object"
-            ? (iaScore.result as any)
-            : null;
 
         return {
           id: cData.id,
@@ -4858,8 +4854,8 @@ export function HRCandidatos() {
           candidato: { ...candidatoDb, ...userData },
           visualizado: cData.visualizado,
           rhVisualizouRecrutamento: cData.rh_visualizou_recrutamento,
-          score_total: result?.score_total ?? null,
-          ai_status: iaScore?.status || "pending",
+          score_total: cData.score_ia ?? null,
+          ai_status: iaScore?.status || (cData.score_ia != null ? "completed" : "pending"),
         } as any;
       });
       setCandidatos(candidatosData);
