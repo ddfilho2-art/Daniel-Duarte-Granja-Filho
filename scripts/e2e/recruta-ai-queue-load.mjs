@@ -46,14 +46,23 @@ async function must(label, promise) {
 }
 
 async function claimBatch(size) {
-  return Promise.all(Array.from({ length: size }, async () => {
-    const data = await must("claim_next_ai_analysis_request", db.rpc("claim_next_ai_analysis_request"));
-    return data;
-  }));
+  const results = await Promise.allSettled(
+    Array.from({ length: size }, async () => {
+      return must("claim_next_ai_analysis_request", db.rpc("claim_next_ai_analysis_request"));
+    }),
+  );
+  const rejected = results.filter((result) => result.status === "rejected");
+  if (rejected.length) {
+    throw new Error(
+      `claim batch falhou: ${rejected.map((result) => result.reason?.message || String(result.reason)).join(" | ")}`,
+    );
+  }
+  return results.map((result) => result.value);
 }
 
 try {
   console.log(`=== Recruta AÍ — queue load test (${total} jobs / concurrency ${concurrency}) ===`);
+  const startedAt = Date.now();
 
   const rows = Array.from({ length: total }, (_, i) => row(i));
   await must("insert synthetic queue", db.from("ai_analysis_requests").insert(rows));
@@ -69,13 +78,19 @@ try {
     }
     claimed.push(...batch);
 
-    await Promise.all(batch.map((item) =>
+    const failures = await Promise.allSettled(batch.map((item) =>
       must("fail synthetic job", db.rpc("fail_ai_analysis_request", {
         p_request_key: item.request_key,
         p_claim_token: item.claim_token,
         p_error_code: "synthetic_load_test",
       }))
     ));
+    const rejectedFailures = failures.filter((result) => result.status === "rejected");
+    if (rejectedFailures.length) {
+      throw new Error(
+        `falha ao finalizar lote: ${rejectedFailures.map((result) => result.reason?.message || String(result.reason)).join(" | ")}`,
+      );
+    }
 
     remaining -= batch.length;
   }
@@ -148,6 +163,8 @@ try {
     failed_after_claim: failed,
     retry_backoff: true,
     lease_recovery: true,
+    elapsed_ms: Date.now() - startedAt,
+    jobs_per_second: Number((total / ((Date.now() - startedAt) / 1000)).toFixed(2)),
   }, null, 2));
 } finally {
   const { error } = await db
