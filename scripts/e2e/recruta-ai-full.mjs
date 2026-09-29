@@ -33,6 +33,10 @@ async function fetchWithTimeout(url, options = {}) {
   return fetch(url, { ...options, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function must(label, operation) {
   const { data, error } = await operation;
   if (error) throw new Error(`${label}: ${error.message}`);
@@ -176,7 +180,9 @@ try {
 
   // O endpoint real já dispara o worker. A chamada explícita abaixo torna
   // o teste determinístico quando waitUntil não executa imediatamente.
-  for (let attempt = 0; attempt < 5; attempt++) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (attempt > 0) await sleep(1500);
+
     const worker = await fetchWithTimeout(`${supabaseUrl}/functions/v1/candidate-analysis-worker`, {
       method: "POST",
       headers: {
@@ -231,7 +237,7 @@ try {
       break;
     }
 
-    if (attempt === 4) {
+    if (attempt === 7) {
       throw new Error(`análise não concluiu: ${JSON.stringify({ analysis, application })}`);
     }
   }
@@ -261,21 +267,38 @@ try {
   if (failedChecks.length) throw new Error("checks failed: " + failedChecks.join(", "));
 
   console.log(JSON.stringify({ ok: true, runId, checks }, null, 2));
-} finally {
+ } finally {
   console.log("\nLimpando fixtures E2E...");
+  const cleanupErrors = [];
+
+  async function cleanup(label, operation) {
+    const { error } = await operation;
+    if (error) cleanupErrors.push(`${label}: ${error.message}`);
+  }
+
   if (candidaturaId) {
-    await admin.from("candidatura_eventos").delete().eq("candidatura_id", candidaturaId);
-    await admin.from("analise_ia_candidato").delete().eq("candidatura_id", candidaturaId);
-    await admin.from("ai_analysis_requests").delete().eq("request_key", requestKey);
-    await admin.from("candidaturas").delete().eq("id", candidaturaId);
+    await cleanup("candidatura_eventos", admin.from("candidatura_eventos").delete().eq("candidatura_id", candidaturaId));
+    await cleanup("analise_ia_candidato", admin.from("analise_ia_candidato").delete().eq("candidatura_id", candidaturaId));
+    if (requestKey) {
+      await cleanup("ai_analysis_requests", admin.from("ai_analysis_requests").delete().eq("request_key", requestKey));
+    }
+    await cleanup("candidaturas", admin.from("candidaturas").delete().eq("id", candidaturaId));
   }
-  if (vagaId) await admin.from("vagas").delete().eq("id", vagaId);
-  if (candidateId) await admin.from("candidatos").delete().eq("id", candidateId);
+  if (vagaId) await cleanup("vagas", admin.from("vagas").delete().eq("id", vagaId));
+  if (candidateId) await cleanup("candidatos", admin.from("candidatos").delete().eq("id", candidateId));
   if (candidateUserId) {
-    await admin.from("candidatos").delete().eq("user_id", candidateUserId);
-    await admin.from("users").delete().eq("id", candidateUserId);
-    await admin.auth.admin.deleteUser(candidateUserId);
+    await cleanup("candidatos_by_user", admin.from("candidatos").delete().eq("user_id", candidateUserId));
+    await cleanup("users", admin.from("users").delete().eq("id", candidateUserId));
+    const deletedAuth = await admin.auth.admin.deleteUser(candidateUserId);
+    if (deletedAuth.error) cleanupErrors.push("auth.deleteUser: " + deletedAuth.error.message);
   }
-  if (tenantId) await admin.from("tenants").delete().eq("id", tenantId);
+  if (tenantId) await cleanup("tenant", admin.from("tenants").delete().eq("id", tenantId));
+
+  if (cleanupErrors.length) {
+    console.error("Falhas na limpeza:");
+    cleanupErrors.forEach((error) => console.error(" - " + error));
+    throw new Error("E2E terminou com resíduos de limpeza; consulte os erros acima.");
+  }
+
   console.log("Fixtures removidas.");
 }
