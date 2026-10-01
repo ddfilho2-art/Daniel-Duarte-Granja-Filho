@@ -247,3 +247,12 @@ e não:
 **uma aplicação/deploy separado para cada empresa.**
 
 Essa abordagem é compatível com a arquitetura de plataformas multi-tenant da Vercel, que suporta múltiplos tenants/domínios sobre uma única base de código. citeturn2search4turn2search7
+
+
+## Cadastro e identidade do candidato por tenant
+
+- A identidade de autenticação permanece no Supabase Auth, mas o cadastro profissional do candidato é uma linha própria em `public.candidatos` para cada empresa.
+- `tenant_memberships` recebe o papel `candidate` somente na empresa em que o candidato se registra.
+- A mesma pessoa pode ter várias fichas de candidato, uma por empresa, sem compartilhar currículo entre tenants.
+- O UUID do Auth não é mais usado como `candidato_id`; a ficha de candidato possui seu próprio identificador.
+- O candidato só entra em `/candidato` dentro do portal `/t/{slug}` da empresa.
