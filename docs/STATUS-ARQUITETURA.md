@@ -171,3 +171,13 @@ Depois disso, o deploy multi-tenant pode continuar sendo simples:
 - [x] Administração de RH endurecida no backend.
 - [x] Acesso `anon` removido de `users`, `candidatos` e `candidaturas`.
 - [ ] E2E com usuários reais de dois tenants ainda depende da criação segura das contas Auth.
+
+
+### 2026-10-02 — endurecimento adicional de identidade
+
+- [x] `handle_new_user()` não confia mais em `raw_user_meta_data.perfil`.
+- [x] Conta criada diretamente no Auth nasce como Candidato no perfil legado.
+- [x] Conta existente com perfil diferente não pode ser convertida em RH pela gestão da empresa.
+- [x] Edge Function `admin-users` versão 5 aplicada e sincronizada no GitHub.
+- [x] Cadastro do candidato usa somente e-mail como identificador de autenticação.
+- [x] Link de confirmação preserva o tenant de origem.
