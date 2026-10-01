@@ -1466,6 +1466,7 @@ export function CandidateResume() {
 
 export function CandidateVagas() {
   const { user, profile } = useAuth();
+  const { tenant } = useTenant();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [vagas, setVagas] = useState<any[]>([]);
@@ -1506,18 +1507,22 @@ export function CandidateVagas() {
 
         let finalVagas = data || [];
 
-        if (profile?.uid && finalVagas.length > 0) {
-          const { data: candidaturas } = await supabase
-            .from("candidaturas")
-            .select("vaga_id")
-            .eq("candidato_id", profile.uid);
+        if (profile?.uid && tenant?.id && finalVagas.length > 0) {
+          const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+          if (candidate) {
+            const { data: candidaturas } = await supabase
+              .from("candidaturas")
+              .select("vaga_id")
+              .eq("tenant_id", tenant.id)
+              .eq("candidato_id", candidate.id);
 
-          if (candidaturas) {
-            const appliedIds = new Set(candidaturas.map((c) => c.vaga_id));
-            finalVagas = finalVagas.map((v) => ({
-              ...v,
-              ja_candidatado: appliedIds.has(v.id),
-            }));
+            if (candidaturas) {
+              const appliedIds = new Set(candidaturas.map((item) => item.vaga_id));
+              finalVagas = finalVagas.map((v) => ({
+                ...v,
+                ja_candidatado: appliedIds.has(v.id),
+              }));
+            }
           }
         }
 
@@ -1617,14 +1622,13 @@ export function CandidateVagas() {
       return;
     }
 
-    // Fetch user profile to get resume_data
-    const { data: userDoc } = await supabase
-      .from("users")
-      .select("resume_data")
-      .eq("uid", profile.uid)
-      .maybeSingle();
+    if (!tenant?.id) {
+      alert("Empresa não identificada.");
+      return;
+    }
 
-    const resumeData = userDoc?.resume_data;
+    const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+    const resumeData = candidate?.resume_data;
 
     console.log("🧪 ===== TESTE DE CANDIDATURA =====");
     console.log("🧠 user:", user);
@@ -2271,6 +2275,7 @@ export function CandidatePlaceholder({ title }: { title: string }) {
 
 export function CandidateCandidaturas() {
   const { profile } = useAuth();
+  const { tenant } = useTenant();
   const [candidaturas, setCandidaturas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortConfig, setSortConfig] = useState<{
@@ -2285,14 +2290,21 @@ export function CandidateCandidaturas() {
   );
 
   useEffect(() => {
-    if (!profile?.uid) return;
+    if (!profile?.uid || !tenant?.id) return;
 
     const fetchCandidaturas = async () => {
       try {
+        const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+        if (!candidate) {
+          setCandidaturas([]);
+          return;
+        }
+
         const { data, error } = await supabase
           .from("candidaturas")
           .select("*, vagas(*)")
-          .eq("candidato_id", profile.uid);
+          .eq("tenant_id", tenant.id)
+          .eq("candidato_id", candidate.id);
 
         if (error) throw error;
 
@@ -2341,7 +2353,7 @@ export function CandidateCandidaturas() {
           event: "*",
           schema: "public",
           table: "candidaturas",
-          filter: `candidato_id=eq.${profile.uid}`,
+          filter: `candidato_id=eq.${(await loadCurrentCandidate(tenant.id, profile.uid))?.id || ""}`,
         },
         () => {
           fetchCandidaturas();
@@ -2352,7 +2364,7 @@ export function CandidateCandidaturas() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [profile]);
+  }, [profile, tenant?.id]);
 
   const getStatusCandidato = (status: string, fase?: string) => {
     const s = status || "ATIVO";
@@ -2634,6 +2646,7 @@ export function CandidateCandidaturas() {
 
 export function CandidateMensagens() {
   const { profile } = useAuth();
+  const { tenant } = useTenant();
   const [selectedCandidaturaId, setSelectedCandidaturaId] = useState<
     string | null
   >(null);
@@ -2653,15 +2666,22 @@ export function CandidateMensagens() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!profile?.uid) return;
+    if (!profile?.uid || !tenant?.id) return;
 
     const fetchCandidaturas = async () => {
       try {
+        const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+        if (!candidate) {
+          setCandidaturas([]);
+          return;
+        }
+
         const [candidaturasRes, mensagensRes] = await Promise.all([
           supabase
             .from("candidaturas")
             .select("*, vagas(*)")
-            .eq("candidato_id", profile.uid),
+            .eq("tenant_id", tenant.id)
+            .eq("candidato_id", candidate.id),
           supabase
             .from("mensagens")
             .select("*")
