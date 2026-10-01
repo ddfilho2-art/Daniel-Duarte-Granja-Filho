@@ -114,7 +114,13 @@ Exemplo:
 
 Mesmo que a mesma pessoa informe o mesmo e-mail, os registros são contextos independentes.
 
-### Estado atual identificado
+### Estado implementado
+
+A manutenção `20261001213000_tenant_scoped_candidate_registration` foi aplicada no Supabase. `candidatos.tenant_id` agora é obrigatório, possui FK para `tenants` e índice/uniqueness por `(tenant_id,user_id)` quando houver identidade.
+
+O RPC `rpc_candidatar_se` agora procura/cria o candidato por `user_id + tenant_id`. Assim, a mesma identidade pode possuir cadastros de candidato independentes em empresas diferentes.
+
+### Estado histórico identificado
 
 A tabela legada `public.candidatos` possui:
 
@@ -123,13 +129,11 @@ A tabela legada `public.candidatos` possui:
 - dados pessoais;
 - `resume_data jsonb`;
 
-mas NÃO possui atualmente `tenant_id`.
+e agora possui `tenant_id` obrigatório.
 
 A tabela `public.candidaturas` possui `tenant_id`.
 
-Portanto, a candidatura já tem isolamento tenant-aware, mas o cadastro-base do candidato ainda não representa corretamente o requisito de cadastro independente por empresa.
-
-### Consequência
+Portanto, o cadastro e a candidatura agora carregam o contexto da empresa.
 
 Não devemos simplesmente colocar o mesmo candidato em várias memberships para resolver esse requisito.
 
@@ -141,7 +145,7 @@ O desenho correto precisa separar:
 - vaga;
 - currículo/dados do processo seletivo.
 
-Essa é uma manutenção estrutural pendente.
+Essa manutenção estrutural foi concluída no banco; a camada de UI de cadastro contextual ainda deve ser validada no E2E.
 
 ## 7. Saúde ocupacional
 
