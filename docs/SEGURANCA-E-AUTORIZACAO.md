@@ -156,3 +156,21 @@ Para cada mudança de RLS:
 O isolamento deve ser validado no banco, não apenas na interface.
 
 O Supabase recomenda testar políticas para SELECT/INSERT/UPDATE/DELETE e os papéis anon/authenticated. citeturn0search1
+
+
+## Fluxo de cadastro/login do candidato
+
+1. O cadastro é iniciado somente dentro de `/t/{slug}/cadastro`.
+2. O Supabase Auth cria a identidade global; a trigger cria `public.users`.
+3. Após confirmar o e-mail, o candidato entra pelo portal da empresa.
+4. Se a conta já existir, o login autentica a identidade e oferece “Cadastrar nesta empresa”, criando/reativando a membership e a ficha `candidatos` daquele tenant.
+5. O currículo é salvo exclusivamente na ficha `candidatos.resume_data` do tenant.
+6. A candidatura é criada apenas por `rpc_candidatar_se`, exigindo ficha e membership ativas no mesmo tenant.
+
+## Administração de usuários
+
+- Platform Master Admin é identificado por `platform_user_roles.platform_master_admin` e é o único perfil autorizado para `/master`.
+- Administrador da empresa é `tenant_memberships.roles = tenant_admin` e atua somente no próprio tenant.
+- RH é `tenant_memberships.roles = hr` e pertence a uma única empresa ativa.
+- A Edge Function de administração aceita como alvo somente usuários RH daquele tenant.
+- Candidato não pode receber papel administrativo e seu cadastro profissional é sempre tenant-scoped.
