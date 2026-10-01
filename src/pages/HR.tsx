@@ -4885,6 +4885,12 @@ export function HRCandidatos() {
         } as any;
       });
       setCandidatos(candidatosData);
+    } catch (error) {
+      console.error("Erro ao carregar dados do RH:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
