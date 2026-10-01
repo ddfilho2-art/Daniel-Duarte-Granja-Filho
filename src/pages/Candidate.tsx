@@ -30,9 +30,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { ChatInput } from "../components/ChatInput";
 import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
+import { useTenant } from "../contexts/TenantContext";
+import { loadCurrentCandidate } from "../lib/current-candidate";
 
 export function CandidateDashboard() {
   const { profile, updateProfile } = useAuth();
+  const { tenant } = useTenant();
   const [stats, setStats] = useState({ active: 0, tests: 0, interviews: 0 });
   const [recentApplications, setRecentApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,20 +43,15 @@ export function CandidateDashboard() {
     useState(true);
 
   useEffect(() => {
-    if (!profile?.uid) return;
+    if (!profile?.uid || !tenant?.id) return;
 
     const fetchDashboardData = async () => {
       try {
-        // Fetch user profile to get resume_data
-        const { data: userDoc } = await supabase
-          .from("users")
-          .select("resume_data")
-          .eq("uid", profile.uid)
-          .maybeSingle();
+        const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+        const resumeData = candidate?.resume_data || null;
 
         const isCurriculoCompleto = (data: any) => {
           if (!data) return false;
-
           return (
             !!data.nome &&
             !!data.telefone &&
@@ -64,48 +62,52 @@ export function CandidateDashboard() {
           );
         };
 
-        const completo = isCurriculoCompleto(userDoc?.resume_data);
+        const completo = isCurriculoCompleto(resumeData);
         setIsCurriculoCompletoState(completo);
-        console.log("📊 [GLOBAL CHECK] Currículo completo:", completo);
+
+        if (!candidate) {
+          setStats({ active: 0, tests: 0, interviews: 0 });
+          setRecentApplications([]);
+          return;
+        }
 
         const { data: candidaturas, error } = await supabase
           .from("candidaturas")
           .select("*, vagas(titulo)")
-          .eq("candidato_id", profile.uid);
+          .eq("tenant_id", tenant.id)
+          .eq("candidato_id", candidate.id);
 
         if (error) throw error;
 
-        const active = candidaturas.filter((c) => {
-          const status = c.status;
-          return !status || status === "APROVADA";
-        }).length;
-        const tests = candidaturas.filter((c) => {
+        const rows = candidaturas || [];
+        const active = rows.filter((c) => !c.status || c.status === "APROVADA").length;
+        const tests = rows.filter((c) => {
           const fase = c.fase ?? "Triagem";
           return fase === "Prova" && c.aprovacao_teste === "Aprovado";
         }).length;
-        const interviews = candidaturas.filter((c) => {
+        const interviews = rows.filter((c) => {
           const fase = c.fase ?? "Triagem";
           return ["Entrevista RH", "Entrevista Gestor"].includes(fase);
         }).length;
 
         setStats({ active, tests, interviews });
 
-        const recent = candidaturas
-          .sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime(),
-          )
-          .slice(0, 3)
-          .map((c) => ({
-            id: c.id,
-            cargo: (c.vagas as any)?.titulo || "Vaga",
-            data: c.created_at,
-            fase: c.fase ?? "Triagem",
-            status: c.status || (c.visualizado ? "ATIVO" : "NOVO"),
-          }));
-
-        setRecentApplications(recent);
+        setRecentApplications(
+          rows
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime(),
+            )
+            .slice(0, 3)
+            .map((c) => ({
+              id: c.id,
+              cargo: (c.vagas as any)?.titulo || "Vaga",
+              data: c.created_at,
+              fase: c.fase ?? "Triagem",
+              status: c.status || (c.visualizado ? "ATIVO" : "NOVO"),
+            })),
+        );
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -114,7 +116,7 @@ export function CandidateDashboard() {
     };
 
     fetchDashboardData();
-  }, [profile]);
+  }, [profile, tenant?.id]);
 
   if (loading) return <div className="p-12 text-center">Carregando...</div>;
 
@@ -292,123 +294,39 @@ const getResumeCompletenessScore = (resume: any) => {
 
 export function CandidateResume() {
   useEffect(() => {
-    console.log("🟢 [FORM] MONTADO");
-    return () => console.log("🔴 [FORM] DESMONTADO");
-  }, []);
-
-  const { profile, updateProfile } = useAuth();
-  const [formData, setFormData] = useState({
-    nome: "",
-    email: "",
-    telefone: "",
-    linkedin: "",
-    dataNascimento: "",
-    genero: "",
-    raca: "",
-    pcd: "",
-    cep: "",
-    logradouro: "",
-    numero: "",
-    complemento: "",
-    bairro: "",
-    cidade: "",
-    estado: "",
-    resumo: "",
-    experiencias: [] as Experience[],
-    formacoes: [] as Education[],
-    idiomas: [] as Language[],
-    certificacoes: [] as Certification[],
-    habilidades: "",
-    foto: "",
-  });
-
-  const [isSaved, setIsSaved] = useState(false);
-  const [certificacoesOpcoes, setCertificacoesOpcoes] = useState<string[]>([]);
-
-  useEffect(() => {
     const loadData = async () => {
-      if (profile?.uid || profile?.email || profile?.login) {
-        const filters = [
-          profile?.uid ? `uid.eq.${profile.uid}` : null,
-          profile?.email ? `email.eq.${profile.email}` : null,
-          profile?.login
-            ? `login_lower.eq.${profile.login.toLowerCase()}`
-            : null,
-        ].filter(Boolean);
+      if (!profile?.uid || !tenant?.id) return;
 
-        const { data: userDocs, error } = await supabase
-          .from("users")
-          .select("*")
-          .or(filters.join(","));
+      try {
+        const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+        const data = candidate?.resume_data || {};
 
-        if (error) {
-          console.error("Erro ao carregar currículo do candidato:", error);
-        }
-
-        const bestUserDoc = (userDocs || [])
-          .map((doc) => ({
-            ...doc,
-            __resumeScore: getResumeCompletenessScore(doc.resume_data),
-          }))
-          .sort((a, b) => b.__resumeScore - a.__resumeScore)[0];
-
-        console.log("🧾 [RESUME LOAD] registros encontrados:", userDocs);
-        console.log("🧾 [RESUME LOAD] registro escolhido:", bestUserDoc);
-
-        // [EDITABLE_START:curriculo_init_form]
-        if (bestUserDoc && bestUserDoc.resume_data) {
-          const data = bestUserDoc.resume_data;
-          setFormData({
-            nome: data.nome || bestUserDoc.nome || profile?.nome || "",
-            email: data.email || bestUserDoc.email || profile?.email || "",
-            telefone: data.telefone || "",
-            linkedin: data.linkedin || "",
-            dataNascimento: data.dataNascimento || "",
-            genero: data.genero || "",
-            raca: data.raca || "",
-            pcd: data.pcd || "",
-            cep: data.cep || "",
-            logradouro: data.logradouro || "",
-            numero: data.numero || "",
-            complemento: data.complemento || "",
-            bairro: data.bairro || "",
-            cidade: data.cidade || "",
-            estado: data.estado || "",
-            resumo: data.resumo || "",
-            experiencias: data.experiencias || [],
-            formacoes: data.formacoes || [],
-            idiomas: data.idiomas || [],
-            certificacoes: data.certificacoes || [],
-            habilidades: data.habilidades || "",
-            foto: data.foto || "",
-          });
-        } else {
-          setFormData((prev) => ({
-            ...prev,
-            nome: profile?.nome || "",
-            email: profile?.email || "",
-            telefone: "",
-            linkedin: "",
-            dataNascimento: "",
-            genero: "",
-            raca: "",
-            pcd: "",
-            cep: "",
-            logradouro: "",
-            numero: "",
-            complemento: "",
-            bairro: "",
-            cidade: "",
-            estado: "",
-            resumo: "",
-            experiencias: [],
-            formacoes: [],
-            idiomas: [],
-            certificacoes: [],
-            habilidades: "",
-            foto: "",
-          }));
-        }
+        setFormData({
+          nome: data.nome || candidate?.nome || profile?.nome || "",
+          email: data.email || candidate?.email || profile?.email || "",
+          telefone: data.telefone || candidate?.telefone || "",
+          linkedin: data.linkedin || candidate?.linkedin || "",
+          dataNascimento: data.dataNascimento || "",
+          genero: data.genero || "",
+          raca: data.raca || "",
+          pcd: data.pcd || "",
+          cep: data.cep || "",
+          logradouro: data.logradouro || "",
+          numero: data.numero || "",
+          complemento: data.complemento || "",
+          bairro: data.bairro || "",
+          cidade: data.cidade || "",
+          estado: data.estado || "",
+          resumo: data.resumo || candidate?.resumo || "",
+          experiencias: data.experiencias || [],
+          formacoes: data.formacoes || [],
+          idiomas: data.idiomas || [],
+          certificacoes: data.certificacoes || [],
+          habilidades: data.habilidades || "",
+          foto: data.foto || candidate?.foto_url || "",
+        });
+      } catch (error) {
+        console.error("Erro ao carregar currículo do candidato:", error);
       }
 
       try {
@@ -418,14 +336,15 @@ export function CandidateResume() {
           .order("nome");
 
         if (!certsError && certsData) {
-          setCertificacoesOpcoes(certsData.map((c: any) => c.nome));
+          setCertificacoesOpcoes(certsData.map((item: any) => item.nome));
         }
       } catch (error) {
         console.error("Erro ao buscar certificações:", error);
       }
     };
-    loadData();
-  }, [profile]);
+
+    void loadData();
+  }, [profile, tenant?.id]);
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -645,48 +564,38 @@ export function CandidateResume() {
       isFullyCompleted ? "true" : "false",
     );
 
-    if (profile?.uid || profile?.email || profile?.login) {
+    if (profile?.uid && tenant?.id) {
       try {
-        const filters = [
-          profile?.uid ? `uid.eq.${profile.uid}` : null,
-          profile?.email ? `email.eq.${profile.email}` : null,
-          profile?.login
-            ? `login_lower.eq.${profile.login.toLowerCase()}`
-            : null,
-        ].filter(Boolean);
+        const { data: candidate, error: candidateError } = await supabase
+          .from("candidatos")
+          .select("id")
+          .eq("tenant_id", tenant.id)
+          .eq("user_id", profile.uid)
+          .maybeSingle();
 
-        console.log("🧾 [RESUME SAVE] filtros aplicados:", filters);
-        console.log("🧾 [RESUME SAVE] payload:", processedFormData);
-
-        const { data: existingUsers, error: existingUsersError } =
-          await supabase
-            .from("users")
-            .select("id, uid, nome, email, login, resume_data")
-            .or(filters.join(","));
-
-        if (existingUsersError) throw existingUsersError;
-
-        console.log(
-          "🧾 [RESUME SAVE] registros que serão sincronizados:",
-          existingUsers,
-        );
+        if (candidateError) throw candidateError;
+        if (!candidate) {
+          throw new Error("Cadastro do candidato nesta empresa não foi localizado.");
+        }
 
         const { error } = await supabase
-          .from("users")
+          .from("candidatos")
           .update({
             nome: processedFormData.nome || profile?.nome || "Sem Nome",
-            resume_completed: isFullyCompleted,
+            email: processedFormData.email || profile?.email || null,
+            telefone: processedFormData.telefone || null,
+            linkedin: processedFormData.linkedin || null,
+            resumo: processedFormData.resumo || null,
+            foto_url: processedFormData.foto || null,
             resume_data: processedFormData,
-            updated_at: new Date().toISOString(),
           })
-          .or(filters.join(","));
+          .eq("id", candidate.id)
+          .eq("tenant_id", tenant.id);
 
         if (error) throw error;
 
         if (updateProfile) {
-          updateProfile({
-            nome: processedFormData.nome,
-          } as any);
+          updateProfile({ nome: processedFormData.nome } as any);
         }
       } catch (error) {
         console.error("Erro ao salvar currículo no Supabase:", error);
