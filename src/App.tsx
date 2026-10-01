@@ -87,6 +87,8 @@ const ProtectedRoute = ({
     profileLoading,
     tenantMembershipLoading,
     tenantRoles,
+    clinicRoles,
+    hasClinicAccess,
     hasTenantAccess,
     canAdministerTenant,
     isAuthenticated,
@@ -153,6 +155,17 @@ const ProtectedRoute = ({
       if (normalized === "admin") return canAdministerTenant;
       if (normalized === "rh") return tenantRoles.includes("hr");
       if (normalized === "candidato") return tenantRoles.includes("candidate");
+      if (
+        normalized === "clinica" ||
+        normalized === "clínica" ||
+        normalized === "empresa de exame"
+      ) {
+        return (
+          hasClinicAccess ||
+          tenantRoles.includes("clinic_admin") ||
+          tenantRoles.includes("clinic_staff")
+        );
+      }
       return false;
     });
     const isAllowed = isTenantRoute ? tenantAllowed : legacyAllowed;
@@ -161,6 +174,7 @@ const ProtectedRoute = ({
       const redirectPath =
         resolveAuthorizedHomePath(userProfileNormalized, isTenantRoute, {
           roles: tenantRoles,
+          clinicRoles,
           canAdministerTenant,
         }) || "/";
 
@@ -207,7 +221,7 @@ const App = () => {
             <Route
               path="/saude-ocupacional"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute allowedProfiles={["Clinica"]}>
                   <OccupationalHealthPortal />
                 </ProtectedRoute>
               }
