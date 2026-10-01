@@ -1312,10 +1312,12 @@ export function Cadastro() {
 }
 
 export function Login() {
-  // [EDITABLE_START:public_login_state]
   const [loginInput, setLoginInput] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<
+    "admin" | "rh" | "clinica" | "candidato"
+  >("candidato");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -1326,14 +1328,41 @@ export function Login() {
     profileLoading,
     tenantMembershipLoading,
     tenantRoles,
+    clinicRoles,
+    hasClinicAccess,
     hasTenantAccess,
     canAdministerTenant,
     login,
   } = useAuth();
   const { isTenantRoute } = useTenant();
-  // [EDITABLE_END:public_login_state]
 
-  // [EDITABLE_START:public_login_useeffect_redirect]
+  const accessOptions = [
+    {
+      id: "admin" as const,
+      title: "Administrador",
+      description: "Gestão da plataforma e configurações.",
+      icon: ShieldCheck,
+    },
+    {
+      id: "rh" as const,
+      title: "Recursos Humanos",
+      description: "Vagas, candidatos e processos seletivos.",
+      icon: Users,
+    },
+    {
+      id: "clinica" as const,
+      title: "Empresa de exame médico",
+      description: "Agendamento e resultados de saúde ocupacional.",
+      icon: FlaskConical,
+    },
+    {
+      id: "candidato" as const,
+      title: "Candidato",
+      description: "Currículo, vagas e acompanhamento das candidaturas.",
+      icon: Briefcase,
+    },
+  ];
+
   useEffect(() => {
     if (
       authLoading ||
@@ -1348,7 +1377,11 @@ export function Login() {
     const destination = resolveAuthorizedHomePath(
       profile.perfil,
       isTenantRoute,
-      { roles: tenantRoles, canAdministerTenant },
+      {
+        roles: tenantRoles,
+        clinicRoles,
+        canAdministerTenant,
+      },
     );
 
     if (destination) {
@@ -1358,6 +1391,11 @@ export function Login() {
 
     if (isTenantRoute && !hasTenantAccess) {
       setError("Sua conta não possui vínculo ativo com esta empresa.");
+      return;
+    }
+
+    if (selectedProfile === "clinica" && !hasClinicAccess) {
+      setError("Esta conta não possui acesso autorizado à empresa de exame médico.");
     }
   }, [
     user,
@@ -1366,19 +1404,17 @@ export function Login() {
     profileLoading,
     tenantMembershipLoading,
     tenantRoles,
+    clinicRoles,
+    hasClinicAccess,
     hasTenantAccess,
     canAdministerTenant,
     isTenantRoute,
     navigate,
+    selectedProfile,
   ]);
-  // [EDITABLE_END:public_login_useeffect_redirect]
 
-  // [EDITABLE_START:public_login_handle_submit]
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    console.log("[LOGIN] 🚀 Iniciando login com username:", loginInput);
-
     setLoading(true);
     setError("");
 
@@ -1395,93 +1431,152 @@ export function Login() {
           replace: true,
           state: { email: emailToVerify, name: nameToVerify },
         });
-        setError("Confirme seu e-mail antes de entrar.");
         return;
       }
 
-      setError(err.message || "Erro inesperado.");
+      setError(err.message || "Não foi possível entrar.");
     } finally {
       setLoading(false);
-      console.log("[LOGIN] 🛑 Finalizando login");
     }
   };
-  // [EDITABLE_END:public_login_handle_submit]
+
+  const selected = accessOptions.find((item) => item.id === selectedProfile)!;
 
   return (
-    <div className="py-12 bg-slate-50 min-h-screen flex items-center justify-center">
-      <div className="max-w-md w-full px-4 sm:px-6">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Bem-vindo de volta
+    <div className="min-h-screen bg-slate-50 py-12">
+      <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
+        <div className="mb-8 text-center">
+          <p className="text-sm font-semibold uppercase tracking-wide text-primary">
+            Recruta AÍ
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
+            Como você vai acessar?
           </h1>
-          <p className="text-slate-600 mt-2">
-            Acesse sua conta para continuar.
+          <p className="mt-2 text-slate-600">
+            Escolha o tipo de acesso e entre com suas credenciais.
           </p>
         </div>
 
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {accessOptions.map((option) => {
+            const Icon = option.icon;
+            const active = selectedProfile === option.id;
+
+            return (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => {
+                  setSelectedProfile(option.id);
+                  setError("");
+                }}
+                className={
+                  "rounded-xl border p-5 text-left transition-all " +
+                  (active
+                    ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/10"
+                    : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm")
+                }
+              >
+                <div
+                  className={
+                    "mb-4 flex h-10 w-10 items-center justify-center rounded-lg " +
+                    (active
+                      ? "bg-primary text-white"
+                      : "bg-slate-100 text-slate-600")
+                  }
+                >
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h2 className="font-semibold text-slate-900">{option.title}</h2>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {option.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Acesso selecionado
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-slate-900">
+              {selected.title}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">{selected.description}</p>
+          </div>
+
           {error && (
-            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
+            <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
               {error}
             </div>
           )}
+
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Login
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Login ou e-mail
               </label>
               <input
                 required
                 type="text"
                 value={loginInput}
                 onChange={(e) => setLoginInput(e.target.value)}
-                placeholder="Digite seu login"
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                placeholder="Digite seu login ou e-mail"
+                autoComplete="username"
+                className="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
+
             <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="block text-sm font-medium text-slate-700">
-                  Senha
-                </label>
-              </div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Senha
+              </label>
               <div className="relative">
                 <input
                   required
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary pr-10"
+                  autoComplete="current-password"
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2.5 pr-10 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="button"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                 >
                   {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
+                    <EyeOff className="h-5 w-5" />
                   ) : (
-                    <Eye className="w-5 h-5" />
+                    <Eye className="h-5 w-5" />
                   )}
                 </button>
               </div>
             </div>
-            <div className="pt-2">
-              <button
-                disabled={loading}
-                type="submit"
-                className="w-full bg-primary text-white px-4 py-2.5 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-50"
-              >
-                {loading ? "Entrando..." : "Entrar"}
-              </button>
-            </div>
+
+            <button
+              disabled={loading}
+              type="submit"
+              className="w-full rounded-lg bg-primary px-4 py-2.5 font-medium text-white transition-colors hover:bg-accent disabled:opacity-50"
+            >
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
           </form>
+
+          <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500">
+            O tipo de acesso acima é apenas uma orientação de entrada. A
+            autorização real é conferida no Supabase pelo perfil e pelas
+            permissões da conta.
+          </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
             Não tem uma conta?{" "}
             <Link
               to="/cadastro"
-              className="text-primary font-medium hover:underline"
+              className="font-medium text-primary hover:underline"
             >
               Cadastre-se
             </Link>
