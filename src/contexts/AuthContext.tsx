@@ -318,15 +318,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setHasClinicAccess(false);
       }
     } catch (error) {
-      if (sessionEstablished) await supabase.auth.signOut();
-      setAuthUserId(null);
-      setProfile(null);
-      setTenantRoles([]);
+      const candidateRegistrationRequired =
+        error instanceof Error &&
+        error.message === "CANDIDATE_TENANT_REGISTRATION_REQUIRED";
+      if (sessionEstablished && !candidateRegistrationRequired) await supabase.auth.signOut();
+      if (!candidateRegistrationRequired) {
+        setAuthUserId(null);
+        setProfile(null);
+      }
+      if (!candidateRegistrationRequired) setTenantRoles([]);
       setClinicRoles([]);
       setClinicTenantIds([]);
       setHasClinicAccess(false);
-      setHasTenantAccess(!isTenantRoute);
-      setCanAdministerTenant(false);
+      if (!candidateRegistrationRequired) {
+        setHasTenantAccess(!isTenantRoute);
+        setCanAdministerTenant(false);
+      }
       setTenantMembershipLoading(false);
       throw error;
     } finally {
