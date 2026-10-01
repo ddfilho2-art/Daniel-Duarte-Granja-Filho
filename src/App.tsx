@@ -137,6 +137,14 @@ const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
+  if (
+    location.pathname.startsWith("/admin") &&
+    !isTenantRoute &&
+    !isPlatformMasterAdmin
+  ) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (isTenantRoute && !hasTenantAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
