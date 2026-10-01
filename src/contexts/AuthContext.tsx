@@ -35,6 +35,7 @@ interface AuthContextType {
   hasClinicAccess: boolean;
   hasTenantAccess: boolean;
   canAdministerTenant: boolean;
+  isPlatformMasterAdmin: boolean;
   isAuthenticated: boolean;
   loading: boolean;
   login: (loginInput: string, passwordInput?: string) => Promise<void>;
@@ -56,6 +57,7 @@ const AuthContext = createContext<AuthContextType>({
   hasClinicAccess: false,
   hasTenantAccess: false,
   canAdministerTenant: false,
+  isPlatformMasterAdmin: false,
   isAuthenticated: false,
   loading: true,
   login: async () => {},
@@ -82,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hasClinicAccess, setHasClinicAccess] = useState(false);
   const [hasTenantAccess, setHasTenantAccess] = useState(!isTenantRoute);
   const [canAdministerTenant, setCanAdministerTenant] = useState(false);
+  const [isPlatformMasterAdmin, setIsPlatformMasterAdmin] = useState(false);
   const profileRequestId = useRef(0);
 
   const synchronizeProfile = useCallback(
@@ -292,6 +295,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setAuthUserId(nextProfile.uid);
       setProfile(nextProfile);
+
+      try {
+        const { data: platformMaster } = await supabase.rpc("is_platform_master_admin");
+        setIsPlatformMasterAdmin(platformMaster === true);
+      } catch {
+        setIsPlatformMasterAdmin(false);
+      }
       try {
         const { data: clinicAccess } = await supabase.rpc("get_current_clinic_access");
         const clinicPayload = (clinicAccess || {}) as Record<string, unknown>;
@@ -330,6 +340,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setClinicRoles([]);
       setClinicTenantIds([]);
       setHasClinicAccess(false);
+      setIsPlatformMasterAdmin(false);
       if (!candidateRegistrationRequired) {
         setHasTenantAccess(!isTenantRoute);
         setCanAdministerTenant(false);
