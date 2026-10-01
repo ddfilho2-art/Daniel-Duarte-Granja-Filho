@@ -112,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthUserId(null);
         setProfile(null);
         setTenantRoles([]);
+        setClinicRoles([]);
+        setClinicTenantIds([]);
+        setHasClinicAccess(false);
         setHasTenantAccess(!isTenantRoute);
         setCanAdministerTenant(false);
         setTenantMembershipLoading(false);
@@ -324,6 +327,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthUserId(null);
     setProfile(null);
     setTenantRoles([]);
+    setClinicRoles([]);
+    setClinicTenantIds([]);
+    setHasClinicAccess(false);
     setHasTenantAccess(!isTenantRoute);
     setCanAdministerTenant(false);
     setTenantMembershipLoading(false);
@@ -373,6 +379,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileLoading,
       tenantMembershipLoading,
       tenantRoles,
+      clinicRoles,
+      clinicTenantIds,
+      hasClinicAccess,
       hasTenantAccess,
       canAdministerTenant,
       authUserId,
