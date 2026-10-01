@@ -174,3 +174,11 @@ O Supabase recomenda testar políticas para SELECT/INSERT/UPDATE/DELETE e os pap
 - RH é `tenant_memberships.roles = hr` e pertence a uma única empresa ativa.
 - A Edge Function de administração aceita como alvo somente usuários RH daquele tenant.
 - Candidato não pode receber papel administrativo e seu cadastro profissional é sempre tenant-scoped.
+
+
+## Regra adicional de identidade Auth
+
+- O trigger `handle_new_user()` nunca aceita `raw_user_meta_data.perfil` como autoridade.
+- Todo usuário criado diretamente pelo Supabase Auth nasce em `public.users` como `Candidato`.
+- Perfis privilegiados (RH, administrador da empresa e administrador da plataforma) são atribuídos somente por fluxos administrativos confiáveis.
+- A Edge Function de gestão de RH recusa converter uma conta existente com outro perfil em RH.
