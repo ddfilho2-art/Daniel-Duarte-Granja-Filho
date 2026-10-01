@@ -83,6 +83,12 @@ export function resolveAuthorizedHomePath(
     if (access.canAdministerTenant) return "/admin";
     if (access.roles.includes("hr")) return "/rh";
     if (access.roles.includes("candidate")) return "/candidato";
+    if (
+      access.roles.includes("clinic_admin") ||
+      access.roles.includes("clinic_staff")
+    ) {
+      return "/saude-ocupacional";
+    }
     return null;
   }
 
