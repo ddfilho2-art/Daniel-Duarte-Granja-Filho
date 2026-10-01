@@ -1,20 +1,63 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Recruta AÍ
 
-# Run and deploy your AI Studio app
+Plataforma de recrutamento multi-tenant construída com React/Vite, Supabase e Vercel.
 
-This contains everything you need to run your app locally.
+## Documentação
 
-View your app in AI Studio: https://ai.studio/apps/a859edb5-8c12-4ccf-a33c-3ee3af306506
+A documentação técnica e arquitetural está em [docs/](./docs/README.md).
 
-## Run Locally
+Principais documentos:
 
-**Prerequisites:**  Node.js
+- [Arquitetura multi-tenant](./docs/ARQUITETURA-MULTI-TENANT.md)
+- [Segurança e autorização](./docs/SEGURANCA-E-AUTORIZACAO.md)
+- [Deploy multi-tenant](./docs/DEPLOY-MULTI-TENANT.md)
+- [Status da arquitetura](./docs/STATUS-ARQUITETURA.md)
 
+## Modelo atual
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+O sistema utiliza uma única aplicação para múltiplas empresas.
+
+- empresa = tenant;
+- administrador da plataforma = escopo global;
+- administrador da empresa = escopo administrativo do tenant autorizado;
+- RH = escopo de uma empresa;
+- candidato = cadastro independente por empresa;
+- equipe clínica = transversal à fase de exame ocupacional.
+
+## Desenvolvimento local
+
+### Pré-requisitos
+
+- Node.js 24.x
+- projeto Supabase configurado
+- variáveis públicas do Supabase disponíveis no ambiente
+
+### Instalação
+
+```bash
+npm install
+```
+
+### Execução
+
+```bash
+npm run dev
+```
+
+### Build
+
+```bash
+npm run build
+```
+
+## Deploy
+
+O projeto é implantado na Vercel a partir do branch `main`.
+
+O deploy é único: adicionar uma empresa não exige um novo projeto Vercel.
+
+O isolamento entre empresas é responsabilidade do modelo multi-tenant do Supabase e das políticas RLS.
+
+## Estado
+
+A fundação multi-tenant já existe. Antes da abertura para produção em escala, a principal manutenção estrutural pendente é alinhar o cadastro de candidatos ao requisito de cadastro independente por empresa e completar a revisão de autorização/RLS descrita em [STATUS-ARQUITETURA.md](./docs/STATUS-ARQUITETURA.md).
