@@ -555,7 +555,8 @@ async function deleteMember(
         revoked_at: new Date().toISOString(),
       })
       .eq("tenant_id", tenantId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .contains("roles", ["hr"]);
 
     if (error) throw error;
 
@@ -582,14 +583,14 @@ async function updateLegacyUser(
   try {
     const { data: membership, error: membershipError } = await adminClient
       .from("tenant_memberships")
-      .select("user_id")
+      .select("user_id, roles")
       .eq("tenant_id", tenantId)
       .eq("user_id", userId)
       .maybeSingle();
 
     if (membershipError) throw membershipError;
-    if (!membership) {
-      return { success: false, code: "USER_NOT_FOUND", error: "User is not a member of this tenant" };
+    if (!membership || !membership.roles?.includes("hr")) {
+      return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado neste tenant" };
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -635,14 +636,14 @@ async function resetUserPassword(
   try {
     const { data: membership, error: membershipError } = await adminClient
       .from("tenant_memberships")
-      .select("user_id")
+      .select("user_id, roles")
       .eq("tenant_id", tenantId)
       .eq("user_id", userId)
       .maybeSingle();
 
     if (membershipError) throw membershipError;
-    if (!membership) {
-      return { success: false, code: "USER_NOT_FOUND", error: "User is not a member of this tenant" };
+    if (!membership || !membership.roles?.includes("hr")) {
+      return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado neste tenant" };
     }
 
     if (!password || password.length < 8 || !/[A-Z]/.test(password) ||
@@ -675,14 +676,14 @@ async function setUserStatus(
   try {
     const { data: membership, error: membershipError } = await adminClient
       .from("tenant_memberships")
-      .select("user_id")
+      .select("user_id, roles")
       .eq("tenant_id", tenantId)
       .eq("user_id", userId)
       .maybeSingle();
 
     if (membershipError) throw membershipError;
-    if (!membership) {
-      return { success: false, code: "USER_NOT_FOUND", error: "User is not a member of this tenant" };
+    if (!membership || !membership.roles?.includes("hr")) {
+      return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado neste tenant" };
     }
 
     const normalizedStatus = status.trim();
@@ -717,7 +718,8 @@ async function setUserStatus(
           : { revoked_at: null }),
       })
       .eq("tenant_id", tenantId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .contains("roles", ["hr"]);
 
     if (membershipUpdateError) throw membershipUpdateError;
 
