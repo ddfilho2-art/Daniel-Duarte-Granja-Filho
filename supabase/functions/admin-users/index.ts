@@ -480,6 +480,36 @@ async function createMember(
 
     const userId = authUser.id;
 
+    const { data: existingProfile, error: existingProfileError } = await adminClient
+      .from("users")
+      .select("id, perfil, status")
+      .eq("id", userId)
+      .maybeSingle();
+    if (existingProfileError) throw existingProfileError;
+
+    if (existingProfile && existingProfile.perfil !== "RH") {
+      return {
+        success: false,
+        code: "PROFILE_CONFLICT",
+        error: "A conta já existe com outro perfil e não pode ser convertida em RH por um administrador da empresa.",
+      };
+    }
+
+    const { error: profileUpsertError } = await adminClient
+      .from("users")
+      .upsert({
+        id: userId,
+        uid: userId,
+        email: normalizedEmail,
+        nome: existingProfile?.perfil === "RH" ? undefined : normalizedEmail.split("@")[0],
+        login: normalizedEmail.split("@")[0],
+        login_lower: normalizedEmail.split("@")[0].toLowerCase(),
+        perfil: "RH",
+        status: "Ativo",
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+    if (profileUpsertError) throw profileUpsertError;
+
     // Then add to tenant_memberships
     const { data, error } = await adminClient
       .from("tenant_memberships")
@@ -591,6 +621,16 @@ async function updateLegacyUser(
     if (membershipError) throw membershipError;
     if (!membership || !membership.roles?.includes("hr")) {
       return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado neste tenant" };
+    }
+
+    const { data: targetProfile, error: targetProfileError } = await adminClient
+      .from("users")
+      .select("perfil")
+      .eq("id", userId)
+      .maybeSingle();
+    if (targetProfileError) throw targetProfileError;
+    if (!targetProfile || targetProfile.perfil !== "RH") {
+      return { success: false, code: "INVALID_PROFILE", error: "Somente usuários RH podem ser alterados." };
     }
 
     const normalizedEmail = email.trim().toLowerCase();
