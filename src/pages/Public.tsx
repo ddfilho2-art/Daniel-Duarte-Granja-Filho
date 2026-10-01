@@ -21,6 +21,7 @@ import {
   Trash2,
   Plus,
   XCircle,
+  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
