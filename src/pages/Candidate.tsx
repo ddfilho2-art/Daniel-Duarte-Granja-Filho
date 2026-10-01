@@ -2353,7 +2353,6 @@ export function CandidateCandidaturas() {
           event: "*",
           schema: "public",
           table: "candidaturas",
-          filter: `candidato_id=eq.${(await loadCurrentCandidate(tenant.id, profile.uid))?.id || ""}`,
         },
         () => {
           fetchCandidaturas();
