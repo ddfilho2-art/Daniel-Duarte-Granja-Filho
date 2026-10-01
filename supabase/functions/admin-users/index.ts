@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { readJsonBody } from "shared/http.ts";
+
 
 function getCorsHeaders(req: Request): Record<string, string> | null {
   const origin = req.headers.get("Origin");
@@ -22,6 +22,14 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
       "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
     Vary: "Origin",
   };
+}
+
+async function readJsonBody<T>(request: Request, maxBytes = 16384): Promise<T> {
+  const contentType = request.headers.get("content-type") || "";
+  if (!contentType.toLowerCase().includes("application/json")) throw new Error("unsupported_media_type");
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > maxBytes) throw new Error("payload_too_large");
+  try { return JSON.parse(body) as T; } catch { throw new Error("invalid_json"); }
 }
 
 interface AdminUserRequest {
@@ -166,24 +174,14 @@ async function getMember(
   userId: string
 ): Promise<AdminUserResponse> {
   try {
-    const { data, error } = await adminClient
-      .from("tenant_memberships")
-      .select("*")
-      .eq("tenant_id", tenantId)
-      .eq("user_id", userId)
-      .single();
-
-    if (error) throw error;
-
-    return {
-      success: true,
-      data,
-    };
+    const { data: membership, error: membershipError } = await adminClient.from("tenant_memberships").select("*").eq("tenant_id", tenantId).eq("user_id", userId).contains("roles", ["hr"]).single();
+    if (membershipError) throw membershipError;
+    const { data: user, error: userError } = await adminClient.from("users").select("id, nome, email, login, perfil, status").eq("id", userId).eq("perfil", "RH").maybeSingle();
+    if (userError) throw userError;
+    if (!user) return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado." };
+    return { success: true, data: { ...user, tenant_membership: membership } };
   } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -523,13 +521,11 @@ async function updateMember(
       updateData.status = status;
     }
 
-    const { data, error } = await adminClient
-      .from("tenant_memberships")
-      .update(updateData)
-      .eq("tenant_id", tenantId)
-      .eq("user_id", userId)
-      .select()
-      .single();
+    const { data: targetUser, error: targetUserError } = await adminClient.from("users").select("id, perfil").eq("id", userId).maybeSingle();
+    if (targetUserError) throw targetUserError;
+    if (!targetUser || targetUser.perfil !== "RH") return { success: false, code: "INVALID_PROFILE", error: "Somente usuários RH podem ser administrados por esta função." };
+    if (roles.some((role) => role !== "hr")) return { success: false, code: "INVALID_ROLE", error: "Somente o papel RH é permitido nesta gestão." };
+    const { data, error } = await adminClient.from("tenant_memberships").update({ ...updateData, roles: ["hr"] }).eq("tenant_id", tenantId).eq("user_id", userId).contains("roles", ["hr"]).select().single();
 
     if (error) throw error;
 
@@ -915,7 +911,7 @@ async function handleRequest(
               error: "Este e-mail já está em uso.",
             };
           } else {
-            result = await createMember(tenantId, normalizedEmail, ["RH"]);
+            result = await createMember(tenantId, normalizedEmail, ["hr"]);
           }
 
           if (result.success && result.data && typeof result.data === "object") {
