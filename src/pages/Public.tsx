@@ -30,7 +30,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { useVagas } from "../lib/useVagas";
 import { safeFetch } from "../lib/api";
 import { sendVerificationCode } from "../lib/email-verification";
-import { requestCandidateAnalysis } from "../lib/candidate-analysis";
 import { useTenant } from "../contexts/TenantContext";
 import { resolveAuthorizedHomePath } from "../lib/tenant-access";
 import { loadCurrentCandidate } from "../lib/current-candidate";
@@ -976,7 +975,7 @@ export function Cadastro() {
     tenantRoles,
     canAdministerTenant,
   } = useAuth();
-  const { isTenantRoute } = useTenant();
+  const { isTenantRoute, tenant } = useTenant();
 
   const [formData, setFormData] = useState({
     nome: "",
@@ -1022,13 +1021,23 @@ export function Cadastro() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!isTenantRoute || !tenant) {
+      setError("O cadastro de candidato deve ser feito dentro do portal de uma empresa.");
+      return;
+    }
+
     if (formData.senha !== formData.confirmarSenha) {
       setError("As senhas não coincidem.");
       return;
     }
 
-    if (formData.senha.length < 8) {
-      setError("A senha deve ter pelo menos 8 caracteres.");
+    if (
+      formData.senha.length < 8 ||
+      !/[A-Z]/.test(formData.senha) ||
+      !/[a-z]/.test(formData.senha) ||
+      !/[0-9]/.test(formData.senha)
+    ) {
+      setError("A senha deve ter pelo menos 8 caracteres e conter maiúscula, minúscula e número.");
       return;
     }
 
@@ -1038,94 +1047,53 @@ export function Cadastro() {
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
+        email: formData.email.trim().toLowerCase(),
         password: formData.senha,
         options: {
           data: {
-            nome: formData.nome,
-            login: formData.login,
+            nome: formData.nome.trim(),
+            login: formData.login.trim(),
             perfil: "Candidato",
           },
           emailRedirectTo: `${window.location.origin}/verify-email`,
         },
       });
 
-      console.log("--- SIGNUP DEBUG ---");
-      console.log("Email:", formData.email);
-      console.log("Resposta completa:", authData);
-      console.log("Erro:", authError);
-
       if (authError) {
-        if (authError.message.includes("User already registered")) {
-          setError("Este email já está cadastrado. Faça login.");
-          setLoading(false);
+        if (authError.message?.includes("User already registered")) {
+          setError("Este e-mail já possui uma conta. Faça login para cadastrar seu currículo nesta empresa.");
           return;
         }
+        throw authError;
+      }
 
-        console.error("Erro no cadastro:", authError.message);
-        setError(authError.message);
-        setLoading(false);
+      if (!authData.user) {
+        throw new Error("Não foi possível criar a conta.");
+      }
+
+      if (authData.user.identities && authData.user.identities.length === 0) {
+        setError("Não foi possível criar uma nova conta com estes dados. Se você já possui uma conta, faça login.");
         return;
       }
 
-      if (!authData.user) throw new Error("Erro ao criar usuário.");
-
-      console.log("Usuário criado no Auth:", authData.user.id);
-
-      const { data: existingUser, error: existingUserError } = await supabase
-        .from("users")
-        .select("*")
-        .eq("id", authData.user.id)
-        .maybeSingle();
-
-      if (existingUserError) {
-        console.error("Erro ao buscar usuário:", existingUserError);
-        throw new Error("Erro ao validar usuário existente.");
-      }
-
-      if (!existingUser) {
-        console.log("Inserindo na tabela users...");
-
-        const { error: userError } = await supabase.from("users").insert({
-          id: authData.user.id,
-          uid: authData.user.id,
-          nome: formData.nome,
-          email: formData.email,
-          login: formData.login,
-          login_lower: formData.login.toLowerCase(),
-          perfil: "Candidato",
-          status: "Ativo",
-          resume_completed: false,
-          email_verified: false,
-        });
-
-        if (userError) {
-          console.error("Erro ao inserir usuário:", userError);
-
-          try {
-            await supabase.auth.admin.deleteUser(authData.user.id);
-            console.log("Rollback realizado: usuário removido do Auth");
-          } catch (deleteError) {
-            console.error("Erro ao fazer rollback no Auth:", deleteError);
-          }
-
-          throw new Error("Erro ao salvar usuário. Tente novamente.");
-        }
-      }
-
+      // A trigger do Auth cria o registro em public.users. A ficha de candidato
+      // é criada depois do login, já dentro do tenant correto.
       await supabase.auth.signOut();
 
       await logAudit(
         "Cadastro",
         "Candidato",
-        `Novo candidato cadastrado: ${formData.nome}.`,
+        `Novo candidato cadastrado no tenant ${tenant.displayName}: ${formData.nome}.`,
       );
 
-      sessionStorage.setItem("pending_verify_email", formData.email);
-      sessionStorage.setItem("pending_verify_name", formData.nome);
+      sessionStorage.setItem("pending_verify_email", formData.email.trim().toLowerCase());
+      sessionStorage.setItem("pending_verify_name", formData.nome.trim());
 
       try {
-        await sendVerificationCode(formData.email, formData.nome);
+        await sendVerificationCode(
+          formData.email.trim().toLowerCase(),
+          formData.nome.trim(),
+        );
       } catch (verificationError) {
         console.warn(
           "Falha ao enviar código de confirmação. Usuário poderá reenviar na tela de verificação.",
@@ -1135,10 +1103,10 @@ export function Cadastro() {
 
       navigate("/verify-email", {
         replace: true,
-        state: { email: formData.email, name: formData.nome },
+        state: { email: formData.email.trim().toLowerCase(), name: formData.nome.trim() },
       });
     } catch (err: any) {
-      console.error(err);
+      console.error("Erro no cadastro:", err);
       setError(err.message || "Erro ao realizar cadastro.");
     } finally {
       setLoading(false);
@@ -1300,6 +1268,7 @@ export function Login() {
   >("candidato");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [candidateRegistrationRequired, setCandidateRegistrationRequired] = useState(false);
   const navigate = useNavigate();
   const {
     user,
@@ -1313,6 +1282,7 @@ export function Login() {
     hasTenantAccess,
     canAdministerTenant,
     login,
+    registerCandidateForTenant,
   } = useAuth();
   const { isTenantRoute } = useTenant();
 
@@ -1414,6 +1384,11 @@ export function Login() {
         return;
       }
 
+      if (err.message === "CANDIDATE_TENANT_REGISTRATION_REQUIRED") {
+        setCandidateRegistrationRequired(true);
+        setError("Sua conta já existe, mas ainda não está cadastrada nesta empresa.");
+        return;
+      }
       setError(err.message || "Não foi possível entrar.");
     } finally {
       setLoading(false);
@@ -1449,6 +1424,7 @@ export function Login() {
                 onClick={() => {
                   setSelectedProfile(option.id);
                   setError("");
+                  setCandidateRegistrationRequired(false);
                 }}
                 className={
                   "rounded-xl border p-5 text-left transition-all " +
@@ -1545,6 +1521,31 @@ export function Login() {
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
+
+          {candidateRegistrationRequired && isTenantRoute && (
+            <button
+              type="button"
+              disabled={loading}
+              onClick={async () => {
+                setLoading(true);
+                setError("");
+                try {
+                  await registerCandidateForTenant();
+                  navigate("/candidato", { replace: true });
+                } catch (registrationError: any) {
+                  setError(
+                    registrationError?.message ||
+                      "Não foi possível cadastrar sua conta nesta empresa.",
+                  );
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="mt-5 w-full rounded-lg bg-primary px-4 py-2.5 font-medium text-white hover:bg-accent disabled:opacity-50"
+            >
+              {loading ? "Cadastrando nesta empresa..." : "Cadastrar nesta empresa"}
+            </button>
+          )}
 
           <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500">
             O tipo de acesso acima é apenas uma orientação de entrada. A
