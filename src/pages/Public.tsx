@@ -979,7 +979,6 @@ export function Cadastro() {
 
   const [formData, setFormData] = useState({
     nome: "",
-    login: "",
     email: "",
     senha: "",
     confirmarSenha: "",
@@ -1052,7 +1051,6 @@ export function Cadastro() {
         options: {
           data: {
             nome: formData.nome.trim(),
-            login: formData.login.trim(),
             perfil: "Candidato",
           },
           emailRedirectTo: `${window.location.origin}/verify-email`,
@@ -1146,7 +1144,7 @@ export function Cadastro() {
             Crie sua conta
           </h1>
           <p className="text-slate-600 mt-2">
-            Junte-se ao time DFL e construa o futuro conosco.
+            Cadastre seu acesso para participar dos processos seletivos desta empresa.
           </p>
         </div>
 
@@ -1171,21 +1169,6 @@ export function Cadastro() {
                 }
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"
                 placeholder="Seu nome completo"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Usuário de Login *
-              </label>
-              <input
-                required
-                type="text"
-                value={formData.login}
-                onChange={(e) =>
-                  setFormData({ ...formData, login: e.target.value })
-                }
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"
-                placeholder="Ex: joaosilva"
               />
             </div>
             <div>
