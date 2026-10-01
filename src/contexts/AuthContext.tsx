@@ -29,6 +29,9 @@ interface AuthContextType {
   profileLoading: boolean;
   tenantMembershipLoading: boolean;
   tenantRoles: TenantRole[];
+  clinicRoles: Extract<TenantRole, "clinic_admin" | "clinic_staff">[];
+  clinicTenantIds: string[];
+  hasClinicAccess: boolean;
   hasTenantAccess: boolean;
   canAdministerTenant: boolean;
   isAuthenticated: boolean;
@@ -46,6 +49,9 @@ const AuthContext = createContext<AuthContextType>({
   profileLoading: true,
   tenantMembershipLoading: false,
   tenantRoles: [],
+  clinicRoles: [],
+  clinicTenantIds: [],
+  hasClinicAccess: false,
   hasTenantAccess: false,
   canAdministerTenant: false,
   isAuthenticated: false,
@@ -66,6 +72,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isTenantRoute,
   );
   const [tenantRoles, setTenantRoles] = useState<TenantRole[]>([]);
+  const [clinicRoles, setClinicRoles] = useState<
+    Extract<TenantRole, "clinic_admin" | "clinic_staff">[]
+  >([]);
+  const [clinicTenantIds, setClinicTenantIds] = useState<string[]>([]);
+  const [hasClinicAccess, setHasClinicAccess] = useState(false);
   const [hasTenantAccess, setHasTenantAccess] = useState(!isTenantRoute);
   const [canAdministerTenant, setCanAdministerTenant] = useState(false);
   const profileRequestId = useRef(0);
@@ -78,6 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthUserId(null);
         setProfile(null);
         setTenantRoles([]);
+        setClinicRoles([]);
+        setClinicTenantIds([]);
+        setHasClinicAccess(false);
         setHasTenantAccess(!isTenantRoute);
         setCanAdministerTenant(false);
         setTenantMembershipLoading(false);
@@ -139,6 +153,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, [synchronizeProfile]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadClinicAccess = async () => {
+      if (!authUserId) {
+        setClinicRoles([]);
+        setClinicTenantIds([]);
+        setHasClinicAccess(false);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.rpc("get_current_clinic_access");
+        if (error) throw error;
+
+        const payload = (data || {}) as Record<string, unknown>;
+        const roles = Array.isArray(payload.roles)
+          ? payload.roles.filter(
+              (role): role is "clinic_admin" | "clinic_staff" =>
+                role === "clinic_admin" || role === "clinic_staff",
+            )
+          : [];
+        const tenantIds = Array.isArray(payload.tenantIds)
+          ? payload.tenantIds.filter(
+              (id): id is string => typeof id === "string",
+            )
+          : [];
+
+        if (!active) return;
+        setClinicRoles(roles);
+        setClinicTenantIds(tenantIds);
+        setHasClinicAccess(payload.hasAccess === true);
+      } catch (error) {
+        console.error("[AUTH] Falha ao validar acesso à clínica:", error);
+        if (!active) return;
+        setClinicRoles([]);
+        setClinicTenantIds([]);
+        setHasClinicAccess(false);
+      }
+    };
+
+    void loadClinicAccess();
+
+    return () => {
+      active = false;
+    };
+  }, [authUserId]);
 
   useEffect(() => {
     let active = true;
@@ -214,11 +276,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setAuthUserId(nextProfile.uid);
       setProfile(nextProfile);
+      try {
+        const { data: clinicAccess } = await supabase.rpc("get_current_clinic_access");
+        const clinicPayload = (clinicAccess || {}) as Record<string, unknown>;
+        setClinicRoles(
+          Array.isArray(clinicPayload.roles)
+            ? clinicPayload.roles.filter(
+                (role): role is "clinic_admin" | "clinic_staff" =>
+                  role === "clinic_admin" || role === "clinic_staff",
+              )
+            : [],
+        );
+        setClinicTenantIds(
+          Array.isArray(clinicPayload.tenantIds)
+            ? clinicPayload.tenantIds.filter(
+                (id): id is string => typeof id === "string",
+              )
+            : [],
+        );
+        setHasClinicAccess(clinicPayload.hasAccess === true);
+      } catch (clinicError) {
+        console.warn("[AUTH] Não foi possível sincronizar acesso da clínica:", clinicError);
+        setClinicRoles([]);
+        setClinicTenantIds([]);
+        setHasClinicAccess(false);
+      }
     } catch (error) {
       if (sessionEstablished) await supabase.auth.signOut();
       setAuthUserId(null);
       setProfile(null);
       setTenantRoles([]);
+      setClinicRoles([]);
+      setClinicTenantIds([]);
+      setHasClinicAccess(false);
       setHasTenantAccess(!isTenantRoute);
       setCanAdministerTenant(false);
       setTenantMembershipLoading(false);
@@ -265,6 +355,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileLoading,
       tenantMembershipLoading,
       tenantRoles,
+      clinicRoles,
+      clinicTenantIds,
+      hasClinicAccess,
       hasTenantAccess,
       canAdministerTenant,
       isAuthenticated: Boolean(authUserId && profile),
