@@ -91,6 +91,7 @@ const ProtectedRoute = ({
     hasClinicAccess,
     hasTenantAccess,
     canAdministerTenant,
+    isPlatformMasterAdmin,
     isAuthenticated,
   } = useAuth();
   const { isTenantRoute } = useTenant();
@@ -120,6 +121,19 @@ const ProtectedRoute = ({
   // CORREÇÃO 3: Se autenticado mas sem perfil após o loading, tentamos esperar ou forçamos logout
   if (!profile) {
     console.warn("➡️ [AUTH] Perfil ausente. Redirecionando.");
+    return <Navigate to="/login" replace />;
+  }
+
+  const profileNormalized = profile.perfil.toLowerCase();
+
+  if (location.pathname.startsWith("/master") && !isPlatformMasterAdmin) {
+    return <Navigate to={isTenantRoute ? "/login" : "/"} replace />;
+  }
+
+  if (
+    !isTenantRoute &&
+    ["rh", "candidato"].includes(profileNormalized)
+  ) {
     return <Navigate to="/login" replace />;
   }
 
