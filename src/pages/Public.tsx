@@ -33,11 +33,12 @@ import { sendVerificationCode } from "../lib/email-verification";
 import { requestCandidateAnalysis } from "../lib/candidate-analysis";
 import { useTenant } from "../contexts/TenantContext";
 import { resolveAuthorizedHomePath } from "../lib/tenant-access";
+import { loadCurrentCandidate } from "../lib/current-candidate";
 
 export function Home() {
   // [EDITABLE_START:public_home_state]
   const { user } = useAuth();
-  const { branding } = useTenant();
+  const { branding, tenant } = useTenant();
   const { vagas, loading, count, vagasAbertas } = useVagas();
   const [vagasDestaque, setVagasDestaque] = useState<any[]>([]);
   // [EDITABLE_END:public_home_state]
@@ -56,23 +57,24 @@ export function Home() {
         })
         .slice(0, 3);
 
-      if (user && openVagas.length > 0) {
+      if (user && tenant?.id && openVagas.length > 0) {
         try {
-          const { data: candidaturas } = await supabase
-            .from("candidaturas")
-            .select("vaga_id")
-            .eq("candidato_id", user.id)
-            .in(
-              "vaga_id",
-              openVagas.map((v) => v.id),
-            );
+          const candidate = await loadCurrentCandidate(tenant.id, user.id);
+          if (candidate) {
+            const { data: candidaturas } = await supabase
+              .from("candidaturas")
+              .select("vaga_id")
+              .eq("tenant_id", tenant.id)
+              .eq("candidato_id", candidate.id)
+              .in("vaga_id", openVagas.map((v) => v.id));
 
-          if (candidaturas) {
-            const appliedIds = new Set(candidaturas.map((c) => c.vaga_id));
-            openVagas = openVagas.map((v) => ({
-              ...v,
-              ja_candidatado: appliedIds.has(v.id),
-            }));
+            if (candidaturas) {
+              const appliedIds = new Set(candidaturas.map((item) => item.vaga_id));
+              openVagas = openVagas.map((v) => ({
+                ...v,
+                ja_candidatado: appliedIds.has(v.id),
+              }));
+            }
           }
         } catch (err) {
           console.error("[HOME] ❌ Erro ao verificar candidaturas:", err);
@@ -83,7 +85,7 @@ export function Home() {
     };
 
     processVagas();
-  }, [vagas, loading, user]);
+  }, [vagas, loading, user, tenant?.id]);
   // [EDITABLE_END:public_home_useeffect_init]
 
   return (
@@ -222,6 +224,7 @@ export function Home() {
 export function ListaVagas() {
   // [EDITABLE_START:public_listavagas_state]
   const { user } = useAuth();
+  const { tenant } = useTenant();
   const { vagas: allVagas, loading, error } = useVagas();
   const [vagas, setVagas] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -242,19 +245,23 @@ export function ListaVagas() {
         return status === "ABERTA" || statusVaga === "ABERTA";
       });
 
-      if (user && openVagas.length > 0) {
+      if (user && tenant?.id && openVagas.length > 0) {
         try {
-          const { data: candidaturas } = await supabase
-            .from("candidaturas")
-            .select("vaga_id")
-            .eq("candidato_id", user.id);
+          const candidate = await loadCurrentCandidate(tenant.id, user.id);
+          if (candidate) {
+            const { data: candidaturas } = await supabase
+              .from("candidaturas")
+              .select("vaga_id")
+              .eq("tenant_id", tenant.id)
+              .eq("candidato_id", candidate.id);
 
-          if (candidaturas) {
-            const appliedIds = new Set(candidaturas.map((c) => c.vaga_id));
-            openVagas = openVagas.map((v) => ({
-              ...v,
-              ja_candidatado: appliedIds.has(v.id),
-            }));
+            if (candidaturas) {
+              const appliedIds = new Set(candidaturas.map((item) => item.vaga_id));
+              openVagas = openVagas.map((v) => ({
+                ...v,
+                ja_candidatado: appliedIds.has(v.id),
+              }));
+            }
           }
         } catch (err) {
           console.error(
@@ -268,7 +275,7 @@ export function ListaVagas() {
     };
 
     processVagas();
-  }, [allVagas, loading, user]);
+  }, [allVagas, loading, user, tenant?.id]);
   // [EDITABLE_END:public_listavagas_useeffect_init]
 
   const filteredVagas = vagas.filter((vaga) => {
@@ -385,6 +392,7 @@ export function ListaVagas() {
 export function DetalheVaga() {
   // [EDITABLE_START:public_detalhevaga_state]
   const { user, profile } = useAuth();
+  const { tenant } = useTenant();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -423,16 +431,18 @@ export function DetalheVaga() {
         setVaga(data);
 
         // Check if user already applied
-        if (user) {
-          const { data: existing } = await supabase
-            .from("candidaturas")
-            .select("id")
-            .eq("vaga_id", id)
-            .eq("candidato_id", user.id)
-            .maybeSingle();
+        if (user && tenant?.id) {
+          const candidate = await loadCurrentCandidate(tenant.id, user.id);
+          if (candidate) {
+            const { data: existing } = await supabase
+              .from("candidaturas")
+              .select("id")
+              .eq("tenant_id", tenant.id)
+              .eq("vaga_id", id)
+              .eq("candidato_id", candidate.id)
+              .maybeSingle();
 
-          if (existing) {
-            setJaCandidatado(true);
+            if (existing) setJaCandidatado(true);
           }
         }
       } catch (error) {
@@ -442,7 +452,7 @@ export function DetalheVaga() {
       }
     };
     fetchVaga();
-  }, [id, user]);
+  }, [id, user, tenant?.id]);
   // [EDITABLE_END:public_detalhevaga_useeffect_init]
 
   // [EDITABLE_START:public_detalhevaga_handlers]
@@ -469,14 +479,13 @@ export function DetalheVaga() {
       return;
     }
 
-    // Fetch user profile to get resume_data
-    const { data: userDoc } = await supabase
-      .from("users")
-      .select("resume_data")
-      .eq("uid", profile.uid)
-      .maybeSingle();
+    if (!tenant?.id) {
+      alert("Empresa não identificada.");
+      return;
+    }
 
-    const resumeData = userDoc?.resume_data;
+    const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
+    const resumeData = candidate?.resume_data;
 
     console.log("🧪 ===== TESTE DE CANDIDATURA =====");
     console.log("🧠 user:", user);
@@ -577,84 +586,54 @@ export function DetalheVaga() {
         return;
       }
 
-      // Check if already applied
-      console.log("Verificando candidatura existente...");
-      const { data: existing, error: checkError } = await supabase
-        .from("candidaturas")
-        .select("id")
-        .eq("vaga_id", id)
-        .eq("candidato_id", user?.id)
-        .maybeSingle();
+      if (!tenant?.id) throw new Error("Empresa não identificada.");
 
-      if (checkError) {
-        console.error("Erro ao verificar candidatura existente:", checkError);
-        throw checkError;
-      }
+      const { data: result, error: applyError } = await supabase.rpc(
+        "rpc_candidatar_se",
+        {
+          p_vaga_id: id,
+          p_origem: comoSoube,
+          p_indicacao_nome:
+            comoSoube === "Indicação de colaborador" ? indicacaoNome : null,
+        },
+      );
 
-      if (existing) {
-        alert("Você já se candidatou a esta vaga.");
-        setShowModal(false);
-        return;
-      }
-
-      console.log("Preparando dados da candidatura...");
-      const candidaturaData = {
-        vaga_id: id,
-        candidato_id: user?.id,
-        fase: "Triagem",
-        visualizado: false,
-        origem: comoSoube,
-        como_soube: comoSoube, // Mantendo ambos por segurança se a coluna existir
-        indicacao_nome:
-          comoSoube === "Indicação de colaborador" ? indicacaoNome : "",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        data_candidatura: new Date().toISOString(),
-      };
-
-      console.log("Inserindo candidatura...", candidaturaData);
-      const { data: newCand, error: insertError } = await supabase
-        .from("candidaturas")
-        .insert(candidaturaData)
-        .select()
-        .maybeSingle();
-
-      if (insertError) {
-        console.error("Erro no insert da candidatura:", insertError);
-        throw insertError;
-      }
-
-      console.log("Candidatura inserida com sucesso!");
-
-      // Avaliação IA Automática (Background)
-
-      const runAIEvaluation = async () => {
-        if (!user?.id || !id) return;
-
-        try {
-          await requestCandidateAnalysis(user.id, id);
-        } catch (error) {
-          console.error("Erro na avaliação automática:", error);
+      if (applyError) {
+        if (applyError.message?.includes("already_applied")) {
+          alert("Você já se candidatou a esta vaga.");
+          setShowModal(false);
+          return;
         }
-      };
-      runAIEvaluation();
+        if (applyError.message?.includes("candidate_registration_required")) {
+          alert("Seu cadastro nesta empresa ainda não foi concluído.");
+          navigate("/cadastro");
+          return;
+        }
+        throw applyError;
+      }
 
-      // Log action in audit
+      const newCandidaturaId = Array.isArray(result)
+        ? result[0]?.candidatura_id
+        : result?.candidatura_id;
+
+      if (!newCandidaturaId) {
+        throw new Error("A candidatura não retornou um identificador válido.");
+      }
+
+      console.log("Candidatura registrada com sucesso:", newCandidaturaId);
+
       await logAudit(
         "Candidatou-se",
         "Portal do Candidato",
         `Candidatou-se à vaga ${currentVaga.titulo}`,
       );
 
-      // Log action in candidacy history
-      if (newCand) {
-        await logCandidaturaEvento(
-          newCand.id,
-          "FASE",
-          "Candidatura iniciada na fase de Triagem",
-          user?.id,
-        );
-      }
+      await logCandidaturaEvento(
+        newCandidaturaId,
+        "FASE",
+        "Candidatura iniciada na fase de Triagem",
+        user?.id,
+      );
 
       // Enviar e-mail de confirmação
       try {
