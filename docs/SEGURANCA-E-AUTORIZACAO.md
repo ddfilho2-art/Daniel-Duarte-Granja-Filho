@@ -100,23 +100,13 @@ As policies usam funções como:
 
 ## 7. Pontos que precisam de manutenção
 
-### 7.1 Candidatos
+### 7.1 Candidatos (CORRIGIDO)
 
-A policy atual de `candidatos` usa `user_id` e contexto de tenant, mas a tabela não possui `tenant_id`.
+`candidatos` agora possui `tenant_id` obrigatório. A leitura/alteração é condicionada ao tenant atual, e o RPC de candidatura cria/atualiza o registro dentro do tenant da vaga.
 
-Isso não modela corretamente cadastros independentes de candidato por empresa.
+### 7.2 Candidaturas (ATUALIZADO)
 
-### 7.2 Candidaturas
-
-A tabela possui `tenant_id`, o que é correto.
-
-Entretanto, existe uma policy de SELECT que também permite acesso quando:
-
-`candidato_id = auth.uid()`
-
-sem exigir o mesmo tenant.
-
-Essa regra deve ser revisada porque pode conflitar com o requisito de cadastro/candidatura independente por empresa.
+A tabela possui `tenant_id` e a policy foi endurecida. O candidato só acessa a candidatura quando existe um registro `candidatos` do mesmo tenant cujo `user_id` corresponde à sessão.
 
 ### 7.3 Vagas públicas
 
