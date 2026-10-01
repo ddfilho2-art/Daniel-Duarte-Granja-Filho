@@ -21,6 +21,7 @@ import {
   type TenantRole,
 } from "../lib/tenant-access";
 import { useTenant } from "./TenantContext";
+import { registerCurrentCandidate } from "../lib/current-candidate";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -40,6 +41,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => void;
+  registerCandidateForTenant: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -60,6 +62,7 @@ const AuthContext = createContext<AuthContextType>({
   signOut: async () => {},
   refreshProfile: async () => {},
   updateProfile: () => {},
+  registerCandidateForTenant: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -265,6 +268,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const access = await loadCurrentTenantAccess(tenant.id);
         if (!access.hasAccess) {
+          if (nextProfile.perfil === "Candidato") {
+            setAuthUserId(nextProfile.uid);
+            setProfile(nextProfile);
+            setTenantRoles([]);
+            setHasTenantAccess(false);
+            setCanAdministerTenant(false);
+            setTenantMembershipLoading(false);
+            throw new Error("CANDIDATE_TENANT_REGISTRATION_REQUIRED");
+          }
+
           await supabase.auth.signOut();
           throw new Error(
             "Sua conta não possui vínculo ativo com esta empresa.",
@@ -319,6 +332,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setProfileLoading(false);
       setAuthLoading(false);
+    }
+  };
+
+  const registerCandidateForTenant = async () => {
+    if (!isTenantRoute || !tenant) {
+      throw new Error("O cadastro do candidato precisa ser feito dentro do portal da empresa.");
+    }
+    if (!profile || profile.perfil !== "Candidato") {
+      throw new Error("Somente candidatos podem concluir este cadastro.");
+    }
+
+    setTenantMembershipLoading(true);
+    try {
+      await registerCurrentCandidate(tenant.id);
+      const access = await loadCurrentTenantAccess(tenant.id);
+      if (!access.hasAccess || !access.roles.includes("candidate")) {
+        throw new Error("O cadastro da empresa não foi ativado.");
+      }
+      setTenantRoles(access.roles);
+      setHasTenantAccess(true);
+      setCanAdministerTenant(access.canAdministerTenant);
+    } finally {
+      setTenantMembershipLoading(false);
     }
   };
 
