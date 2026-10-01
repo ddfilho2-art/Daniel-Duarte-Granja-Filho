@@ -386,6 +386,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHasClinicAccess(false);
     setHasTenantAccess(!isTenantRoute);
     setCanAdministerTenant(false);
+    setIsPlatformMasterAdmin(false);
     setTenantMembershipLoading(false);
     await supabase.auth.signOut();
   };
