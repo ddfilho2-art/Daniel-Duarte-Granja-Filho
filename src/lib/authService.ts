@@ -84,19 +84,10 @@ export async function loadProfileForAuthUser(
 
 async function resolveLoginEmail(loginInput: string): Promise<string> {
   const normalized = loginInput.trim().toLocaleLowerCase("pt-BR");
-  if (!normalized) throw new Error("Email ou senha inválidos.");
-  if (normalized.includes("@")) return normalized;
-
-  // Compatibilidade temporária com logins legados. A resolução será movida para
-  // uma Edge Function tenant-aware após o baseline da tabela public.users.
-  const { data, error } = await supabase
-    .from("users")
-    .select("email")
-    .eq("login_lower", normalized)
-    .maybeSingle();
-
-  if (error || !data?.email) throw new Error("Email ou senha inválidos.");
-  return String(data.email).trim().toLocaleLowerCase("pt-BR");
+  if (!normalized || !normalized.includes("@")) {
+    throw new Error("Informe o e-mail da conta.");
+  }
+  return normalized;
 }
 
 export async function loginWithLogin(
