@@ -77,7 +77,9 @@ export async function loadCurrentTenantAccess(
 export function resolveAuthorizedHomePath(
   legacyProfile: string | null | undefined,
   isTenantRoute: boolean,
-  access: Pick<TenantAccess, "roles" | "canAdministerTenant">,
+  access: Pick<TenantAccess, "roles" | "canAdministerTenant"> & {
+    clinicRoles?: Extract<TenantRole, "clinic_admin" | "clinic_staff">[];
+  },
 ): string | null {
   if (isTenantRoute) {
     if (access.canAdministerTenant) return "/admin";
@@ -86,6 +88,12 @@ export function resolveAuthorizedHomePath(
     if (
       access.roles.includes("clinic_admin") ||
       access.roles.includes("clinic_staff")
+    ) {
+      return "/saude-ocupacional";
+    }
+    if (
+      access.clinicRoles?.includes("clinic_admin") ||
+      access.clinicRoles?.includes("clinic_staff")
     ) {
       return "/saude-ocupacional";
     }
@@ -99,6 +107,12 @@ export function resolveAuthorizedHomePath(
       return "/rh";
     case "candidato":
       return "/candidato";
+    case "clinica":
+    case "clínica":
+    case "empresa de exame":
+    case "saude ocupacional":
+    case "saúde ocupacional":
+      return "/saude-ocupacional";
     default:
       return null;
   }
