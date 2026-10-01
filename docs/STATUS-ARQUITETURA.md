@@ -156,3 +156,18 @@ e
 Depois disso, o deploy multi-tenant pode continuar sendo simples:
 
 **uma aplicação Vercel atendendo todas as empresas.**
+
+
+## Manutenção 2026-10-02 — candidato e administração de usuários
+
+- [x] Cadastro de candidato por tenant.
+- [x] Ficha `candidatos` com identificador próprio por empresa.
+- [x] Membership `candidate` por empresa.
+- [x] Currículo salvo no candidato tenant-scoped.
+- [x] Candidatura vinculada à ficha do tenant e não ao UUID global do Auth.
+- [x] Rotas de candidato/RH exigem portal tenant.
+- [x] `/master` exige Platform Master Admin.
+- [x] `/admin` exige contexto e autorização do tenant.
+- [x] Administração de RH endurecida no backend.
+- [x] Acesso `anon` removido de `users`, `candidatos` e `candidaturas`.
+- [ ] E2E com usuários reais de dois tenants ainda depende da criação segura das contas Auth.
