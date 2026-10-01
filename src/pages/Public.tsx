@@ -1472,14 +1472,14 @@ export function Login() {
           <form className="space-y-4" onSubmit={handleLogin}>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                Login ou e-mail
+                E-mail da conta
               </label>
               <input
                 required
-                type="text"
+                type="email"
                 value={loginInput}
                 onChange={(e) => setLoginInput(e.target.value)}
-                placeholder="Digite seu login ou e-mail"
+                placeholder="Digite seu e-mail"
                 autoComplete="username"
                 className="w-full rounded-lg border border-slate-300 px-4 py-2.5 outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
