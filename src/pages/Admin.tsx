@@ -945,7 +945,7 @@ export function AdminGestaoUsuarios() {
             Gestão de Usuários RH
           </h1>
           <p className="text-slate-500 text-sm">
-            Gerencie os recrutadores e administradores do sistema.
+            Gerencie os usuários de Recursos Humanos desta empresa.
           </p>
         </div>
         <button
