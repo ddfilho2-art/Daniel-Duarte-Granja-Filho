@@ -8,13 +8,13 @@ import { useUI } from "../contexts/UIContext";
 console.log("✅ [LOAD] PerfilAdmin carregado");
 
 export function PerfilAdmin() {
-  const { user, updateProfile } = useAuth();
+  const { user, profile, updateProfile } = useAuth();
   const navigate = useNavigate();
   const { openChangePassword } = useUI();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState(() => profile?.avatar_url || profile?.foto_url || "");
   const [email, setEmail] = useState("");
 
   const [nome, setNome] = useState("");
@@ -148,10 +148,28 @@ export function PerfilAdmin() {
       } = supabase.storage.from("avatars").getPublicUrl(fileName);
       const urlWithCache = publicUrl + "?t=" + new Date().getTime();
 
+      // Atualiza imediatamente a fonte global de perfil e persiste a foto.
+      // Assim o avatar do menu lateral e o avatar desta página usam o mesmo estado,
+      // mesmo antes de o usuário clicar em "Salvar Alterações".
       setAvatarUrl(urlWithCache);
-      if (updateProfile) {
-        updateProfile({ avatar_url: urlWithCache, foto_url: urlWithCache });
+
+      const { error: profilePhotoError } = await supabase
+        .from("users")
+        .update({
+          foto_url: urlWithCache,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", activeUserId);
+
+      if (profilePhotoError) {
+        console.error("❌ [FOTO BANCO ERRO]:", profilePhotoError);
+        throw profilePhotoError;
       }
+
+      updateProfile?.({
+        avatar_url: urlWithCache,
+        foto_url: urlWithCache,
+      });
     } catch (error: any) {
       console.error("❌ [FOTO ERRO]:", error);
       alert("Erro no upload da foto.");
@@ -181,9 +199,10 @@ export function PerfilAdmin() {
         <div className="flex flex-col items-center sm:flex-row gap-8 mb-8 pb-8 border-b">
           <div className="relative">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg bg-slate-50 flex items-center justify-center">
-              {avatarUrl ? (
+              {(avatarUrl || profile?.avatar_url || profile?.foto_url) ? (
                 <img
-                  src={avatarUrl}
+                  key={avatarUrl || profile?.avatar_url || profile?.foto_url}
+                  src={avatarUrl || profile?.avatar_url || profile?.foto_url || ""}
                   alt="Perfil"
                   className="w-full h-full object-cover"
                 />
