@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabaseTenantId, supabase } from "./supabase";
 import { readEdgeFunctionError } from "./function-errors";
 
 type AdminUserAction =
@@ -78,7 +78,7 @@ export async function executeAdminUserAction(
 ): Promise<AdminUserResponse> {
   const { data, error } = await supabase.functions.invoke<AdminUserResponse>(
     "admin-users",
-    { body },
+    {\n      body,\n      headers: getSupabaseTenantId()\n        ? { "x-tenant-id": getSupabaseTenantId() as string }\n        : undefined,\n    },
   );
 
   if (error || !data?.success) {
