@@ -42,7 +42,7 @@ async function readJsonBody<T>(request: Request, maxBytes = 16384): Promise<T> {
 
 interface AdminUserRequest {
   action: "list" | "get" | "get_single" | "create" | "update" | "delete" | "reset_password" | "set_status" | "transfer_history" | "transfer" | "auto_return";
-  tenant_id: string;
+  tenant_id?: string;
   user_id?: string;
   email?: string;
   roles?: string[];
@@ -173,6 +173,38 @@ async function listMembers(
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  }
+}
+
+// List all RH members for a platform master when no tenant context exists.
+async function listAllMembers(): Promise<AdminUserResponse> {
+  try {
+    const { data: memberships, error: membershipError } = await adminClient
+      .from("tenant_memberships")
+      .select("tenant_id, user_id, roles, status, created_at, activated_at")
+      .contains("roles", ["hr"])
+      .order("created_at", { ascending: false });
+    if (membershipError) throw membershipError;
+
+    const userIds = [...new Set((memberships || []).map((membership) => membership.user_id))];
+    if (userIds.length === 0) return { success: true, data: [], message: "Found 0 RH members" };
+
+    const { data: users, error: usersError } = await adminClient
+      .from("users")
+      .select("*")
+      .in("id", userIds)
+      .eq("perfil", "RH");
+    if (usersError) throw usersError;
+
+    const result = (users || []).flatMap((user) =>
+      (memberships || [])
+        .filter((membership) => membership.user_id === user.id)
+        .map((membership) => ({ ...user, tenant_membership: membership }))
+    );
+
+    return { success: true, data: result, message: `Found ${result.length} RH memberships` };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -812,17 +844,9 @@ async function handleRequest(
   }
 
   try {
-    // Get tenant from header
-    const tenantId = req.headers.get("x-tenant-id");
-    if (!tenantId) {
-      return new Response(
-        JSON.stringify({ success: false, error: "x-tenant-id header required" }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    // Tenant context is mandatory for company-admin mutations. Platform master may
+    // use the global RH list without a tenant context.
+    const tenantId = req.headers.get("x-tenant-id") || undefined;
 
     // Get auth user
     const authHeader = req.headers.get("authorization");
@@ -864,6 +888,45 @@ async function handleRequest(
       );
     }
 
+    let isPlatformMaster = false;
+    try {
+      const { data: platformMaster } = await userClient.rpc("is_platform_master_admin");
+      isPlatformMaster = platformMaster === true;
+    } catch (error) {
+      console.error("Platform admin validation error:", error);
+    }
+
+    const body = await (async () => {
+      try {
+        return await readJsonBody<AdminUserRequest>(req);
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "invalid_json";
+        const status = code === "payload_too_large" ? 413 : code === "unsupported_media_type" ? 415 : 400;
+        return { __parseError: { code, status } } as const;
+      }
+    })();
+    if ("__parseError" in body) {
+      return new Response(JSON.stringify({ success: false, code: body.__parseError.code, error: body.__parseError.code }), {
+        status: body.__parseError.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const action = body.action;
+    if (!tenantId) {
+      if (isPlatformMaster && (action === "list" || action === "get")) {
+        const result = await listAllMembers();
+        return new Response(JSON.stringify(result), {
+          status: result.success ? 200 : 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: false, code: "TENANT_REQUIRED", error: "Selecione uma empresa para esta operação." }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const hasAccess = await validateTenantAccess(tenantId, `Bearer ${token}`);
     if (!hasAccess) {
       return new Response(
@@ -877,27 +940,6 @@ async function handleRequest(
         }
       );
     }
-
-    // Parse JSON with a bounded body and explicit content type.
-    let body: AdminUserRequest;
-    try {
-      body = await readJsonBody<AdminUserRequest>(req);
-    } catch (error) {
-      const code = error instanceof Error ? error.message : "invalid_json";
-      const status = code === "payload_too_large"
-        ? 413
-        : code === "unsupported_media_type"
-          ? 415
-          : 400;
-      return new Response(
-        JSON.stringify({ success: false, code, error: code }),
-        {
-          status,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-    const action = body.action;
 
     let result: AdminUserResponse;
 
