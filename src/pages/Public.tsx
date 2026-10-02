@@ -21,7 +21,6 @@ import {
   Trash2,
   Plus,
   XCircle,
-  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
@@ -397,8 +396,7 @@ export function DetalheVaga() {
   const location = useLocation();
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<
-    "success" | "error" | "login" | "applyForm"
-  >("success");
+    "success" | "error" | "login" | "applyForm"  >("success");
   const [vaga, setVaga] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
@@ -797,8 +795,7 @@ export function DetalheVaga() {
                   {comoSoube === "Indicação de colaborador" && (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-200">
                       <label className="block text-sm font-medium text-slate-700 mb-1">
-                        Nome de quem indicou{" "}
-                        <span className="text-red-500">*</span>
+                        Nome de quem indicou{" "}                        <span className="text-red-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1197,8 +1194,7 @@ export function Cadastro() {
                 onChange={(e) =>
                   setFormData({ ...formData, senha: e.target.value })
                 }
-                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"
-                placeholder="Mínimo 8 caracteres"
+                className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary/20 outline-none"                placeholder="Mínimo 8 caracteres"
                 minLength={8}
               />
             </div>
@@ -1246,9 +1242,6 @@ export function Login() {
   const [loginInput, setLoginInput] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<
-    "admin" | "rh" | "clinica" | "candidato"
-  >("candidato");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [candidateRegistrationRequired, setCandidateRegistrationRequired] = useState(false);
@@ -1268,33 +1261,6 @@ export function Login() {
     registerCandidateForTenant,
   } = useAuth();
   const { isTenantRoute } = useTenant();
-
-  const accessOptions = [
-    {
-      id: "admin" as const,
-      title: "Administrador",
-      description: "Gestão da plataforma e configurações.",
-      icon: ShieldCheck,
-    },
-    {
-      id: "rh" as const,
-      title: "Recursos Humanos",
-      description: "Vagas, candidatos e processos seletivos.",
-      icon: Users,
-    },
-    {
-      id: "clinica" as const,
-      title: "Empresa de exame médico",
-      description: "Agendamento e resultados de saúde ocupacional.",
-      icon: FlaskConical,
-    },
-    {
-      id: "candidato" as const,
-      title: "Candidato",
-      description: "Currículo, vagas e acompanhamento das candidaturas.",
-      icon: Briefcase,
-    },
-  ];
 
   useEffect(() => {
     if (
@@ -1327,9 +1293,6 @@ export function Login() {
       return;
     }
 
-    if (selectedProfile === "clinica" && !hasClinicAccess) {
-      setError("Esta conta não possui acesso autorizado à empresa de exame médico.");
-    }
   }, [
     user,
     profile,
@@ -1343,7 +1306,6 @@ export function Login() {
     canAdministerTenant,
     isTenantRoute,
     navigate,
-    selectedProfile,
   ]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -1378,24 +1340,21 @@ export function Login() {
     }
   };
 
-  const selected = accessOptions.find((item) => item.id === selectedProfile)!;
-
   return (
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="mx-auto w-full max-w-5xl px-4 sm:px-6">
-        <div className="mb-8 text-center">
+        <div className="mx-auto mb-8 max-w-md text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">
             Recruta AÍ
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900">
-            Como você vai acessar?
+            Entrar
           </h1>
           <p className="mt-2 text-slate-600">
-            Escolha o tipo de acesso e entre com suas credenciais.
+            Informe seu e-mail e senha. O sistema identifica automaticamente seu perfil e direciona você para a área autorizada.
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {accessOptions.map((option) => {
             const Icon = option.icon;
             const active = selectedProfile === option.id;
@@ -1435,16 +1394,7 @@ export function Login() {
           })}
         </div>
 
-        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
-              Acesso selecionado
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-slate-900">
-              {selected.title}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">{selected.description}</p>
-          </div>
+        <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
 
           {error && (
             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -1531,9 +1481,8 @@ export function Login() {
           )}
 
           <div className="mt-6 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-500">
-            O tipo de acesso acima é apenas uma orientação de entrada. A
-            autorização real é conferida no Supabase pelo perfil e pelas
-            permissões da conta.
+            O acesso é definido pela conta cadastrada. Após o login, o sistema
+            verifica automaticamente o perfil e as permissões no Supabase.
           </div>
 
           <p className="mt-6 text-center text-sm text-slate-600">
@@ -1597,8 +1546,7 @@ export function SobreNos() {
               <p className="text-sm text-slate-500">Fundada em 1939</p>
             </div>
             <div className="text-center px-4">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6" />
+              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">                <Users className="w-6 h-6" />
               </div>
               <h3 className="text-2xl font-bold text-slate-900 mb-1">
                 53% mulheres
