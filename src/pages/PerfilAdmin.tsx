@@ -135,7 +135,7 @@ export function PerfilAdmin() {
       }
 
       const fileExt = file.name.split(".").pop();
-      const fileName = `${activeUserId}_${Date.now()}.${fileExt}`;
+      const fileName = `${activeUserId}/${activeUserId}_${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
