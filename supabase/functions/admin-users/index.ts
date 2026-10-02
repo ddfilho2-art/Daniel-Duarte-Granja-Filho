@@ -4,22 +4,30 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 function getCorsHeaders(req: Request): Record<string, string> | null {
   const origin = req.headers.get("Origin");
-  const appUrl = Deno.env.get("APP_URL")?.trim().replace(/\/$/, "");
+  const configuredOrigins = (
+    Deno.env.get("ALLOWED_ORIGINS") ||
+    Deno.env.get("APP_URL") ||
+    "https://daniel-duarte-granja-filho.vercel.app,http://localhost:5173"
+  )
+    .split(",")
+    .map((value) => value.trim().replace(/\/$/, ""))
+    .filter(Boolean);
 
-  if (!origin || !appUrl || origin !== appUrl) {
-    if (origin) return null;
+  if (!origin) {
     return {
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers":
-        "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
+        "authorization, x-client-info, apikey, content-type, x-tenant-id, idempotency-key",
     };
   }
+
+  if (!configuredOrigins.includes(origin)) return null;
 
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers":
-      "authorization, x-client-info, content-type, x-tenant-id, idempotency-key",
+      "authorization, x-client-info, apikey, content-type, x-tenant-id, idempotency-key",
     Vary: "Origin",
   };
 }
