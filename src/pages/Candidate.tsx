@@ -23,6 +23,9 @@ import {
   Building2,
   CheckCircle,
   Eye,
+  Sparkles,
+  Upload,
+  Loader2,
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
@@ -293,6 +296,120 @@ const getResumeCompletenessScore = (resume: any) => {
 };
 
 export function CandidateResume() {
+  const { profile, updateProfile } = useAuth();
+  const { tenant } = useTenant();
+
+  const [formData, setFormData] = useState<any>({
+    nome: "", email: "", telefone: "", linkedin: "", dataNascimento: "",
+    genero: "", raca: "", pcd: "", cep: "", logradouro: "", numero: "",
+    complemento: "", bairro: "", cidade: "", estado: "", resumo: "",
+    experiencias: [], formacoes: [], idiomas: [], certificacoes: [],
+    habilidades: "", foto: "",
+  });
+  const [certificacoesOpcoes, setCertificacoesOpcoes] = useState<string[]>([]);
+  const [isSaved, setIsSaved] = useState(false);
+  const [isImportingCv, setIsImportingCv] = useState(false);
+  const [cvImportMessage, setCvImportMessage] = useState("");
+  const cvInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCvImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !tenant?.id) return;
+
+    const allowedTypes = new Set(["application/pdf", "text/plain", "text/markdown"]);
+    if (!allowedTypes.has(file.type)) {
+      setCvImportMessage("Formato não suportado. Use PDF, TXT ou Markdown.");
+      return;
+    }
+    if (file.size > 7 * 1024 * 1024) {
+      setCvImportMessage("O currículo deve ter no máximo 7 MB.");
+      return;
+    }
+
+    setIsImportingCv(true);
+    setCvImportMessage("A IA está lendo seu currículo...");
+
+    try {
+      const fileBase64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result || "");
+          const comma = result.indexOf(",");
+          resolve(comma >= 0 ? result.slice(comma + 1) : result);
+        };
+        reader.onerror = () => reject(new Error("Não foi possível ler o arquivo."));
+        reader.readAsDataURL(file);
+      });
+
+      const { data, error } = await supabase.functions.invoke("candidate-resume-import", {
+        body: {
+          tenant_id: tenant.id,
+          file_name: file.name,
+          mime_type: file.type,
+          file_base64: fileBase64,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success || !data?.resume) {
+        throw new Error(data?.error || "Não foi possível interpretar o currículo.");
+      }
+
+      const imported = data.resume;
+      const stamp = Date.now();
+      const experiencias = Array.isArray(imported.experiencias)
+        ? imported.experiencias.map((item: any, index: number) => ({
+            id: `ai-exp-${stamp}-${index}`,
+            empresa: item.empresa || "", cargo: item.cargo || "",
+            dataInicio: item.dataInicio || "", dataFim: item.dataFim || "",
+            atual: Boolean(item.atual), descricao: item.descricao || "",
+          }))
+        : [];
+      const formacoes = Array.isArray(imported.formacoes)
+        ? imported.formacoes.map((item: any, index: number) => ({
+            id: `ai-edu-${stamp}-${index}`,
+            instituicao: item.instituicao || "", curso: item.curso || "",
+            grau: item.grau || "Graduação", anoInicio: item.anoInicio || "",
+            anoFim: item.anoFim || "",
+          }))
+        : [];
+      const idiomas = Array.isArray(imported.idiomas)
+        ? imported.idiomas.map((item: any, index: number) => ({
+            id: `ai-lang-${stamp}-${index}`,
+            idioma: item.idioma || "", nivel: item.nivel || "Conhecimento Básico",
+          }))
+        : [];
+      const certificacoes = Array.isArray(imported.certificacoes)
+        ? imported.certificacoes.map((item: any, index: number) => ({
+            id: `ai-cert-${stamp}-${index}`,
+            nome: item.nome || "", instituicao: item.instituicao || "", ano: item.ano || "",
+          }))
+        : [];
+
+      setFormData((previous: any) => ({
+        ...previous,
+        nome: imported.nome || previous.nome, email: imported.email || previous.email,
+        telefone: imported.telefone || previous.telefone, linkedin: imported.linkedin || previous.linkedin,
+        cep: imported.cep || previous.cep, logradouro: imported.logradouro || previous.logradouro,
+        numero: imported.numero || previous.numero, complemento: imported.complemento || previous.complemento,
+        bairro: imported.bairro || previous.bairro, cidade: imported.cidade || previous.cidade,
+        estado: imported.estado || previous.estado, resumo: imported.resumo || previous.resumo,
+        habilidades: imported.habilidades || previous.habilidades,
+        experiencias: experiencias.length ? experiencias : previous.experiencias,
+        formacoes: formacoes.length ? formacoes : previous.formacoes,
+        idiomas: idiomas.length ? idiomas : previous.idiomas,
+        certificacoes: certificacoes.length ? certificacoes : previous.certificacoes,
+      }));
+      setIsSaved(false);
+      setCvImportMessage("Currículo importado. Revise os campos antes de salvar.");
+    } catch (error) {
+      console.error("Erro ao importar currículo com IA:", error);
+      setCvImportMessage(error instanceof Error ? error.message : "Não foi possível importar o currículo.");
+    } finally {
+      setIsImportingCv(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!profile?.uid || !tenant?.id) return;
@@ -645,6 +762,35 @@ export function CandidateResume() {
 
   return (
     <div className="max-w-4xl space-y-6">
+      <div className="bg-gradient-to-r from-primary/5 to-white p-5 rounded-xl border border-primary/20">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="font-semibold text-slate-900">Preencha seu currículo com IA</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Envie seu CV e o Gemini 2.5 Flash preencherá os dados encontrados.
+                O arquivo é usado somente durante a leitura e não é armazenado pelo Recruta AÍ.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <input ref={cvInputRef} type="file"
+              accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown"
+              className="hidden" onChange={handleCvImport} />
+            <button type="button" disabled={isImportingCv || !tenant?.id}
+              onClick={() => cvInputRef.current?.click()}
+              className="inline-flex items-center justify-center gap-2 bg-primary text-white px-5 py-2.5 rounded-lg font-medium hover:bg-accent transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              {isImportingCv ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              {isImportingCv ? "Lendo currículo..." : "Importar currículo"}
+            </button>
+          </div>
+        </div>
+        {cvImportMessage && <p className="mt-3 text-sm text-slate-600" aria-live="polite">{cvImportMessage}</p>}
+      </div>
+
       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-6 mb-8">
           <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl font-bold relative group overflow-hidden">
