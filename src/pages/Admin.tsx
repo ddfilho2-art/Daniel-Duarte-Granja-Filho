@@ -92,7 +92,7 @@ export function AdminDashboard() {
           const { data, error } = await supabase
             .from("candidaturas")
             .select("id")
-            .gte("data_candidatura", trintaDiasAtras.toISOString());
+            .gte("created_at", trintaDiasAtras.toISOString());
           if (error) throw error;
           return (data || []).length;
         };
@@ -120,27 +120,34 @@ export function AdminDashboard() {
 
         const fetchCargaTrabalho = async () => {
           const [vagasRes, usersResponse] = await Promise.all([
-            supabase.from("vagas").select("owner_nome").eq("status", "Aberta"),
-            executeAdminUserAction({ action: "list" }),
+            supabase
+              .from("vagas")
+              .select("proprietario_id")
+              .eq("status", "Aberta"),
+            supabase
+              .from("users")
+              .select("id, nome, status")
+              .eq("perfil", "RH")
+              .eq("status", "Ativo"),
           ]);
 
           if (vagasRes.error) throw vagasRes.error;
+          if (usersResponse.error) throw usersResponse.error;
 
-          const rhUsers = Array.isArray(usersResponse.data)
-            ? usersResponse.data.filter(
-                (user: any) => user?.status === "Ativo",
-              )
-            : [];
           const cargaTrabalhoMap: { [key: string]: number } = {};
+          const nomesPorId = new Map<string, string>();
 
-          rhUsers.forEach((user: any) => {
-            if (user?.nome) {
+          (usersResponse.data || []).forEach((user: any) => {
+            if (user?.id && user?.nome) {
+              nomesPorId.set(user.id, user.nome);
               cargaTrabalhoMap[user.nome] = 0;
             }
           });
 
-          (vagasRes.data || []).forEach((v: any) => {
-            const nomeResponsavel = v.owner_nome || v.owner?.nome;
+          (vagasRes.data || []).forEach((vaga: any) => {
+            const nomeResponsavel = vaga?.proprietario_id
+              ? nomesPorId.get(vaga.proprietario_id)
+              : undefined;
             if (
               nomeResponsavel &&
               cargaTrabalhoMap[nomeResponsavel] !== undefined
