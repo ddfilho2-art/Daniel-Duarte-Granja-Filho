@@ -4,24 +4,13 @@ const supabaseUrl =
   process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
 const supabaseAnonKey =
   process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-
-const authClient =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
-
-const serviceClient =
-  supabaseUrl && supabaseServiceRoleKey
-    ? createClient(supabaseUrl, supabaseServiceRoleKey)
-    : null;
 
 export default async function handler(req: any, res: any) {
   if (req.method !== "GET") {
     return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED" });
   }
 
-  if (!authClient || !serviceClient) {
+  if (!supabaseUrl || !supabaseAnonKey) {
     return res.status(500).json({ success: false, code: "SUPABASE_NOT_CONFIGURED" });
   }
 
@@ -35,31 +24,18 @@ export default async function handler(req: any, res: any) {
   }
 
   const token = authorization.slice("Bearer ".length).trim();
+  const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    global: { headers: { Authorization: authorization } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   const { data: userData, error: userError } = await authClient.auth.getUser(token);
 
   if (userError || !userData.user) {
     return res.status(401).json({ success: false, code: "INVALID_SESSION" });
   }
 
-  const { data: privilegedUser, error: privilegedUserError } = await serviceClient
-    .from("users")
-    .select("id,uid,perfil,status")
-    .or(`id.eq.${userData.user.id},uid.eq.${userData.user.id}`)
-    .maybeSingle();
-
-  const privileged =
-    !privilegedUserError &&
-    privilegedUser &&
-    ["admin", "rh"].includes(String(privilegedUser.perfil || "").toLowerCase()) &&
-    !["inativo", "inactive", "suspended"].includes(
-      String(privilegedUser.status || "ativo").toLowerCase(),
-    );
-
-  if (!privileged) {
-    return res.status(403).json({ success: false, code: "FORBIDDEN" });
-  }
-
-  const { data, error } = await serviceClient
+  const { data, error } = await authClient
     .from("email_queue")
     .select("id,status,attempts,error,created_at,updated_at,payload")
     .order("created_at", { ascending: false })
