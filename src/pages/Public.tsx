@@ -1254,7 +1254,6 @@ export function Login() {
     tenantMembershipLoading,
     tenantRoles,
     clinicRoles,
-    hasClinicAccess,
     hasTenantAccess,
     canAdministerTenant,
     login,
@@ -1301,7 +1300,6 @@ export function Login() {
     tenantMembershipLoading,
     tenantRoles,
     clinicRoles,
-    hasClinicAccess,
     hasTenantAccess,
     canAdministerTenant,
     isTenantRoute,
@@ -1353,45 +1351,6 @@ export function Login() {
           <p className="mt-2 text-slate-600">
             Informe seu e-mail e senha. O sistema identifica automaticamente seu perfil e direciona você para a área autorizada.
           </p>
-        </div>
-
-          {accessOptions.map((option) => {
-            const Icon = option.icon;
-            const active = selectedProfile === option.id;
-
-            return (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => {
-                  setSelectedProfile(option.id);
-                  setError("");
-                  setCandidateRegistrationRequired(false);
-                }}
-                className={
-                  "rounded-xl border p-5 text-left transition-all " +
-                  (active
-                    ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/10"
-                    : "border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm")
-                }
-              >
-                <div
-                  className={
-                    "mb-4 flex h-10 w-10 items-center justify-center rounded-lg " +
-                    (active
-                      ? "bg-primary text-white"
-                      : "bg-slate-100 text-slate-600")
-                  }
-                >
-                  <Icon className="h-5 w-5" />
-                </div>
-                <h2 className="font-semibold text-slate-900">{option.title}</h2>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
-                  {option.description}
-                </p>
-              </button>
-            );
-          })}
         </div>
 
         <div className="mx-auto max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
