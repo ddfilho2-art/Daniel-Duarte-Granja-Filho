@@ -1,0 +1,30 @@
+name: E2E - Isolamento Multi-Tenant
+
+on:
+  workflow_dispatch:
+
+jobs:
+  tenant-isolation:
+    name: Teste real de isolamento entre tenants
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Executar E2E de isolamento multi-tenant
+        run: npm run e2e:recruta:isolation
