@@ -78,7 +78,12 @@ export async function executeAdminUserAction(
 ): Promise<AdminUserResponse> {
   const { data, error } = await supabase.functions.invoke<AdminUserResponse>(
     "admin-users",
-    {\n      body,\n      headers: getSupabaseTenantId()\n        ? { "x-tenant-id": getSupabaseTenantId() as string }\n        : undefined,\n    },
+    {
+      body,
+      headers: getSupabaseTenantId()
+        ? { "x-tenant-id": getSupabaseTenantId() as string }
+        : undefined,
+    },
   );
 
   if (error || !data?.success) {
