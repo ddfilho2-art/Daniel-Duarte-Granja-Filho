@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
-import { Camera, Save, User as UserIcon, ArrowLeft } from "lucide-react";
+import { Camera, User as UserIcon, ArrowLeft } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useUI } from "../contexts/UIContext";
@@ -14,23 +14,28 @@ export function PerfilAdmin() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [avatarUrl, setAvatarUrl] = useState(() => profile?.avatar_url || profile?.foto_url || "");
   const [email, setEmail] = useState("");
-
   const [nome, setNome] = useState("");
   const [cargo, setCargo] = useState("");
 
   const isLoaded = useRef(false);
   const isSaving = useRef(false);
+  const saveMessageTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (saveMessageTimer.current) clearTimeout(saveMessageTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isLoaded.current) return;
     isLoaded.current = true;
 
     const fetchProfile = async () => {
-      const {
-        data: { user: supabaseUser },
-      } = await supabase.auth.getUser();
+      const { data: { user: supabaseUser } } = await supabase.auth.getUser();
 
       if (supabaseUser) {
         setEmail(supabaseUser.email || "");
@@ -60,8 +65,13 @@ export function PerfilAdmin() {
 
     if (isSaving.current) return;
     isSaving.current = true;
-
     setSaving(true);
+    setSaveMessage("");
+
+    if (saveMessageTimer.current) {
+      clearTimeout(saveMessageTimer.current);
+      saveMessageTimer.current = null;
+    }
 
     try {
       const payload = {
@@ -82,9 +92,7 @@ export function PerfilAdmin() {
         return;
       }
 
-      if (updateProfile) {
-        updateProfile({ ...payload, avatar_url: avatarUrl });
-      }
+      updateProfile?.({ ...payload, avatar_url: avatarUrl });
 
       const { data: refetch } = await supabase
         .from("users")
@@ -96,17 +104,19 @@ export function PerfilAdmin() {
         setNome(refetch.nome || "");
         setCargo(refetch.cargo || "");
 
-        if (updateProfile) {
-          updateProfile({
-            nome: refetch.nome,
-            cargo: refetch.cargo,
-            foto_url: refetch.foto_url,
-            avatar_url: refetch.foto_url,
-          });
-        }
+        updateProfile?.({
+          nome: refetch.nome,
+          cargo: refetch.cargo,
+          foto_url: refetch.foto_url,
+          avatar_url: refetch.foto_url,
+        });
       }
 
-      alert("✅ Perfil atualizado com sucesso!");
+      setSaveMessage("Alterações salvas com sucesso.");
+      saveMessageTimer.current = setTimeout(() => {
+        setSaveMessage("");
+        saveMessageTimer.current = null;
+      }, 3500);
     } catch (err) {
       console.error("💥 Erro inesperado:", err);
       alert("Erro ao salvar.");
@@ -124,18 +134,13 @@ export function PerfilAdmin() {
       if (!file) return;
 
       await supabase.auth.refreshSession();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
+      const { data: { session } } = await supabase.auth.getSession();
       const activeUserId = session?.user?.id || user?.id || user?.uid;
 
-      if (!activeUserId) {
-        throw new Error("Usuário não autenticado");
-      }
+      if (!activeUserId) throw new Error("Usuário não autenticado");
 
       const fileExt = file.name.split(".").pop();
-      const fileName = `${activeUserId}/${activeUserId}_${Date.now()}.${fileExt}`;
+      const fileName = activeUserId + "/" + activeUserId + "_" + Date.now() + "." + fileExt;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
@@ -143,14 +148,11 @@ export function PerfilAdmin() {
 
       if (uploadError) throw uploadError;
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(fileName);
+      const { data: { publicUrl } } = supabase.storage
+        .from("avatars")
+        .getPublicUrl(fileName);
       const urlWithCache = publicUrl + "?t=" + new Date().getTime();
 
-      // Atualiza imediatamente a fonte global de perfil e persiste a foto.
-      // Assim o avatar do menu lateral e o avatar desta página usam o mesmo estado,
-      // mesmo antes de o usuário clicar em "Salvar Alterações".
       setAvatarUrl(urlWithCache);
 
       const { error: profilePhotoError } = await supabase
@@ -239,9 +241,7 @@ export function PerfilAdmin() {
         <form onSubmit={handleSave} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-slate-700">
-                Nome
-              </label>
+              <label className="text-sm font-semibold text-slate-700">Nome</label>
               <input
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
@@ -250,9 +250,7 @@ export function PerfilAdmin() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-slate-700">
-                E-mail
-              </label>
+              <label className="text-sm font-semibold text-slate-700">E-mail</label>
               <input
                 value={email}
                 disabled
@@ -261,9 +259,7 @@ export function PerfilAdmin() {
             </div>
 
             <div className="md:col-span-2 space-y-1">
-              <label className="text-sm font-semibold text-slate-700">
-                Cargo
-              </label>
+              <label className="text-sm font-semibold text-slate-700">Cargo</label>
               <input
                 value={cargo}
                 onChange={(e) => setCargo(e.target.value)}
@@ -272,22 +268,30 @@ export function PerfilAdmin() {
             </div>
           </div>
 
-          <div className="flex justify-end items-center gap-4 pt-6 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={openChangePassword}
-              className="px-6 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
-            >
-              Trocar Senha
-            </button>
+          <div className="flex flex-col items-end gap-2 pt-6 border-t border-slate-100">
+            {saveMessage && (
+              <div role="status" aria-live="polite" className="text-xs text-emerald-600">
+                {saveMessage}
+              </div>
+            )}
 
-            <button
-              type="submit"
-              disabled={saving || loading}
-              className="bg-[#0054A6] text-white px-10 py-3 rounded-lg font-bold"
-            >
-              {saving ? "Salvando..." : "Salvar Alterações"}
-            </button>
+            <div className="flex justify-end items-center gap-4 w-full">
+              <button
+                type="button"
+                onClick={openChangePassword}
+                className="px-6 py-2 text-sm font-medium bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                Trocar Senha
+              </button>
+
+              <button
+                type="submit"
+                disabled={saving || loading}
+                className="bg-[#0054A6] text-white px-10 py-3 rounded-lg font-bold"
+              >
+                {saving ? "Salvando..." : "Salvar Alterações"}
+              </button>
+            </div>
           </div>
         </form>
       </div>
