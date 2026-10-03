@@ -8,7 +8,7 @@ import { useUI } from "../contexts/UIContext";
 console.log("✅ [LOAD] PerfilAdmin carregado");
 
 export function PerfilAdmin() {
-  const { user, profile, updateProfile } = useAuth();
+  const { user, profile, updateProfile, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const { openChangePassword } = useUI();
 
@@ -151,27 +151,40 @@ export function PerfilAdmin() {
       const { data: { publicUrl } } = supabase.storage
         .from("avatars")
         .getPublicUrl(fileName);
-      const urlWithCache = publicUrl + "?t=" + new Date().getTime();
+      const canonicalUrl = publicUrl;
+      const urlWithCache = canonicalUrl + "?t=" + new Date().getTime();
 
+      // Exibe imediatamente, mas só considera o upload concluído depois que
+      // a URL canônica também foi confirmada em public.users.
       setAvatarUrl(urlWithCache);
 
-      const { error: profilePhotoError } = await supabase
-        .from("users")
-        .update({
-          foto_url: urlWithCache,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", activeUserId);
+      const persistAvatar = async (column: "id" | "uid") => {
+        const { data, error } = await supabase
+          .from("users")
+          .update({
+            foto_url: canonicalUrl,
+            updated_at: new Date().toISOString(),
+          })
+          .eq(column, activeUserId)
+          .select("id, foto_url")
+          .maybeSingle();
 
-      if (profilePhotoError) {
-        console.error("❌ [FOTO BANCO ERRO]:", profilePhotoError);
-        throw profilePhotoError;
+        if (error) throw error;
+        return data;
+      };
+
+      let savedProfile = await persistAvatar("id");
+      if (!savedProfile) savedProfile = await persistAvatar("uid");
+
+      if (!savedProfile || savedProfile.foto_url !== canonicalUrl) {
+        throw new Error("A foto foi enviada, mas não foi confirmada no perfil.");
       }
 
       updateProfile?.({
         avatar_url: urlWithCache,
-        foto_url: urlWithCache,
+        foto_url: canonicalUrl,
       });
+      await refreshProfile?.();
     } catch (error: any) {
       console.error("❌ [FOTO ERRO]:", error);
       alert("Erro no upload da foto.");
