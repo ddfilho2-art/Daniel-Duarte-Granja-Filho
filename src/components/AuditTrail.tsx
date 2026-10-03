@@ -19,12 +19,12 @@ import { supabase } from '../lib/supabase';
  */
 interface AuditLog {
   id: string;
-  created_at: string;
+  data: string;
   acao: string;
   modulo: string;
   detalhes: string;
-  user_id?: string;
   usuario_id?: string;
+  usuario_email?: string;
   executor_login?: string;
   metadata?: {
     ip?: string;
@@ -76,20 +76,20 @@ export function AuditTrail() {
       const { data, error } = await supabase
         .from('logs')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('data', { ascending: false })
         .limit(200);
 
       if (error) throw error;
 
       const normalized = (data || []).map(log => ({
         ...log,
-        executor_login: map[String(log.user_id || log.usuario_id)] || 'SISTEMA',
+        executor_login: map[String(log.usuario_id)] || log.usuario_email || 'SISTEMA',
         severidade: log.metadata?.severidade || (
           log.acao.toLowerCase().includes('cancelado') || 
           log.acao.toLowerCase().includes('congelado') ||
           log.modulo === 'ADMIN' ? 'Crítico' : 'Info'
         ),
-        ip: log.metadata?.ip || '127.0.0.1'
+        ip: log.ip || 'N/D'
       }));
 
       setLogs(normalized);
@@ -126,12 +126,12 @@ export function AuditTrail() {
           setLogs(prev => {
             const normalized = {
               ...newLog,
-              executor_login: mapToUse[String(newLog.user_id || newLog.usuario_id)] || 'SISTEMA',
+              executor_login: mapToUse[String(newLog.usuario_id)] || newLog.usuario_email || 'SISTEMA',
               severidade: newLog.metadata?.severidade || (
                 newLog.acao.toLowerCase().includes('cancelado') || 
                 newLog.acao.toLowerCase().includes('congelado') ? 'Crítico' : 'Info'
               ),
-              ip: newLog.metadata?.ip || '127.0.0.1'
+              ip: newLog.ip || 'N/D'
             };
             return [normalized, ...prev].slice(0, 200);
           });
@@ -151,7 +151,7 @@ export function AuditTrail() {
     const rows = [headers.join(',')];
     
     logs.forEach(log => {
-      const d = new Date(log.created_at);
+      const d = new Date(log.data);
       const row = [
         d.toLocaleDateString('pt-BR', { timeZone: TIMEZONE }),
         d.toLocaleTimeString('pt-BR', { timeZone: TIMEZONE }),
@@ -250,10 +250,10 @@ export function AuditTrail() {
                 filtered.map(log => (
                   <tr key={log.id} className={`hover:bg-slate-50 transition-colors animate-in slide-in-from-top duration-300 ${log.severidade === 'Crítico' ? 'bg-red-50/10' : ''}`}>
                     <td className="px-5 py-3 font-mono text-xs text-slate-600 font-bold">
-                      {new Date(log.created_at).toLocaleDateString('pt-BR', { timeZone: TIMEZONE })}
+                      {new Date(log.data).toLocaleDateString('pt-BR', { timeZone: TIMEZONE })}
                     </td>
                     <td className="px-5 py-3 font-mono text-sm text-slate-800 font-bold">
-                      {new Date(log.created_at).toLocaleTimeString('pt-BR', { timeZone: TIMEZONE })}
+                      {new Date(log.data).toLocaleTimeString('pt-BR', { timeZone: TIMEZONE })}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2">
