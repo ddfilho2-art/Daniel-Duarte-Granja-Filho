@@ -49,17 +49,15 @@ async function must(label, operation) {
 async function expectDenied(label, operation) {
   const { data, error } = await operation;
   if (error) {
-    results[label] = { passed: true, error: error.message };
+    results[label] = { passed: true, mode: "error", error: error.message };
+    return;
+  }
+  if (Array.isArray(data) && data.length === 0) {
+    results[label] = { passed: true, mode: "rls_zero_rows" };
     return;
   }
   throw new Error(`${label}: operação deveria ter sido bloqueada, mas retornou sucesso: ${JSON.stringify(data)}`);
 }
-
-async function cleanup(label, operation, errors) {
-  const { error } = await operation;
-  if (error) errors.push(`${label}: ${error.message}`);
-}
-
 try {
   console.log("\n=== Recruta AÍ — E2E isolamento multi-tenant real ===");
   console.log("Run:", runId);
