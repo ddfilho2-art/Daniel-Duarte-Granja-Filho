@@ -22,6 +22,9 @@ const tenantA = { slug: `e2e-iso-a-${runId}`, name: `E2E Isolation A ${runId}` }
 const tenantB = { slug: `e2e-iso-b-${runId}`, name: `E2E Isolation B ${runId}` };
 const userAEmail = `e2e-iso-a-${runId}@example.invalid`;
 const userBEmail = `e2e-iso-b-${runId}@example.invalid`;
+const cnpjSeed = String(Date.now()).slice(-10);
+const cnpjA = `0000${cnpjSeed}`;
+const cnpjB = `0001${cnpjSeed}`;
 
 let tenantAId = null;
 let tenantBId = null;
@@ -65,7 +68,7 @@ try {
   const createdTenants = await must("tenants", admin.from("tenants").insert([
     {
       kind: "employer",
-      cnpj: "000000000" + runId.slice(0, 5),
+      cnpj: cnpjA,
       legal_name: tenantA.name,
       display_name: tenantA.name,
       slug: tenantA.slug,
@@ -74,7 +77,7 @@ try {
     },
     {
       kind: "employer",
-      cnpj: "000000001" + runId.slice(0, 5),
+      cnpj: cnpjB,
       legal_name: tenantB.name,
       display_name: tenantB.name,
       slug: tenantB.slug,
