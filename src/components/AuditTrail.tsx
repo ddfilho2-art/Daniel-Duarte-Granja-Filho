@@ -328,7 +328,7 @@ export function AuditTrail() {
                 <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
                   <span className="text-[10px] font-bold text-slate-400 uppercase">Horário RJ (UTC-3)</span>
                   <p className="text-sm font-bold text-slate-800 mt-2 italic shadow-text">
-                    {new Date(selectedLog.created_at).toLocaleTimeString('pt-BR', { timeZone: TIMEZONE })}
+                    {new Date(selectedLog.data).toLocaleTimeString('pt-BR', { timeZone: TIMEZONE })}
                   </p>
                 </div>
                 <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
