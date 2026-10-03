@@ -91,18 +91,22 @@ try {
     resumo: "Currículo temporário para homologação.",
   };
 
-  await must("users", admin.from("users").insert({
-    id: candidateUserId,
-    uid: candidateUserId,
-    nome: resumeData.nome,
-    email,
-    login: email,
-    login_lower: email.toLowerCase(),
-    perfil: "Candidato",
-    status: "Ativo",
-    resume_completed: true,
-    resume_data: resumeData,
-  }));
+  // handle_new_user() já cria o perfil legado; o E2E apenas completa os
+  // dados do candidato, sem tentar inserir uma segunda linha.
+  await must("users", admin.from("users")
+    .update({
+      nome: resumeData.nome,
+      email,
+      login: email,
+      login_lower: email.toLowerCase(),
+      perfil: "Candidato",
+      status: "Ativo",
+      resume_completed: true,
+      resume_data: resumeData,
+    })
+    .eq("id", candidateUserId)
+    .select("id")
+    .single());
   checks.candidate_profile = true;
 
   const vacancy = await must("vacancy", admin.from("vagas").insert({
@@ -122,6 +126,7 @@ try {
   checks.vacancy = true;
 
   const candidateClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { "x-tenant-id": tenantId } },
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const signed = await candidateClient.auth.signInWithPassword({ email, password });
@@ -130,12 +135,37 @@ try {
   }
   checks.auth = true;
 
+  const registration = await must(
+    "candidate registration",
+    candidateClient.rpc("rpc_registrar_candidato", { p_tenant_id: tenantId }),
+  );
+  if (!registration?.[0]?.candidato_id) {
+    throw new Error("rpc_registrar_candidato não criou a ficha do tenant");
+  }
+  candidateId = String(registration[0].candidato_id);
+  checks.candidate_registration = {
+    candidato_id: registration[0].candidato_id,
+    tenant_id: registration[0].tenant_id,
+    membership_status: registration[0].membership_status,
+  };
+
+  const membership = await must("candidate membership", admin.from("tenant_memberships")
+    .select("tenant_id,user_id,roles,status")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", candidateUserId)
+    .single());
+  if (membership.status !== "active" || !membership.roles.includes("candidate")) {
+    throw new Error("membership de candidato inválida");
+  }
+  checks.candidate_membership = membership;
+
   const apply = await fetchWithTimeout(`${supabaseUrl}/functions/v1/apply-to-vacancy`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       apikey: anonKey,
       Authorization: `Bearer ${signed.data.session.access_token}`,
+      "x-tenant-id": tenantId,
     },
     body: JSON.stringify({ vaga_id: vagaId, origem: "E2E" }),
   });
@@ -248,6 +278,7 @@ try {
       "Content-Type": "application/json",
       apikey: anonKey,
       Authorization: `Bearer ${signed.data.session.access_token}`,
+      "x-tenant-id": tenantId,
     },
     body: JSON.stringify({ vaga_id: vagaId, origem: "E2E_DUPLICATE" }),
   });
@@ -287,6 +318,10 @@ try {
   if (vagaId) await cleanup("vagas", admin.from("vagas").delete().eq("id", vagaId));
   if (candidateId) await cleanup("candidatos", admin.from("candidatos").delete().eq("id", candidateId));
   if (candidateUserId) {
+    await cleanup(
+      "tenant_memberships",
+      admin.from("tenant_memberships").delete().eq("tenant_id", tenantId).eq("user_id", candidateUserId),
+    );
     await cleanup("candidatos_by_user", admin.from("candidatos").delete().eq("user_id", candidateUserId));
     await cleanup("users", admin.from("users").delete().eq("id", candidateUserId));
     const deletedAuth = await admin.auth.admin.deleteUser(candidateUserId);
