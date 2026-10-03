@@ -60,4 +60,6 @@ O isolamento entre empresas é responsabilidade do modelo multi-tenant do Supaba
 
 ## Estado
 
-A fundação multi-tenant já existe. Antes da abertura para produção em escala, a principal manutenção estrutural pendente é alinhar o cadastro de candidatos ao requisito de cadastro independente por empresa e completar a revisão de autorização/RLS descrita em [STATUS-ARQUITETURA.md](./docs/STATUS-ARQUITETURA.md).
+A fundação multi-tenant e o cadastro independente de candidato por empresa já estão implantados.
+
+As próximas validações estruturais são a homologação E2E multi-tenant, os testes de isolamento entre empresas e a revisão contínua de autorização/RLS descrita em [STATUS-ARQUITETURA.md](./docs/STATUS-ARQUITETURA.md).
