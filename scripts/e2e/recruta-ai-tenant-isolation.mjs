@@ -22,9 +22,25 @@ const tenantA = { slug: `e2e-iso-a-${runId}`, name: `E2E Isolation A ${runId}` }
 const tenantB = { slug: `e2e-iso-b-${runId}`, name: `E2E Isolation B ${runId}` };
 const userAEmail = `e2e-iso-a-${runId}@example.invalid`;
 const userBEmail = `e2e-iso-b-${runId}@example.invalid`;
+function makeValidCnpj(base12) {
+  const digits = String(base12).replace(/\\D/g, "").slice(0, 12).padStart(12, "0");
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+
+  const digit = (value, weights) => {
+    const sum = value.split("").reduce((acc, char, index) => acc + Number(char) * weights[index], 0);
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const d1 = digit(digits, weights1);
+  const d2 = digit(digits + d1, weights2);
+  return digits + d1 + d2;
+}
+
 const cnpjSeed = String(Date.now()).slice(-10);
-const cnpjA = `0000${cnpjSeed}`;
-const cnpjB = `0001${cnpjSeed}`;
+const cnpjA = makeValidCnpj(`12${cnpjSeed}`);
+const cnpjB = makeValidCnpj(`13${cnpjSeed}`);
 
 let tenantAId = null;
 let tenantBId = null;
