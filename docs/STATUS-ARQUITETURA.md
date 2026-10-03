@@ -170,7 +170,9 @@ Depois disso, o deploy multi-tenant pode continuar sendo simples:
 - [x] `/admin` exige contexto e autorização do tenant.
 - [x] Administração de RH endurecida no backend.
 - [x] Acesso `anon` removido de `users`, `candidatos` e `candidaturas`.
-- [ ] E2E com usuários reais de dois tenants ainda depende da criação segura das contas Auth.
+- [ ] E2E com usuários reais de dois tenants ainda depende da execução local com credenciais seguras de teste.
+- [x] Runner E2E completo alinhado ao cadastro contextual por tenant e ao cabeçalho x-tenant-id.
+- [x] Índice dedicado em candidatos.user_id criado para cobertura da chave estrangeira.
 
 
 ### 2026-10-02 — endurecimento adicional de identidade
@@ -181,3 +183,12 @@ Depois disso, o deploy multi-tenant pode continuar sendo simples:
 - [x] Edge Function `admin-users` versão 5 aplicada e sincronizada no GitHub.
 - [x] Cadastro do candidato usa somente e-mail como identificador de autenticação.
 - [x] Link de confirmação preserva o tenant de origem.
+
+
+### 2026-10-03 — preparação da homologação E2E
+
+- [x] Runner E2E completo corrigido para respeitar o fluxo oficial de registro do candidato por tenant.
+- [x] Runner E2E passa x-tenant-id no cliente autenticado e nas chamadas de candidatura.
+- [x] Runner E2E deixou de duplicar a linha criada por handle_new_user() e passou a completar o perfil existente.
+- [x] Índice candidatos.user_id criado para cobertura da FK e registrado em migration.
+- [ ] Execução E2E real com credenciais locais ainda pendente.
