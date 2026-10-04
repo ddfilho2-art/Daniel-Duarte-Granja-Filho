@@ -23,6 +23,21 @@ on:
         required: true
         default: "32"
         type: string
+      run_real_ai_load:
+        description: "Executar carga REAL da IA/Gemini"
+        required: true
+        default: false
+        type: boolean
+      real_ai_jobs:
+        description: "Quantidade de análises reais com Gemini (1-200)"
+        required: true
+        default: "20"
+        type: string
+      real_ai_concurrency:
+        description: "Concorrência de invocações do worker real (1-16)"
+        required: true
+        default: "8"
+        type: string
 
 permissions:
   contents: write
@@ -38,6 +53,8 @@ jobs:
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       E2E_QUEUE_JOBS: ${{ inputs.queue_jobs }}
       E2E_QUEUE_CONCURRENCY: ${{ inputs.queue_concurrency }}
+      E2E_REAL_AI_JOBS: ${{ inputs.real_ai_jobs }}
+      E2E_REAL_AI_CONCURRENCY: ${{ inputs.real_ai_concurrency }}
 
     steps:
       - name: Checkout
@@ -86,3 +103,7 @@ jobs:
       - name: E2E carga da fila de IA
         if: ${{ inputs.run_queue_load }}
         run: npm run e2e:recruta:queue
+
+      - name: E2E carga REAL da IA (Gemini)
+        if: ${{ inputs.run_real_ai_load }}
+        run: npm run e2e:recruta:real-ai
