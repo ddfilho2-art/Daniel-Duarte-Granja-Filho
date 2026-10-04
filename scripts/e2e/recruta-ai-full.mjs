@@ -319,8 +319,9 @@ try {
   const duplicateBody = await duplicate.json().catch(() => ({}));
   checks.duplicate = {
     http_status: duplicate.status,
-    code: duplicateBody.code || null,
-    rejected: duplicateBody.code === "already_applied",
+    error: duplicateBody.error || null,
+    rejected: duplicate.status === 409 && duplicateBody.error === "already_applied",
+    response: duplicateBody,
   };
 
   if (!checks.score) throw new Error("score persistido não corresponde à média do radar");
