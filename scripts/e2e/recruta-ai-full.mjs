@@ -242,7 +242,22 @@ try {
       body: JSON.stringify({ max_jobs: 3 }),
     });
     const workerBody = await worker.json().catch(() => ({}));
-    checks[`worker_${attempt + 1}`] = { status: worker.status, body: workerBody };
+    const queueState = await must("queue state", admin.from("ai_analysis_requests")
+      .select("status,error_code,attempt_count,next_attempt_at")
+      .eq("request_key", requestKey)
+      .maybeSingle());
+
+    checks[`worker_${attempt + 1}`] = {
+      status: worker.status,
+      body: workerBody,
+      queue: queueState,
+    };
+
+    if (queueState?.status === "failed") {
+      throw new Error(
+        `worker falhou na fila: ${queueState.error_code || "erro_desconhecido"}`,
+      );
+    }
 
     const analysis = await must("analysis", admin.from("analise_ia_candidato")
       .select("id,status,result,error,candidatura_id")
