@@ -3,11 +3,14 @@ name: E2E - Isolamento Multi-Tenant
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   tenant-isolation:
-    name: Teste real de isolamento entre tenants
+    name: Segurança, dependências e isolamento multi-tenant
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -16,6 +19,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -23,8 +28,30 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Regenerar package-lock com Node 24
+        run: |
+          npm install --package-lock-only
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json já está alinhado."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package-lock.json
+            git commit -m "chore: atualizar lockfile das dependências"
+            git push origin main
+          fi
+
       - name: Instalar dependências
         run: npm ci
 
-      - name: Executar E2E de isolamento multi-tenant
+      - name: Auditoria de dependências de produção
+        run: npm audit --omit=dev
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E de isolamento multi-tenant
         run: npm run e2e:recruta:isolation
