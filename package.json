@@ -54,7 +54,8 @@
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.23.15",
-    "typescript": "~5.8.2"
+    "typescript": "~5.8.2",
+    "@vitejs/plugin-react": "^5.2.0"
   },
   "overrides": {
     "protobufjs": "^7.6.6",
