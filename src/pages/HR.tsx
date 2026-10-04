@@ -4728,6 +4728,7 @@ export function HRPlaceholder({ title }: { title: string }) {
 export function HRCandidatos() {
   const [selectedVaga, setSelectedVaga] = useState<string | null>(null);
   const [filterEducation, setFilterEducation] = useState("Todos");
+  const [scoreMinFilter, setScoreMinFilter] = useState("");
   const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
   const [selectedCandidato, setSelectedCandidato] = useState<any>(null);
   const [selectedCandidaturaId, setSelectedCandidaturaId] = useState<
