@@ -365,7 +365,9 @@ export function HRLayout() {
 
   React.useEffect(() => {
     const fetchBadges = async () => {
-      const { data, error } = await supabase.from("candidaturas").select("*");
+      const { data, error } = await supabase
+        .from("candidaturas")
+        .select("fase, visualizado, status, unread_messages_by_hr");
 
       if (error) {
         console.error("Erro ao buscar badges:", error);

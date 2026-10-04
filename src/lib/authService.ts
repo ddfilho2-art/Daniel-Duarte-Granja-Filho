@@ -58,7 +58,7 @@ export async function loadProfileForAuthUser(
 ): Promise<UserProfile> {
   const byUid = await supabase
     .from("users")
-    .select("*")
+    .select("id, uid, nome, email, login, perfil, status, avatar_url, foto_url, cargo, matricula, unidade_negocio_id, resume_completed, email_verified, resume_data")
     .eq("uid", authUserId)
     .maybeSingle();
 
@@ -68,7 +68,7 @@ export async function loadProfileForAuthUser(
   if (!data) {
     const byId = await supabase
       .from("users")
-      .select("*")
+      .select("id, uid, nome, email, login, perfil, status, avatar_url, foto_url, cargo, matricula, unidade_negocio_id, resume_completed, email_verified, resume_data")
       .eq("id", authUserId)
       .maybeSingle();
     if (byId.error) throw byId.error;
