@@ -31,12 +31,12 @@ on:
       real_ai_jobs:
         description: "Quantidade de análises reais com Gemini (1-200)"
         required: true
-        default: "20"
+        default: "10"
         type: string
       real_ai_concurrency:
         description: "Concorrência de invocações do worker real (1-16)"
         required: true
-        default: "8"
+        default: "2"
         type: string
 
 permissions:
