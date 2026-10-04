@@ -569,7 +569,16 @@ function CandidateProfileModal({
 
         const body = (
           settings.emailTemplateBody ||
-          "Olá [Nome do Candidato],\n\nVocê tem uma nova mensagem do RH referente à vaga [Título da Vaga].\n\nMensagem:\n[Mensagem do Convite]\n\nAtenciosamente,\n[Nome do RH]\n[Email do RH]"
+          "Olá [Nome do Candidato],
+
+Você tem uma nova mensagem do RH referente à vaga [Título da Vaga].
+
+Mensagem:
+[Mensagem do Convite]
+
+Atenciosamente,
+[Nome do RH]
+[Email do RH]"
         )
           .replace("[Nome do Candidato]", nome)
           .replace("[Título da Vaga]", vaga?.titulo || "Vaga")
@@ -736,8 +745,12 @@ function CandidateProfileModal({
             "Prova Técnica";
 
           let msgTexto =
-            `Olá ${nome}, parabéns! Você avançou para a fase de Prova Técnica.\n\n` +
-            `A prova vinculada a esta vaga é: **${provaNome}**.\n\n` +
+            `Olá ${nome}, parabéns! Você avançou para a fase de Prova Técnica.
+
+` +
+            `A prova vinculada a esta vaga é: **${provaNome}**.
+
+` +
             `Por favor, acesse a aba "Provas" no seu painel para mais detalhes e instruções de realização.`;
 
           if (settings && settings.template) {
@@ -777,7 +790,15 @@ function CandidateProfileModal({
 
             const body = (
               settings?.template ||
-              "Olá [Nome do Candidato],\n\nVocê avançou para a etapa de prova da vaga [Título da Vaga].\n\nProva: [Nome da Prova]\nLink: [Link da Prova]\n\nResponsável RH: [Nome do RH]\nE-mail RH: [Email do RH]"
+              "Olá [Nome do Candidato],
+
+Você avançou para a etapa de prova da vaga [Título da Vaga].
+
+Prova: [Nome da Prova]
+Link: [Link da Prova]
+
+Responsável RH: [Nome do RH]
+E-mail RH: [Email do RH]"
             )
               .replace("[Nome do Candidato]", nome)
               .replace("[Título da Vaga]", vaga?.titulo || "Vaga")
@@ -3576,7 +3597,9 @@ export function HRGestaoVagas() {
           return false;
         }
       }
-      return true;\n    })\n    .sort((a, b) => {
+      return true;
+    })
+    .sort((a, b) => {
       // Sort by novidades first
       const aNovidades = candidaturasStats[a.id]?.novidades || 0;
       const bNovidades = candidaturasStats[b.id]?.novidades || 0;
@@ -5901,7 +5924,16 @@ const SendMessageModal = ({
 
           const body = (
             settings.emailTemplateBody ||
-            "Olá [Nome do Candidato],\n\nVocê tem uma nova mensagem do RH referente à vaga [Título da Vaga].\n\nMensagem:\n[Mensagem do Convite]\n\nAtenciosamente,\n[Nome do RH]\n[Email do RH]"
+            "Olá [Nome do Candidato],
+
+Você tem uma nova mensagem do RH referente à vaga [Título da Vaga].
+
+Mensagem:
+[Mensagem do Convite]
+
+Atenciosamente,
+[Nome do RH]
+[Email do RH]"
           )
             .replace("[Nome do Candidato]", candidatoNome)
             .replace("[Título da Vaga]", vagaTitulo)
@@ -7431,7 +7463,16 @@ export function HRMensagens() {
 
           const body = (
             settings.emailTemplateBody ||
-            "Olá [Nome do Candidato],\n\nVocê tem uma nova mensagem do RH referente à vaga [Título da Vaga].\n\nMensagem:\n[Mensagem do Convite]\n\nAtenciosamente,\n[Nome do RH]\n[Email do RH]"
+            "Olá [Nome do Candidato],
+
+Você tem uma nova mensagem do RH referente à vaga [Título da Vaga].
+
+Mensagem:
+[Mensagem do Convite]
+
+Atenciosamente,
+[Nome do RH]
+[Email do RH]"
           )
             .replace("[Nome do Candidato]", candidatoNome)
             .replace("[Título da Vaga]", vagaTitulo)
