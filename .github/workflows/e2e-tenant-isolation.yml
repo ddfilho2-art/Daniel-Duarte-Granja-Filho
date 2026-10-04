@@ -1,7 +1,28 @@
-name: E2E - Isolamento Multi-Tenant
+name: E2E - Multi-Tenant, Fluxo Completo e Carga
 
 on:
   workflow_dispatch:
+    inputs:
+      run_full_e2e:
+        description: "Executar fluxo completo candidato → candidatura → IA → score"
+        required: true
+        default: true
+        type: boolean
+      run_queue_load:
+        description: "Executar teste de carga da fila de IA"
+        required: true
+        default: false
+        type: boolean
+      queue_jobs:
+        description: "Quantidade de jobs sintéticos no teste de carga (1-1000)"
+        required: true
+        default: "200"
+        type: string
+      queue_concurrency:
+        description: "Concorrência do teste de carga (4-32)"
+        required: true
+        default: "32"
+        type: string
 
 permissions:
   contents: write
@@ -15,6 +36,8 @@ jobs:
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      E2E_QUEUE_JOBS: ${{ inputs.queue_jobs }}
+      E2E_QUEUE_CONCURRENCY: ${{ inputs.queue_concurrency }}
 
     steps:
       - name: Checkout
@@ -55,3 +78,11 @@ jobs:
 
       - name: E2E de isolamento multi-tenant
         run: npm run e2e:recruta:isolation
+
+      - name: E2E fluxo completo candidato → IA → score
+        if: ${{ inputs.run_full_e2e }}
+        run: npm run e2e:recruta
+
+      - name: E2E carga da fila de IA
+        if: ${{ inputs.run_queue_load }}
+        run: npm run e2e:recruta:queue
