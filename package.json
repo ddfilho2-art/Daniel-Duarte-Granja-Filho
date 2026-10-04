@@ -27,7 +27,7 @@
     "date-fns": "^4.1.0",
     "dom-to-image": "^2.6.0",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2",
+    "express": "^4.22.3",
     "file-type": "^22.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.2.1",
@@ -36,11 +36,13 @@
     "multer": "^2.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "^7.18.3",
     "recharts": "^3.8.0",
     "tailwind-merge": "^3.5.0",
-    "vite": "^6.2.0",
-    "xlsx": "^0.18.5"
+    "vite": "^6.4.3",
+    "@andreeewill/exceljs": "^5.0.3",
+    "postcss": "^8.5.28",
+    "dompurify": "^3.4.16"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.3.0",
@@ -53,5 +55,13 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "protobufjs": "^7.6.6",
+    "qs": "^6.16.0",
+    "ws": "^8.22.0",
+    "picomatch": "^4.0.7",
+    "brace-expansion": "^5.0.12",
+    "nanoid": "^3.3.19"
   }
 }

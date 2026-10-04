@@ -76,7 +76,7 @@ import {
 } from "recharts";
 import domtoimage from "dom-to-image";
 import jsPDF from "jspdf";
-import * as XLSX from "xlsx";
+import ExcelJS from "@andreeewill/exceljs";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
@@ -2456,62 +2456,51 @@ export function HRDashboard() {
       });
 
       // Criação do Workbook
-      const wb = XLSX.utils.book_new();
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Recruta AÍ";
+      wb.created = new Date();
 
-      // Adicionando cada tabela como uma aba (Sheet)
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(candidatos),
-        "Candidatos",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(vagas),
-        "Vagas",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(candidaturas),
-        "Candidaturas",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(etapasProcesso),
-        "Etapas do Processo",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(movimentacaoEtapas),
-        "Movimentação nas Etapas",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(entrevistas),
-        "Entrevistas",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(ofertasPropostas),
-        "Ofertas e Propostas",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(fontesRecrutamento),
-        "Fontes Recrutamento",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(motivosRecusa),
-        "Motivos de Recusa",
-      );
-      XLSX.utils.book_append_sheet(
-        wb,
-        XLSX.utils.json_to_sheet(diversidade),
-        "Diversidade",
-      );
+      const abas = [
+        ["Candidatos", candidatos],
+        ["Vagas", vagas],
+        ["Candidaturas", candidaturas],
+        ["Etapas do Processo", etapasProcesso],
+        ["Movimentação nas Etapas", movimentacaoEtapas],
+        ["Entrevistas", entrevistas],
+        ["Ofertas e Propostas", ofertasPropostas],
+        ["Fontes Recrutamento", fontesRecrutamento],
+        ["Motivos de Recusa", motivosRecusa],
+        ["Diversidade", diversidade],
+      ] as const;
 
-      // Gerando o arquivo e disparando o download
-      XLSX.writeFile(wb, "Base_de_Dados_Recrutamento_DFL.xlsx");
+      abas.forEach(([nome, dados]) => {
+        const worksheet = wb.addWorksheet(nome);
+        const rows = dados as Record<string, unknown>[];
+
+        if (rows.length > 0) {
+          worksheet.columns = Object.keys(rows[0]).map((key) => ({
+            header: key,
+            key,
+            width: Math.min(Math.max(key.length + 4, 14), 40),
+          }));
+          worksheet.addRows(rows);
+          worksheet.getRow(1).font = { bold: true };
+          worksheet.views = [{ state: "frozen", ySplit: 1 }];
+        }
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "Base_de_Dados_Recrutamento_DFL.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Erro ao exportar Excel:", error);
       alert("Erro ao exportar dados. Verifique o console.");
