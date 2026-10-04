@@ -250,7 +250,8 @@ async function invokeWorker() {
 
 try {
   console.log(`=== Recruta AÍ — carga REAL de IA (${total} jobs / concorrência ${concurrency}) ===`);
-  console.log(`Wave delay/backoff-aware: ${waveDelayMs}ms; timeout: ${timeoutMs}ms`);\n  console.log("Modo cota gratuita: 1 invocação do worker por onda, 1 job por invocação.");
+  console.log(`Wave delay/backoff-aware: ${waveDelayMs}ms; timeout: ${timeoutMs}ms`);
+  console.log("Modo cota gratuita: 1 invocação do worker por onda, 1 job por invocação.");
   console.log("Modelo alvo: gemini-2.5-flash");
   console.log("Run:", runId);
 
