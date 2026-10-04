@@ -3412,6 +3412,7 @@ export function HRGestaoVagas() {
     refresh: refreshVagas,
   } = useVagas();
   const [searchTerm, setSearchTerm] = useState("");
+  const [scoreMinFilter, setScoreMinFilter] = useState("");
   const [sortConfig, setSortConfig] = useState<{
     key: string;
     direction: "asc" | "desc";
@@ -3575,9 +3576,7 @@ export function HRGestaoVagas() {
           return false;
         }
       }
-      return true;
-    })
-    .sort((a, b) => {
+      const minScore = scoreMinFilter === "" ? null : Number(scoreMinFilter);\n      if (minScore !== null) {\n        const score = Number((vaga as any).score_ia ?? (vaga as any).score ?? 0);\n        if (score < minScore) return false;\n      }\n      return true;\n    })\n    .sort((a, b) => {
       // Sort by novidades first
       const aNovidades = candidaturasStats[a.id]?.novidades || 0;
       const bNovidades = candidaturasStats[b.id]?.novidades || 0;
