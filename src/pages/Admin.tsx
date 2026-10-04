@@ -582,12 +582,10 @@ export function AdminTransferencias() {
     try {
       setIsProcessingReturn(true);
 
-      const { error } = await executeAdminUserAction({
+      await executeAdminUserAction({
         action: "auto_return",
         vaga_id: vaga.id,
       });
-
-      if (error) throw new Error(error);
 
       await logAudit(
         "Retorno Automático de Proprietário",
