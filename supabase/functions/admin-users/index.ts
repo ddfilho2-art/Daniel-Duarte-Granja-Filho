@@ -338,7 +338,7 @@ async function executeTransfer(
       proprietario_anterior_nome: vaga.owner_nome || "Sem proprietário",
       novo_proprietario_id: newOwner.id,
       novo_proprietario_nome: newOwner.nome,
-      justificativa,
+      justificativa: justification,
       executado_por_id: operatorId,
     };
 
@@ -974,7 +974,6 @@ async function handleRequest(
         break;
 
       case "create":
-      case "post":
         if (!body.email || !body.nome || !body.login || !body.password) {
           result = {
             success: false,
@@ -1037,7 +1036,6 @@ async function handleRequest(
         break;
 
       case "update":
-      case "put":
         if (!body.user_id || body.roles) {
           if (body.user_id && body.roles) {
             result = await updateMember(tenantId, body.user_id, body.roles, body.status);
