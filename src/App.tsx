@@ -96,14 +96,26 @@ const CandidateResume = lazyNamed(
 );
 const CandidateVagas = lazyNamed(() => import("./pages/Candidate"), "CandidateVagas");
 
-// Layouts
-import {
-  AdminLayout,
-  HRLayout,
-  CandidateLayout,
-  PublicLayout,
-  MasterLayout,
-} from "./components/Layouts";
+const PublicLayout = lazyNamed(
+  () => import("./components/layouts/PublicLayout"),
+  "PublicLayout",
+);
+const CandidateLayout = lazyNamed(
+  () => import("./components/layouts/DashboardLayouts"),
+  "CandidateLayout",
+);
+const HRLayout = lazyNamed(
+  () => import("./components/layouts/DashboardLayouts"),
+  "HRLayout",
+);
+const AdminLayout = lazyNamed(
+  () => import("./components/layouts/DashboardLayouts"),
+  "AdminLayout",
+);
+const MasterLayout = lazyNamed(
+  () => import("./components/layouts/DashboardLayouts"),
+  "MasterLayout",
+);
 
 const ProtectedRoute = ({
   children,
