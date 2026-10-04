@@ -377,10 +377,10 @@ try {
 } finally {
   if (safeToCleanup) {
     await db.from("ai_analysis_requests").delete().like("request_key", `${prefix}%`);
+    if (applicationIds.length) await db.from("analise_ia_candidato").delete().in("candidatura_id", applicationIds);
     if (applicationIds.length) await db.from("candidaturas").delete().in("id", applicationIds);
     if (vacancyIds.length) await db.from("vagas").delete().in("id", vacancyIds);
     if (candidateIds.length) await db.from("candidatos").delete().in("id", candidateIds);
-    await db.from("analise_ia_candidato").delete().in("candidatura_id", applicationIds);
     await db.from("tenants").delete().eq("id", tenantId);
     console.log("Fixtures de carga real removidas.");
   } else {
