@@ -35,7 +35,10 @@ if (!Number.isInteger(total) || total < 1 || total > 200) {
 if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) {
   throw new Error("E2E_REAL_AI_CONCURRENCY deve estar entre 1 e 8.");
 }
-if (concurrency !== 1) {\n  throw new Error("E2E_REAL_AI_CONCURRENCY deve ser 1 no teste com cota gratuita de 5 RPM.");\n}\nif (!Number.isFinite(waveDelayMs) || waveDelayMs < 18000) {
+if (concurrency !== 1) {
+  throw new Error("E2E_REAL_AI_CONCURRENCY deve ser 1 no teste com cota gratuita de 5 RPM.");
+}
+if (!Number.isFinite(waveDelayMs) || waveDelayMs < 18000) {
   throw new Error("E2E_REAL_AI_WAVE_DELAY_MS deve ser >= 18000ms para preservar margem na cota gratuita de 5 RPM.");
 }
 
