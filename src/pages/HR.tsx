@@ -74,9 +74,6 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
 } from "recharts";
-import domtoimage from "dom-to-image";
-import jsPDF from "jspdf";
-import ExcelJS from "@andreeewill/exceljs";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
 import { logCandidaturaEvento } from "../lib/events";
@@ -2234,6 +2231,11 @@ export function HRDashboard() {
       // Aguarda um pequeno intervalo para garantir que as animações dos gráficos terminaram
       await new Promise((resolve) => setTimeout(resolve, 500));
 
+      const [{ default: domtoimage }, { default: jsPDF }] = await Promise.all([
+        import("dom-to-image"),
+        import("jspdf"),
+      ]);
+
       const targetNode = dashboardRef.current;
       const width = targetNode.scrollWidth;
       const height = targetNode.scrollHeight;
@@ -2455,7 +2457,8 @@ export function HRDashboard() {
         };
       });
 
-      // Criação do Workbook
+      // ExcelJS é carregado somente quando o usuário solicita a exportação XLSX.
+      const { default: ExcelJS } = await import("@andreeewill/exceljs");
       const wb = new ExcelJS.Workbook();
       wb.creator = "Recruta AÍ";
       wb.created = new Date();
