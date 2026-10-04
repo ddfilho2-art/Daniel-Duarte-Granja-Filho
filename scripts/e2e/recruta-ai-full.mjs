@@ -18,7 +18,26 @@ const runId = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const email = `e2e-candidato-${runId}@example.invalid`;
 const password = `E2eRun!${crypto.randomBytes(12).toString("hex")}A1`;
 const slug = `e2e-${runId}`;
-const cnpj = "000000000" + runId.slice(0, 5);
+function makeValidCnpj(base12) {
+  const digits = String(base12).replace(/\D/g, "").slice(0, 12).padStart(12, "0");
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+
+  const digit = (value, weights) => {
+    const sum = value.split("").reduce(
+      (acc, char, index) => acc + Number(char) * weights[index],
+      0,
+    );
+    const remainder = sum % 11;
+    return remainder < 2 ? 0 : 11 - remainder;
+  };
+
+  const d1 = digit(digits, weights1);
+  const d2 = digit(digits + d1, weights2);
+  return digits + d1 + d2;
+}
+
+const cnpj = makeValidCnpj(`12${String(Date.now()).slice(-10)}`);
 let tenantId = null;
 let candidateUserId = null;
 let candidateId = null;
