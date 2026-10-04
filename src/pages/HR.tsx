@@ -8228,7 +8228,6 @@ export function HRBancoTalentos() {
   const handleConvidar = async () => {
     if (!selectedTalentoId || !selectedVagaToConvidar) return;
     try {
-      const { logAudit } = await import("../lib/audit");
       const talento = talentos.find((t) => t.id === selectedTalentoId);
       const vaga = vagasAbertas.find((v) => v.id === selectedVagaToConvidar);
 
