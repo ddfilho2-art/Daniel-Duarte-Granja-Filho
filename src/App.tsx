@@ -10,59 +10,91 @@ import { UIProvider } from "./contexts/UIContext";
 import { useTenant } from "./contexts/TenantContext";
 import { resolveAuthorizedHomePath } from "./lib/tenant-access";
 
-// Public Pages
-import {
+// Page-level code splitting: páginas são carregadas sob demanda.
+const lazyNamed = (loader: () => Promise<any>, exportName: string) =>
+  React.lazy(async () => {
+    const module = await loader();
+    return { default: module[exportName] };
+  });
+
+const {
   Login,
   Home,
   ListaVagas,
   DetalheVaga,
   Cadastro,
   SobreNos,
-} from "./pages/Public";
-import { VerifyEmail } from "./pages/VerifyEmail";
-import { OccupationalHealthPortal } from "./pages/OccupationalHealth";
+} = {
+  Login: lazyNamed(() => import("./pages/Public"), "Login"),
+  Home: lazyNamed(() => import("./pages/Public"), "Home"),
+  ListaVagas: lazyNamed(() => import("./pages/Public"), "ListaVagas"),
+  DetalheVaga: lazyNamed(() => import("./pages/Public"), "DetalheVaga"),
+  Cadastro: lazyNamed(() => import("./pages/Public"), "Cadastro"),
+  SobreNos: lazyNamed(() => import("./pages/Public"), "SobreNos"),
+};
 
-// Master Admin Pages
-import {
-  MasterDashboard,
-  MasterTenantList,
-  MasterBrandingEditor,
-} from "./pages/Master";
+const VerifyEmail = lazyNamed(() => import("./pages/VerifyEmail"), "VerifyEmail");
+const OccupationalHealthPortal = lazyNamed(
+  () => import("./pages/OccupationalHealth"),
+  "OccupationalHealthPortal",
+);
 
-// Admin Pages
-import {
-  AdminDashboard,
-  AdminTransferencias,
-  AdminGestaoUsuarios,
-  AdminAuditoria,
-} from "./pages/Admin";
-import { AdminConfiguracoes } from "./pages/AdminConfiguracoes";
-import { AdminPerformance } from "./pages/AdminPerformance";
-import { PerfilAdmin } from "./pages/PerfilAdmin";
+const MasterDashboard = lazyNamed(() => import("./pages/Master"), "MasterDashboard");
+const MasterTenantList = lazyNamed(() => import("./pages/Master"), "MasterTenantList");
+const MasterBrandingEditor = lazyNamed(
+  () => import("./pages/Master"),
+  "MasterBrandingEditor",
+);
 
-// RH Pages
-import {
-  HRDashboard,
-  HRGestaoVagas,
-  HRNovaVaga,
-  HRCandidatos,
-  HREntrevistas,
-  HRMensagens,
-  HRBancoTalentos,
-  HRProvas,
-  HRProfile,
-} from "./pages/HR";
-import { HRDetalheVaga } from "./pages/HRDetalheVaga";
-import { HRRelatorios } from "./pages/HRRelatorios";
+const AdminDashboard = lazyNamed(() => import("./pages/Admin"), "AdminDashboard");
+const AdminTransferencias = lazyNamed(
+  () => import("./pages/Admin"),
+  "AdminTransferencias",
+);
+const AdminGestaoUsuarios = lazyNamed(
+  () => import("./pages/Admin"),
+  "AdminGestaoUsuarios",
+);
+const AdminAuditoria = lazyNamed(() => import("./pages/Admin"), "AdminAuditoria");
+const AdminConfiguracoes = lazyNamed(
+  () => import("./pages/AdminConfiguracoes"),
+  "AdminConfiguracoes",
+);
+const AdminPerformance = lazyNamed(
+  () => import("./pages/AdminPerformance"),
+  "AdminPerformance",
+);
+const PerfilAdmin = lazyNamed(() => import("./pages/PerfilAdmin"), "PerfilAdmin");
 
-// Candidate Pages
-import {
-  CandidateDashboard,
-  CandidateCandidaturas,
-  CandidateMensagens,
-  CandidateResume,
-  CandidateVagas,
-} from "./pages/Candidate";
+const HRDashboard = lazyNamed(() => import("./pages/HR"), "HRDashboard");
+const HRGestaoVagas = lazyNamed(() => import("./pages/HR"), "HRGestaoVagas");
+const HRNovaVaga = lazyNamed(() => import("./pages/HR"), "HRNovaVaga");
+const HRCandidatos = lazyNamed(() => import("./pages/HR"), "HRCandidatos");
+const HREntrevistas = lazyNamed(() => import("./pages/HR"), "HREntrevistas");
+const HRMensagens = lazyNamed(() => import("./pages/HR"), "HRMensagens");
+const HRBancoTalentos = lazyNamed(() => import("./pages/HR"), "HRBancoTalentos");
+const HRProvas = lazyNamed(() => import("./pages/HR"), "HRProvas");
+const HRProfile = lazyNamed(() => import("./pages/HR"), "HRProfile");
+const HRDetalheVaga = lazyNamed(() => import("./pages/HRDetalheVaga"), "HRDetalheVaga");
+const HRRelatorios = lazyNamed(() => import("./pages/HRRelatorios"), "HRRelatorios");
+
+const CandidateDashboard = lazyNamed(
+  () => import("./pages/Candidate"),
+  "CandidateDashboard",
+);
+const CandidateCandidaturas = lazyNamed(
+  () => import("./pages/Candidate"),
+  "CandidateCandidaturas",
+);
+const CandidateMensagens = lazyNamed(
+  () => import("./pages/Candidate"),
+  "CandidateMensagens",
+);
+const CandidateResume = lazyNamed(
+  () => import("./pages/Candidate"),
+  "CandidateResume",
+);
+const CandidateVagas = lazyNamed(() => import("./pages/Candidate"), "CandidateVagas");
 
 // Layouts
 import {
@@ -214,7 +246,17 @@ const App = () => {
   return (
     <AuthProvider>
       <UIProvider>
-        <Routes>
+        <React.Suspense
+          fallback={
+            <div className="min-h-screen flex items-center justify-center bg-slate-50">
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+                <p className="text-sm text-slate-500">Carregando página...</p>
+              </div>
+            </div>
+          }
+        >
+          <Routes>
             {/* Public Routes */}
             <Route element={<PublicLayout />}>
               <Route path="/" element={<Home />} />
@@ -312,7 +354,8 @@ const App = () => {
 
             {/* Fallback - Colocado como última opção para evitar falsos positivos */}
             <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </React.Suspense>
       </UIProvider>
     </AuthProvider>
   );
