@@ -29,14 +29,14 @@ on:
         default: false
         type: boolean
       real_ai_jobs:
-        description: "Quantidade de análises reais com Gemini (1-200)"
+        description: "Quantidade de análises reais com Gemini (1-200); padrão seguro para cota gratuita: 4"
         required: true
-        default: "10"
+        default: "4"
         type: string
       real_ai_concurrency:
-        description: "Concorrência de invocações do worker real (1-16)"
+        description: "Concorrência do worker real; mantenha 1 na cota gratuita de 5 RPM"
         required: true
-        default: "2"
+        default: "1"
         type: string
 
 permissions:

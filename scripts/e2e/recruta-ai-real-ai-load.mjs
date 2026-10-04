@@ -20,14 +20,14 @@ const workerUrl =
 const runId = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const prefix = `e2e-real-ai-${runId}-`;
 const tenantId = crypto.randomUUID();
-const total = Number(process.env.E2E_REAL_AI_JOBS || 10);
+const total = Number(process.env.E2E_REAL_AI_JOBS || 4);
 const concurrency = Math.min(
   8,
   Math.max(1, Number(process.env.E2E_REAL_AI_CONCURRENCY || 2)),
 );
 const pollMs = Number(process.env.E2E_REAL_AI_POLL_MS || 2000);
-const waveDelayMs = Number(process.env.E2E_REAL_AI_WAVE_DELAY_MS || 3000);
-const timeoutMs = Number(process.env.E2E_REAL_AI_TIMEOUT_MS || 300000);
+const waveDelayMs = Number(process.env.E2E_REAL_AI_WAVE_DELAY_MS || 18000);
+const timeoutMs = Number(process.env.E2E_REAL_AI_TIMEOUT_MS || 360000);
 
 if (!Number.isInteger(total) || total < 1 || total > 200) {
   throw new Error("E2E_REAL_AI_JOBS deve estar entre 1 e 200.");
@@ -35,8 +35,8 @@ if (!Number.isInteger(total) || total < 1 || total > 200) {
 if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) {
   throw new Error("E2E_REAL_AI_CONCURRENCY deve estar entre 1 e 8.");
 }
-if (!Number.isFinite(waveDelayMs) || waveDelayMs < 0) {
-  throw new Error("E2E_REAL_AI_WAVE_DELAY_MS deve ser >= 0.");
+if (concurrency !== 1) {\n  throw new Error("E2E_REAL_AI_CONCURRENCY deve ser 1 no teste com cota gratuita de 5 RPM.");\n}\nif (!Number.isFinite(waveDelayMs) || waveDelayMs < 18000) {
+  throw new Error("E2E_REAL_AI_WAVE_DELAY_MS deve ser >= 18000ms para preservar margem na cota gratuita de 5 RPM.");
 }
 
 function makeValidCnpj(base12) {
@@ -220,7 +220,7 @@ async function invokeWorker() {
         apikey: serviceRoleKey,
         Authorization: `Bearer ${serviceRoleKey}`,
       },
-      body: JSON.stringify({ max_jobs: 3 }),
+      body: JSON.stringify({ max_jobs: 1 }),
     });
     const text = await res.text();
     let body = {};
@@ -247,7 +247,7 @@ async function invokeWorker() {
 
 try {
   console.log(`=== Recruta AÍ — carga REAL de IA (${total} jobs / concorrência ${concurrency}) ===`);
-  console.log(`Wave delay/backoff-aware: ${waveDelayMs}ms; timeout: ${timeoutMs}ms`);
+  console.log(`Wave delay/backoff-aware: ${waveDelayMs}ms; timeout: ${timeoutMs}ms`);\n  console.log("Modo cota gratuita: 1 invocação do worker por onda, 1 job por invocação.");
   console.log("Modelo alvo: gemini-2.5-flash");
   console.log("Run:", runId);
 
