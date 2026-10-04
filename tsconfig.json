@@ -17,5 +17,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
   },
-  "exclude": ["node_modules", "dist", "Script/Manual"],
+  "exclude": ["node_modules", "dist", "Script/Manual", "supabase/functions", "scripts/seed.ts", "src/lib/seed.ts"],
 }
