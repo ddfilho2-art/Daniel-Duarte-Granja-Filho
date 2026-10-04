@@ -20,19 +20,23 @@ const workerUrl =
 const runId = crypto.randomUUID().replaceAll("-", "").slice(0, 12);
 const prefix = `e2e-real-ai-${runId}-`;
 const tenantId = crypto.randomUUID();
-const total = Number(process.env.E2E_REAL_AI_JOBS || 20);
+const total = Number(process.env.E2E_REAL_AI_JOBS || 10);
 const concurrency = Math.min(
-  16,
-  Math.max(1, Number(process.env.E2E_REAL_AI_CONCURRENCY || 8)),
+  8,
+  Math.max(1, Number(process.env.E2E_REAL_AI_CONCURRENCY || 2)),
 );
 const pollMs = Number(process.env.E2E_REAL_AI_POLL_MS || 2000);
-const timeoutMs = Number(process.env.E2E_REAL_AI_TIMEOUT_MS || 180000);
+const waveDelayMs = Number(process.env.E2E_REAL_AI_WAVE_DELAY_MS || 3000);
+const timeoutMs = Number(process.env.E2E_REAL_AI_TIMEOUT_MS || 300000);
 
 if (!Number.isInteger(total) || total < 1 || total > 200) {
-  throw new Error("E2E_REAL_AI_JOBS deve estar entre 1 e 200 nesta etapa de validação.");
+  throw new Error("E2E_REAL_AI_JOBS deve estar entre 1 e 200.");
 }
-if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 16) {
-  throw new Error("E2E_REAL_AI_CONCURRENCY deve estar entre 1 e 16.");
+if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8) {
+  throw new Error("E2E_REAL_AI_CONCURRENCY deve estar entre 1 e 8.");
+}
+if (!Number.isFinite(waveDelayMs) || waveDelayMs < 0) {
+  throw new Error("E2E_REAL_AI_WAVE_DELAY_MS deve ser >= 0.");
 }
 
 function makeValidCnpj(base12) {
@@ -243,6 +247,7 @@ async function invokeWorker() {
 
 try {
   console.log(`=== Recruta AÍ — carga REAL de IA (${total} jobs / concorrência ${concurrency}) ===`);
+  console.log(`Wave delay/backoff-aware: ${waveDelayMs}ms; timeout: ${timeoutMs}ms`);
   console.log("Modelo alvo: gemini-2.5-flash");
   console.log("Run:", runId);
 
@@ -274,44 +279,68 @@ try {
   );
   await must("real AI queue", db.from("ai_analysis_requests").insert(requests));
 
-  let inFlight = 0;
-  let cursor = 0;
   const workerResults = [];
   const workerStartedAt = Date.now();
-
-  async function workerSlot() {
-    while (true) {
-      const index = cursor++;
-      if (index >= concurrency) return;
-      inFlight++;
-      workerResults[index] = await invokeWorker();
-      inFlight--;
-    }
-  }
-
-  await Promise.all(Array.from({ length: concurrency }, () => workerSlot()));
-  const workerElapsedMs = Date.now() - workerStartedAt;
-
   const deadline = Date.now() + timeoutMs;
   let states = [];
+
   while (Date.now() < deadline) {
+    const waveStartedAt = Date.now();
+    const wave = await Promise.all(
+      Array.from({ length: concurrency }, () => invokeWorker()),
+    );
+    workerResults.push(...wave);
+
     states = await must("queue verification", db
       .from("ai_analysis_requests")
-      .select("request_key,status,error_code,attempt_count,completed_at")
+      .select("request_key,status,error_code,attempt_count,next_attempt_at,completed_at")
       .like("request_key", `${prefix}%`));
 
     const terminal = states.filter((x) => x.status === "completed" || x.status === "failed").length;
-    console.log(`Queue: ${terminal}/${total} terminal; processing/queued=${total - terminal}`);
+    const completedNow = states.filter((x) => x.status === "completed").length;
+    const failedNow = states.filter((x) => x.status === "failed").length;
+    const retryable429 = states.filter((x) =>
+      String(x.error_code || "").includes("gemini_retryable_429"),
+    ).length;
+
+    console.log(
+      `Queue: ${terminal}/${total} terminal; completed=${completedNow}; failed=${failedNow}; retryable_429=${retryable429}; pending=${total - terminal}`,
+    );
 
     if (terminal === total) {
       safeToCleanup = true;
       break;
     }
-    await sleep(pollMs);
+
+    const retryAtMs = states
+      .filter((x) => x.status === "queued" && x.error_code)
+      .map((x) => new Date(x.next_attempt_at).getTime())
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b)[0];
+
+    let waitMs = waveDelayMs;
+    if (Number.isFinite(retryAtMs)) {
+      waitMs = Math.max(waitMs, retryAtMs - Date.now());
+    } else if (Date.now() - waveStartedAt < pollMs) {
+      waitMs = Math.max(waitMs, pollMs - (Date.now() - waveStartedAt));
+    }
+
+    await sleep(waitMs);
   }
 
+  const workerElapsedMs = Date.now() - workerStartedAt;
+
   if (!safeToCleanup) {
-    throw new Error(`timeout aguardando conclusão da carga real: ${states.length ? states.map((x) => `${x.request_key}=${x.status}`).join(", ") : "sem estados"}`);
+    const summary = states.reduce((acc, row) => {
+      acc[row.status] = (acc[row.status] || 0) + 1;
+      return acc;
+    }, {});
+    const retryable429 = states.filter((x) =>
+      String(x.error_code || "").includes("gemini_retryable_429"),
+    ).length;
+    throw new Error(
+      `timeout aguardando conclusão da carga real: states=${JSON.stringify(summary)}, retryable_429=${retryable429}`,
+    );
   }
 
   const failed = states.filter((x) => x.status === "failed");
