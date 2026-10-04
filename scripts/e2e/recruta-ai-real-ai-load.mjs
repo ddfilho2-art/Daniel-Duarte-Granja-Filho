@@ -23,7 +23,7 @@ const tenantId = crypto.randomUUID();
 const total = Number(process.env.E2E_REAL_AI_JOBS || 4);
 const concurrency = Math.min(
   8,
-  Math.max(1, Number(process.env.E2E_REAL_AI_CONCURRENCY || 2)),
+  Math.max(1, Number(process.env.E2E_REAL_AI_CONCURRENCY || 1)),
 );
 const pollMs = Number(process.env.E2E_REAL_AI_POLL_MS || 2000);
 const waveDelayMs = Number(process.env.E2E_REAL_AI_WAVE_DELAY_MS || 18000);
