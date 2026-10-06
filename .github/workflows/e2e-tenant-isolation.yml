@@ -3,6 +3,11 @@ name: E2E - Multi-Tenant, Fluxo Completo e Carga
 on:
   workflow_dispatch:
     inputs:
+      run_tenant_isolation:
+        description: "Executar E2E de isolamento multi-tenant"
+        required: true
+        default: true
+        type: boolean
       run_full_e2e:
         description: "Executar fluxo completo candidato → candidatura → IA → score"
         required: true
@@ -40,7 +45,7 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   tenant-isolation:
@@ -68,19 +73,6 @@ jobs:
           node-version: 24
           cache: npm
 
-      - name: Regenerar package-lock com Node 24
-        run: |
-          npm install --package-lock-only
-          if git diff --quiet -- package-lock.json; then
-            echo "package-lock.json já está alinhado."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "chore: atualizar lockfile das dependências"
-            git push origin main
-          fi
-
       - name: Instalar dependências
         run: npm ci
 
@@ -94,6 +86,7 @@ jobs:
         run: npm run build
 
       - name: E2E de isolamento multi-tenant
+        if: ${{ inputs.run_tenant_isolation }}
         run: npm run e2e:recruta:isolation
 
       - name: E2E fluxo completo candidato → IA → score
