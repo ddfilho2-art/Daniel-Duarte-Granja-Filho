@@ -375,14 +375,22 @@ try {
       Number(r.score_cultura),
     ];
     const totalScore = Number(r.score_total);
+    const expected = Math.round((axes.reduce((sum, value) => sum + value, 0) / 5) * 100) / 100;
     return axes.some((v) => !Number.isFinite(v) || v < 0 || v > 100) ||
-      !Number.isFinite(totalScore) || totalScore < 0 || totalScore > 100;
+      !Number.isFinite(totalScore) || totalScore < 0 || totalScore > 100 ||
+      totalScore !== expected;
+  });
+
+  const scoreMap = new Map(applicationsState.map((x) => [String(x.id), Number(x.score_ia)]));
+  const scoreMismatch = completedAnalyses.filter((x) => {
+    const r = x.result || {};
+    return Number(scoreMap.get(String(x.candidatura_id))) !== Number(r.score_total);
   });
 
   if (failed.length || completed.length !== total || completedAnalyses.length !== total ||
-      scoredApplications.length !== total || invalidResults.length) {
+      scoredApplications.length !== total || invalidResults.length || scoreMismatch.length) {
     throw new Error(
-      `carga real falhou: queued=${total}, completed=${completed.length}, failed=${failed.length}, analyses=${completedAnalyses.length}, scores=${scoredApplications.length}, invalid_results=${invalidResults.length}`,
+      `carga real falhou: queued=${total}, completed=${completed.length}, failed=${failed.length}, analyses=${completedAnalyses.length}, scores=${scoredApplications.length}, invalid_results=${invalidResults.length}, score_mismatch=${scoreMismatch.length}`,
     );
   }
 
@@ -397,6 +405,7 @@ try {
     completed_analyses: completedAnalyses.length,
     persisted_scores: scoredApplications.length,
     invalid_results: invalidResults.length,
+    score_mismatch: scoreMismatch.length,
     worker_invocations: workerResults.length,
     worker_non_2xx: workerResults.filter((x) => !x.ok).length,
     worker_elapsed_ms: workerElapsedMs,
