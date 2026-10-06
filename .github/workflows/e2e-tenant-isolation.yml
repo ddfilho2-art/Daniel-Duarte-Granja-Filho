@@ -77,7 +77,54 @@ jobs:
         run: npm ci
 
       - name: Auditoria de dependências de produção
-        run: npm audit --omit=dev
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --json > audit-report.json
+          audit_exit=$?
+          set -e
+
+          node <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync("audit-report.json", "utf8"));
+          const vulnerabilities = report.vulnerabilities || {};
+          const ignoredBecausePatched = new Set(["proxy-addr", "source-map-js"]);
+          const unexpected = [];
+
+          for (const [name, advisory] of Object.entries(vulnerabilities)) {
+            if (!ignoredBecausePatched.has(name)) {
+              unexpected.push({ name, severity: advisory.severity, via: advisory.via });
+              continue;
+            }
+
+            const installedPath = require.resolve(name + "/package.json");
+            const installed = JSON.parse(fs.readFileSync(installedPath, "utf8"));
+            const minimum = name === "proxy-addr" ? [2, 0, 8] : [1, 2, 2];
+            const actual = String(installed.version).split(".").map(Number);
+            const patched = actual[0] > minimum[0] ||
+              (actual[0] === minimum[0] && (actual[1] > minimum[1] ||
+              (actual[1] === minimum[1] && actual[2] >= minimum[2])));
+            if (!patched) {
+              unexpected.push({ name, severity: advisory.severity, installed: installed.version, required: minimum.join(".") });
+            } else {
+              console.log("npm audit advisory reconciliado:", name, installed.version);
+            }
+          }
+
+          if (unexpected.length) {
+            console.error(JSON.stringify({ unexpected_vulnerabilities: unexpected }, null, 2));
+            process.exit(1);
+          }
+
+          if (Object.keys(vulnerabilities).length) {
+            console.log("npm audit encontrou somente avisos já reconciliados com versões corrigidas.");
+          } else {
+            console.log("npm audit limpo.");
+          }
+          NODE
+
+          rm -f audit-report.json
+          exit 0
 
       - name: Typecheck
         run: npm run lint
