@@ -206,3 +206,11 @@ Os advisors do Supabase ainda registram funções `SECURITY DEFINER` deliberadam
 - [x] Policy anônima de `vagas` passou a exigir o tenant resolvido no contexto da requisição.
 - [x] Validação reversível confirmou que o tenant A enxerga somente sua vaga, o tenant B somente a sua e uma chamada sem tenant não enxerga nenhuma das duas.
 - [x] Runner dedicado `e2e:recruta:public-vagas` criado para impedir regressão dessa proteção.
+
+
+### 2026-10-06 — isolamento da análise por estágio
+
+- [x] `rpc_solicitar_analise_estagio` exige sessão autenticada, perfil `Candidato` ativo, membership `candidate` ativa e correspondência entre candidatura, vaga, ficha do candidato e tenant ativo.
+- [x] Um candidato não pode solicitar análise de uma candidatura de outro tenant alterando apenas o `x-tenant-id` ou conhecendo o ID da candidatura.
+- [x] O mesmo tenant continua podendo enfileirar a análise normalmente.
+- [x] Regressão dedicada registrada em `npm run e2e:recruta:stage-isolation`.

@@ -194,3 +194,16 @@ O Supabase recomenda testar políticas para SELECT/INSERT/UPDATE/DELETE e os pap
 - O E2E público de vagas cobre explicitamente Empresa A → somente A, Empresa B → somente B e ausência de tenant → nenhuma das vagas de fixture.
 - Os advisors continuam apontando funções `SECURITY DEFINER` executáveis por `authenticated` e a função pública `get_public_tenant_context`; esses itens continuam em revisão porque parte deles é deliberada pelo modelo de RPC da aplicação.
 - A proteção contra senhas vazadas do Supabase Auth continua desabilitada no projeto e requer configuração da camada de autenticação, não alteração de RLS.
+
+
+### 2026-10-06 — proteção do RPC de análise por estágio
+
+O RPC `rpc_solicitar_analise_estagio` foi endurecido para exigir:
+
+- identidade autenticada;
+- perfil `Candidato` ativo;
+- candidatura, vaga e ficha de candidato pertencentes ao mesmo tenant;
+- tenant da candidatura igual ao tenant resolvido pela requisição;
+- membership `candidate` ativa no tenant da candidatura.
+
+A regressão específica testa tanto o bloqueio cross-tenant quanto a continuidade do fluxo no tenant correto.
