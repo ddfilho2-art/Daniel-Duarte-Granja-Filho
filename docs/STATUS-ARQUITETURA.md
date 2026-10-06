@@ -1,6 +1,6 @@
 # Status da Arquitetura
 
-> Auditoria técnica realizada em 2026-10-01.
+> Auditoria técnica atualizada em 2026-10-06.
 
 ## Resumo
 
@@ -17,15 +17,15 @@ A arquitetura, porém, ainda não está alinhada 100% ao modelo de negócio defi
 | Admin plataforma | OK | `platform_user_roles` + `platform_master_admin` |
 | Admin empresa | PARCIAL | `tenant_admin` existe; regra de múltiplos admins precisa ser confirmada |
 | RH | OK | `hr` é tenant-scoped |
-| Candidato por empresa | PENDENTE | `candidatos` não possui `tenant_id` |
-| Candidaturas tenant-aware | OK/PARCIAL | `candidaturas.tenant_id` existe; policies precisam revisão |
+| Candidato por empresa | OK | cadastro profissional é tenant-scoped e possui identificador próprio por empresa |
+| Candidaturas tenant-aware | OK | `tenant_id` + candidatura vinculada ao tenant/candidato/vaga |
 | Clínica | PARCIAL | estrutura suporta múltiplos providers; negócio atual prevê equipe clínica comum |
-| RLS | PARCIAL | base ampla existe, mas há pontos de isolamento a corrigir |
+| RLS | PARCIAL | isolamento estrutural validado; ainda há revisão contínua de policies públicas e SECURITY DEFINER |
 | Branding por empresa | OK | tenant branding versionado |
 | URL por empresa | OK | `/t/{slug}` |
 | Deploy multi-tenant | OK | uma aplicação Vercel atende todos os tenants |
 | Domínio personalizado | FUTURO | ainda não necessário |
-| Gestão de usuários | PARCIAL | escopos existem, mas fluxo seguro de criação/ativação/reset/troca de e-mail precisa ser consolidado |
+| Gestão de usuários | OK/PARCIAL | backend protegido e escopos consolidados; UI completa ainda requer homologação funcional |
 | Documentação | ATUALIZADA | esta pasta passa a ser referência arquitetural |
 
 ## 2. Principais problemas encontrados
@@ -170,7 +170,8 @@ Depois disso, o deploy multi-tenant pode continuar sendo simples:
 - [x] `/admin` exige contexto e autorização do tenant.
 - [x] Administração de RH endurecida no backend.
 - [x] Acesso `anon` removido de `users`, `candidatos` e `candidaturas`.
-- [ ] E2E com usuários reais de dois tenants ainda depende da execução local com credenciais seguras de teste.
+- [x] Suíte E2E automatizada de isolamento, fluxo completo, fila e carga real da IA validada em execuções do GitHub Actions.
+- [ ] Homologação funcional manual com usuários reais de dois tenants ainda depende de roteiro/credenciais de teste.
 - [x] Runner E2E completo alinhado ao cadastro contextual por tenant e ao cabeçalho x-tenant-id.
 - [x] Índice dedicado em candidatos.user_id criado para cobertura da chave estrangeira.
 
@@ -191,4 +192,16 @@ Depois disso, o deploy multi-tenant pode continuar sendo simples:
 - [x] Runner E2E passa x-tenant-id no cliente autenticado e nas chamadas de candidatura.
 - [x] Runner E2E deixou de duplicar a linha criada por handle_new_user() e passou a completar o perfil existente.
 - [x] Índice candidatos.user_id criado para cobertura da FK e registrado em migration.
-- [ ] Execução E2E real com credenciais locais ainda pendente.
+- [x] Execuções E2E reais de isolamento/fluxo/carga e carga real Gemini concluídas em 2026-10-06.
+
+
+### 2026-10-06 — fechamento da suíte de validação
+
+- [x] E2E de isolamento multi-tenant passou.
+- [x] E2E do fluxo completo candidato → candidatura → IA → score passou.
+- [x] E2E de carga da fila de IA passou.
+- [x] E2E de carga REAL da IA com Gemini passou.
+- [x] CI atualizado para não mutar `main` nem regenerar `package-lock` durante a execução.
+- [x] Worker de IA protegido por autorização de `service_role`; foi adicionado smoke test para impedir regressão de autorização.
+
+Os advisors do Supabase ainda registram funções `SECURITY DEFINER` deliberadamente expostas ao papel `authenticated` e uma função pública (`get_public_tenant_context`) exposta a `anon`. Esses avisos permanecem como revisão de segurança, não como falha dos E2E de isolamento.

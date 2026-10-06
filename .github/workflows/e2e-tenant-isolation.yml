@@ -132,6 +132,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: E2E segurança do worker de IA
+        run: npm run e2e:recruta:worker-security
+
       - name: E2E de isolamento multi-tenant
         if: ${{ inputs.run_tenant_isolation }}
         run: npm run e2e:recruta:isolation
