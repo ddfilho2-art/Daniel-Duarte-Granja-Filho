@@ -168,9 +168,6 @@ try {
     );
   }
 
-  client.setAuth(signed.data.session.access_token);
-  client.headers = undefined;
-
   const sameTenantClient = createClient(supabaseUrl, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
     global: {
