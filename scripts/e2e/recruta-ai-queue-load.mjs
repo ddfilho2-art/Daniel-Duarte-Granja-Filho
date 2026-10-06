@@ -114,7 +114,7 @@ try {
     ...row(total + 1),
     request_key: retryKey,
   }));
-  const retryClaim = await must("claim retry fixture", db.rpc("claim_next_ai_analysis_request"));
+  const retryClaim = await must("claim retry fixture", db.rpc("claim_next_ai_analysis_request_for_tenant", { p_tenant_id: tenantId }));
   if (!retryClaim || retryClaim.request_key !== retryKey) {
     throw new Error("retry fixture não foi reivindicada");
   }
@@ -144,7 +144,7 @@ try {
     attempt_count: 1,
     next_attempt_at: new Date(Date.now() - 1000).toISOString(),
   }));
-  const leaseClaim = await must("claim expired lease", db.rpc("claim_next_ai_analysis_request"));
+  const leaseClaim = await must("claim expired lease", db.rpc("claim_next_ai_analysis_request_for_tenant", { p_tenant_id: tenantId }));
   if (!leaseClaim || leaseClaim.request_key !== leaseKey) {
     throw new Error("lease expirado não foi recuperado");
   }
