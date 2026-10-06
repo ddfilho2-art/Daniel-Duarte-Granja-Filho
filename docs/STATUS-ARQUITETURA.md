@@ -30,21 +30,15 @@ A arquitetura, porém, ainda não está alinhada 100% ao modelo de negócio defi
 
 ## 2. Principais problemas encontrados
 
-### P1 — Cadastro de candidato
+### P1 — Cadastro de candidato (CORRIGIDO)
 
-O modelo atual liga `candidatos` a `users`, mas não a um tenant.
+`candidatos` possui `tenant_id` obrigatório e o cadastro profissional é independente por empresa.
 
-Isso conflita com a regra:
+O RPC de candidatura usa a ficha do candidato dentro do tenant da vaga; a identidade global do Auth não substitui o cadastro tenant-scoped.
 
-> cada empresa possui seu próprio cadastro de candidato.
+### P2 — Política de candidatura (CORRIGIDA)
 
-Este é o principal ponto estrutural a corrigir.
-
-### P2 — Política de candidatura
-
-A policy de SELECT de `candidaturas` permite acesso por `candidato_id = auth.uid()` além do tenant atual.
-
-A regra precisa ser revisada para que a candidatura permaneça no contexto da empresa correspondente.
+As policies atuais exigem `tenant_id = current_tenant_id()` e, para o candidato, uma ficha `candidatos` do mesmo tenant vinculada à sessão.
 
 ### P3 — Vagas públicas
 
@@ -91,12 +85,12 @@ Enquanto a revisão estrutural não for concluída, não alterar sem necessidade
 
 ### Fase B — Banco
 
-1. corrigir modelagem de candidato por empresa;
-2. revisar candidatura;
-3. corrigir políticas públicas;
-4. revisar funções SECURITY DEFINER;
-5. executar advisors;
-6. criar testes RLS.
+1. [x] corrigir modelagem de candidato por empresa;
+2. [x] revisar candidatura;
+3. [x] corrigir política pública de vagas;
+4. [ ] revisar funções SECURITY DEFINER uma a uma;
+5. [x] executar advisors;
+6. [x] criar testes RLS estruturais e regressões específicas.
 
 ### Fase C — Aplicação
 
@@ -205,3 +199,10 @@ Depois disso, o deploy multi-tenant pode continuar sendo simples:
 - [x] Worker de IA protegido por autorização de `service_role`; foi adicionado smoke test para impedir regressão de autorização.
 
 Os advisors do Supabase ainda registram funções `SECURITY DEFINER` deliberadamente expostas ao papel `authenticated` e uma função pública (`get_public_tenant_context`) exposta a `anon`. Esses avisos permanecem como revisão de segurança, não como falha dos E2E de isolamento.
+
+
+### 2026-10-06 — isolamento público das vagas
+
+- [x] Policy anônima de `vagas` passou a exigir o tenant resolvido no contexto da requisição.
+- [x] Validação reversível confirmou que o tenant A enxerga somente sua vaga, o tenant B somente a sua e uma chamada sem tenant não enxerga nenhuma das duas.
+- [x] Runner dedicado `e2e:recruta:public-vagas` criado para impedir regressão dessa proteção.

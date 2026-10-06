@@ -108,13 +108,17 @@ As policies usam funções como:
 
 A tabela possui `tenant_id` e a policy foi endurecida. O candidato só acessa a candidatura quando existe um registro `candidatos` do mesmo tenant cujo `user_id` corresponde à sessão.
 
-### 7.3 Vagas públicas
+### 7.3 Vagas públicas (CORRIGIDO EM 2026-10-06)
 
-Existe policy para `anon` que permite leitura de vagas abertas quando `tenant_id IS NOT NULL`.
+A policy anônima agora exige simultaneamente vaga aberta e:
 
-Para um portal multi-tenant, o isolamento público deve ser baseado no tenant resolvido pelo site, e não apenas na existência de `tenant_id`.
+`tenant_id = current_tenant_id()`
 
-A consulta pública deve ser revisada para garantir que o site da Empresa A não exponha vagas da Empresa B por consulta direta.
+`current_tenant_id()` lê o `x-tenant-id` do contexto da requisição. Assim, o portal da Empresa A não pode obter, via Data API anônima, a vaga da Empresa B apenas alterando a consulta.
+
+A correção foi validada com duas fixtures temporárias em uma transação reversível e possui runner dedicado:
+
+`npm run e2e:recruta:public-vagas`.
 
 ### 7.4 Funções SECURITY DEFINER
 
@@ -182,3 +186,11 @@ O Supabase recomenda testar políticas para SELECT/INSERT/UPDATE/DELETE e os pap
 - Todo usuário criado diretamente pelo Supabase Auth nasce em `public.users` como `Candidato`.
 - Perfis privilegiados (RH, administrador da empresa e administrador da plataforma) são atribuídos somente por fluxos administrativos confiáveis.
 - A Edge Function de gestão de RH recusa converter uma conta existente com outro perfil em RH.
+
+
+## Validações adicionais em 2026-10-06
+
+- O worker de IA requer autorização exata do `SUPABASE_SERVICE_ROLE_KEY`; o smoke test `e2e:recruta:worker-security` cobre chamadas sem autorização e com chave anon.
+- O E2E público de vagas cobre explicitamente Empresa A → somente A, Empresa B → somente B e ausência de tenant → nenhuma das vagas de fixture.
+- Os advisors continuam apontando funções `SECURITY DEFINER` executáveis por `authenticated` e a função pública `get_public_tenant_context`; esses itens continuam em revisão porque parte deles é deliberada pelo modelo de RPC da aplicação.
+- A proteção contra senhas vazadas do Supabase Auth continua desabilitada no projeto e requer configuração da camada de autenticação, não alteração de RLS.

@@ -17,7 +17,8 @@
     "e2e:recruta:queue": "node scripts/e2e/recruta-ai-queue-load.mjs",
     "e2e:recruta:isolation": "node scripts/e2e/recruta-ai-tenant-isolation.mjs",
     "e2e:recruta:real-ai": "node scripts/e2e/recruta-ai-real-ai-load.mjs",
-    "e2e:recruta:worker-security": "node scripts/e2e/recruta-ai-worker-security.mjs"
+    "e2e:recruta:worker-security": "node scripts/e2e/recruta-ai-worker-security.mjs",
+    "e2e:recruta:public-vagas": "node scripts/e2e/recruta-ai-public-vacancy-isolation.mjs"
   },
   "dependencies": {
     "@andreeewill/exceljs": "^5.0.3",
