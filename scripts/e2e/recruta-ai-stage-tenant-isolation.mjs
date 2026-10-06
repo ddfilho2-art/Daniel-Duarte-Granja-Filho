@@ -23,6 +23,9 @@ const vacancyB = crypto.randomUUID();
 const candidateB = crypto.randomUUID();
 const applicationB = crypto.randomUUID();
 const requestKey = `candidate-analysis:${tenantB}:${applicationB}:prova`;
+const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const tenantRateSubjectHash = sha256(`stage-analysis:tenant:${tenantB}`);
+const candidateRateSubjectHash = sha256(`stage-analysis:candidate:${tenantB}:${candidateB}`);
 
 function makeValidCnpj(base12) {
   const digits = String(base12).replace(/\D/g, "").slice(0, 12).padStart(12, "0");
@@ -201,10 +204,6 @@ try {
       `same-tenant stage request inválida: rpc=${JSON.stringify(sameTenant)}, queue=${JSON.stringify(sameTenantRequest)}`,
     );
   }
-
-  const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
-  const tenantRateSubjectHash = sha256(`stage-analysis:tenant:${tenantB}`);
-  const candidateRateSubjectHash = sha256(`stage-analysis:candidate:${tenantB}:${candidateB}`);
 
   for (let nota = 2; nota <= 30; nota += 1) {
     const retry = await sameTenantClient.rpc("rpc_solicitar_analise_estagio", {
