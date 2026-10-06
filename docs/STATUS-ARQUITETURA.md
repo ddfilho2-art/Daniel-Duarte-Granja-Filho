@@ -214,3 +214,9 @@ Os advisors do Supabase ainda registram funções `SECURITY DEFINER` deliberadam
 - [x] Um candidato não pode solicitar análise de uma candidatura de outro tenant alterando apenas o `x-tenant-id` ou conhecendo o ID da candidatura.
 - [x] O mesmo tenant continua podendo enfileirar a análise normalmente.
 - [x] Regressão dedicada registrada em `npm run e2e:recruta:stage-isolation`.
+
+### 2026-10-06 — proteção contra abuso da análise por estágio
+- [x] Novas gerações de análise por estágio limitadas a 30/h por candidato no tenant e 300/h por empresa.
+- [x] Cache, fila idêntica e processamento com lease válido não consomem quota.
+- [x] `stage_input` limitado a 12 KB.
+- [x] O E2E de estágio valida bloqueio por candidato e por empresa antes de qualquer alteração da fila.

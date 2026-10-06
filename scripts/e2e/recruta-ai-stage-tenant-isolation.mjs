@@ -202,15 +202,105 @@ try {
     );
   }
 
+  const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+  const tenantRateSubjectHash = sha256(`stage-analysis:tenant:${tenantB}`);
+  const candidateRateSubjectHash = sha256(`stage-analysis:candidate:${tenantB}:${candidateB}`);
+
+  for (let nota = 2; nota <= 30; nota += 1) {
+    const retry = await sameTenantClient.rpc("rpc_solicitar_analise_estagio", {
+      p_candidatura_id: applicationB,
+      p_analysis_stage: "prova",
+      p_input_snapshot: { nota },
+      p_force: false,
+    });
+    if (retry.error || !retry.data?.[0] || retry.data[0].analysis_status !== "queued") {
+      throw new Error(`stage rate limit atingido antes da hora (nota=${nota}): ${JSON.stringify(retry.error)}`);
+    }
+  }
+
+  const fillTenant = await must("prepare tenant rate-limit assertion", admin.from("edge_rate_limits")
+    .update({ request_count: 1, updated_at: new Date().toISOString() })
+    .eq("scope", "candidate_stage_analysis_tenant")
+    .eq("subject_hash", tenantRateSubjectHash)
+    .eq("window_seconds", 3600));
+
+  const fillCandidate = await must("prepare candidate rate-limit assertion", admin.from("edge_rate_limits")
+    .update({ request_count: 30, updated_at: new Date().toISOString() })
+    .eq("scope", "candidate_stage_analysis_candidate")
+    .eq("subject_hash", candidateRateSubjectHash)
+    .eq("window_seconds", 3600));
+
+  if (!fillTenant || !fillCandidate) {
+    throw new Error("Falha ao preparar os buckets de rate limit.");
+  }
+
+  const forcedAtLimit = await sameTenantClient.rpc("rpc_solicitar_analise_estagio", {
+    p_candidatura_id: applicationB,
+    p_analysis_stage: "prova",
+    p_input_snapshot: { nota: 30 },
+    p_force: true,
+  });
+
+  const queueAfterCandidateLimit = await must("candidate-limit queue verification", admin
+    .from("ai_analysis_requests")
+    .select("request_key,status,input_snapshot")
+    .eq("request_key", requestKey)
+    .maybeSingle());
+
+  if (!forcedAtLimit.error ||
+      !/stage_analysis_rate_limited/.test(forcedAtLimit.error.message || "") ||
+      queueAfterCandidateLimit?.input_snapshot?.stage_input?.nota !== 30) {
+    throw new Error(
+      `limite por candidato não bloqueou antes da fila: rpc=${JSON.stringify(forcedAtLimit.error)}, queue=${JSON.stringify(queueAfterCandidateLimit)}`,
+    );
+  }
+
+  await must("reset candidate bucket for tenant-limit assertion", admin.from("edge_rate_limits")
+    .update({ request_count: 1, updated_at: new Date().toISOString() })
+    .eq("scope", "candidate_stage_analysis_candidate")
+    .eq("subject_hash", candidateRateSubjectHash)
+    .eq("window_seconds", 3600));
+
+  await must("prepare tenant bucket limit", admin.from("edge_rate_limits")
+    .update({ request_count: 300, updated_at: new Date().toISOString() })
+    .eq("scope", "candidate_stage_analysis_tenant")
+    .eq("subject_hash", tenantRateSubjectHash)
+    .eq("window_seconds", 3600));
+
+  const tenantAtLimit = await sameTenantClient.rpc("rpc_solicitar_analise_estagio", {
+    p_candidatura_id: applicationB,
+    p_analysis_stage: "prova",
+    p_input_snapshot: { nota: 31 },
+    p_force: false,
+  });
+
+  const queueAfterTenantLimit = await must("tenant-limit queue verification", admin
+    .from("ai_analysis_requests")
+    .select("request_key,status,input_snapshot")
+    .eq("request_key", requestKey)
+    .maybeSingle());
+
+  if (!tenantAtLimit.error ||
+      !/stage_analysis_rate_limited/.test(tenantAtLimit.error.message || "") ||
+      queueAfterTenantLimit?.input_snapshot?.stage_input?.nota !== 30) {
+    throw new Error(
+      `limite por empresa não bloqueou antes da fila: rpc=${JSON.stringify(tenantAtLimit.error)}, queue=${JSON.stringify(queueAfterTenantLimit)}`,
+    );
+  }
+
   console.log(JSON.stringify({
     ok: true,
     runId,
     cross_tenant_status: crossTenant.error?.message ?? "denied",
     same_tenant_status: sameTenant.data[0].analysis_status,
+    stage_rate_limit_candidate: true,
+    stage_rate_limit_tenant: true,
     queue_request: sameTenantRequest,
   }, null, 2));
 } finally {
   await admin.from("ai_analysis_requests").delete().eq("request_key", requestKey);
+  await admin.from("edge_rate_limits").delete().eq("scope", "candidate_stage_analysis_tenant").eq("subject_hash", tenantRateSubjectHash).eq("window_seconds", 3600);
+  await admin.from("edge_rate_limits").delete().eq("scope", "candidate_stage_analysis_candidate").eq("subject_hash", candidateRateSubjectHash).eq("window_seconds", 3600);
   await admin.from("analise_ia_candidato").delete().eq("candidatura_id", applicationB);
   await admin.from("candidatura_eventos").delete().eq("candidatura_id", applicationB);
   await admin.from("candidaturas").delete().eq("id", applicationB);

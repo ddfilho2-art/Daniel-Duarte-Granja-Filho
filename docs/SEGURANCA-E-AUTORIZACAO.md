@@ -207,3 +207,7 @@ O RPC `rpc_solicitar_analise_estagio` foi endurecido para exigir:
 - membership `candidate` ativa no tenant da candidatura.
 
 A regressão específica testa tanto o bloqueio cross-tenant quanto a continuidade do fluxo no tenant correto.
+
+### 2026-10-06 — proteção contra abuso de análise por estágio
+Além do vínculo obrigatório ao tenant ativo, o RPC `rpc_solicitar_analise_estagio` agora só consome quota quando realmente precisa gerar uma nova análise. Resultados em cache, solicitações já enfileiradas com o mesmo hash e análises em processamento com lease válido não consomem quota.
+As novas gerações ficam limitadas a 30 por candidato/tenant em janela de 1 hora e 300 por empresa em janela de 1 hora. O `stage_input` também é limitado a 12 KB. O limite é aplicado antes de alterar/enfileirar a solicitação, incluindo o caminho `p_force`.
