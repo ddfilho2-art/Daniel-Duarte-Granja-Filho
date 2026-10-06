@@ -15,7 +15,7 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 function makeValidCnpj(base12) {
-  const digits = String(base12).replace(/\\D/g, "").slice(0, 12).padStart(12, "0");
+  const digits = String(base12).replace(/\D/g, "").slice(0, 12).padStart(12, "0");
 
   const digit = (value, weights) => {
     const sum = value.split("").reduce(
