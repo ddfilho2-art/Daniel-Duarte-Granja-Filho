@@ -48,7 +48,7 @@ async function must(label, promise) {
 async function claimBatch(size) {
   const results = await Promise.allSettled(
     Array.from({ length: size }, async () => {
-      return must("claim_next_ai_analysis_request", db.rpc("claim_next_ai_analysis_request"));
+      return must("claim_next_ai_analysis_request", db.rpc("claim_next_ai_analysis_request_for_tenant", { p_tenant_id: tenantId }));
     }),
   );
   const rejected = results.filter((result) => result.status === "rejected");
