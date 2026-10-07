@@ -27,22 +27,31 @@ const tenantAwareFetch: typeof fetch = (input, init: RequestInit = {}) => {
   if (activeTenantId) headers.set("x-tenant-id", activeTenantId);
 
   const requestUrl = input instanceof Request ? input.url : String(input);
-  if (requestUrl.includes("/rest/v1/rpc/")) {
-    const authorization = headers.get("authorization");
-    const apikey = headers.get("apikey");
-    const authorizationEqualsApiKey =
-      Boolean(authorization && apikey) &&
-      authorization === `Bearer ${apikey}`;
+  const authorization = headers.get("authorization");
+  const apikey = headers.get("apikey");
+  const authorizationEqualsApiKey =
+    Boolean(authorization && apikey) &&
+    authorization === `Bearer ${apikey}`;
+  const transportDebug = {
+    url: requestUrl,
+    method: init.method || (input instanceof Request ? input.method : "GET"),
+    authorizationPresent: Boolean(authorization),
+    authorizationEqualsApiKey,
+    authorizationRoleHint: authorizationEqualsApiKey
+      ? "anon-key"
+      : authorization
+        ? "present-not-anon-key"
+        : "absent",
+    apikeyPresent: Boolean(apikey),
+    tenantPresent: headers.has("x-tenant-id"),
+  };
 
-    console.info("[RPC TRANSPORT DEBUG]", {
-      url: requestUrl,
-      method: init.method || (input instanceof Request ? input.method : "GET"),
-      authorizationPresent: Boolean(authorization),
-      authorizationEqualsApiKey,
-      authorizationRoleHint: authorizationEqualsApiKey ? "anon-key" : authorization ? "access-token-or-custom" : "absent",
-      apikeyPresent: Boolean(apikey),
-      tenantPresent: headers.has("x-tenant-id"),
-    });
+  if (requestUrl.includes("/rest/v1/rpc/")) {
+    console.info("[RPC TRANSPORT DEBUG]", transportDebug);
+  }
+
+  if (requestUrl.includes("/rest/v1/logs")) {
+    console.info("[LOG TRANSPORT DEBUG]", transportDebug);
   }
 
   return globalThis.fetch(input, {
