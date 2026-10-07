@@ -222,34 +222,142 @@ Os advisors do Supabase ainda registram funções `SECURITY DEFINER` deliberadam
 - [x] O E2E de estágio valida bloqueio por candidato e por empresa antes de qualquer alteração da fila.
 
 
-## Manutenção de autenticação — RPCs de autorização (2026-10-07)
+## Manutenção de autenticação — inconsistência entre sessão Supabase e AuthContext (2026-10-07)
 
-### O que aconteceu
-Após o login, chamadas às RPCs de autorização chegaram ao PostgREST com o JWT de fallback do cliente (role `anon`), produzindo HTTP 401 / PostgreSQL 42501. Os logs também registraram chamadas autenticadas 200 para as mesmas RPCs e, logo depois, eventos de logout.
+### PROBLEMA
 
-### Causa-raiz comprovada
-O cliente `@supabase/supabase-js@2.101.1` usa a sessão disponível para montar o header `Authorization`; quando não há sessão disponível, o mecanismo interno faz fallback para a chave pública. A investigação confirmou que o `tenantAwareFetch` preserva os headers e não remove o Authorization.
+Durante o login, RPCs protegidos chegaram ao PostgREST como `anon` e retornaram HTTP 401 / PostgreSQL 42501, embora chamadas autenticadas às mesmas RPCs também tenham sido observadas.
 
-A causa operacional foi uma corrida entre o fluxo explícito de login e o sincronismo disparado por `onAuthStateChange`. O sincronismo concorrente podia falhar ao carregar o perfil e o código de `synchronizeProfile` executava `signOut()` automaticamente. As chamadas já iniciadas ou disparadas após esse logout passavam a usar o fallback `anon`.
+O risco arquitetural identificado é o uso de `authUserId` como gatilho suficiente para autorização, sem confirmar a sessão Supabase efetivamente disponível para o cliente.
 
-Os logs do Supabase comprovaram a sequência: login 200 → logout emitido pela aplicação → RPCs 401 com role `anon`. Também foi observada uma requisição antiga de perfil usando a lista de colunas inexistentes, enquanto o código atual já usa `select("*")`; isso indica que clientes/bundles antigos ainda podem permanecer ativos e reforça que uma falha de sincronização de perfil não deve derrubar uma sessão válida.
+### EVIDÊNCIAS
 
-### O que mudou
+- `public.get_current_clinic_access()`: SECURITY INVOKER; EXECUTE para `authenticated`; sem EXECUTE para `anon`.
+- `public.is_platform_master_admin()`: SECURITY DEFINER; EXECUTE para `authenticated`; sem EXECUTE para `anon`.
+- Não houve alteração de RLS, grants, SECURITY INVOKER/DEFINER ou schema nesta manutenção.
+- Logs anteriores comprovaram RPC 200 com role `authenticated` e RPC 401 com role `anon`.
+- `tenantAwareFetch` preserva os headers existentes e apenas acrescenta `x-tenant-id`.
+- A versão atual de `authService.ts` mantém `select("*")`.
+- A documentação atual do Supabase recomenda o uso de `onAuthStateChange` para reagir aos eventos de autenticação; a implementação anterior combinava um `getUser()` assíncrono de inicialização com o listener, abrindo uma janela de sincronização concorrente.
+
+### SEQUÊNCIA REAL DOS EVENTOS
+
+Fluxo anterior relevante:
+
+`signInWithPassword()`
+→ sessão criada
+→ `SIGNED_IN`
+→ fluxo explícito carrega perfil
+→ `setAuthUserId()`
+→ efeitos derivados podem iniciar RPCs
+→ em determinados caminhos de falha havia `signOut()`
+→ requisições posteriores sem sessão podiam chegar como `anon`
+→ 401/42501.
+
+A sequência exata de produção após o último deploy ainda precisa ser revalidada em navegador limpo; por isso a causa operacional desta manutenção permanece em validação.
+
+### CAUSA-RAIZ
+
+**Hipótese estrutural confirmada:** `authUserId` era uma fonte de verdade insuficiente para decidir quando executar RPCs protegidos. O estado React podia permanecer ou ser atualizado independentemente da sessão efetivamente disponível ao cliente Supabase.
+
+**Hipótese operacional em validação:** corrida entre inicialização/login e/ou destruição da sessão durante o fluxo de carregamento do perfil. Os logs anteriores sustentam essa hipótese, mas a confirmação final deve vir dos testes de produção desta manutenção.
+
+Classificação atual: **B — inconsistência/autorization baseada em estado sem confirmação de sessão**, com **C — signOut concorrente** mantida como hipótese operacional a confirmar.
+
+### CORREÇÃO
+
+- `AuthContext` passou a manter a `Session` do Supabase separadamente de `authUserId`.
+- `onAuthStateChange` passou a ser a fonte de sincronização da sessão, inclusive `INITIAL_SESSION`, `SIGNED_IN`, `TOKEN_REFRESHED` e `SIGNED_OUT`.
+- O `initialize()` baseado em `getUser()` foi removido, eliminando a corrida entre inicialização assíncrona e login.
+- `get_current_clinic_access` deixou de ser chamado diretamente pelo `login()`; agora é responsabilidade única do efeito derivado da identidade autenticada.
+- Antes do RPC clínico, `supabase.auth.getSession()` confirma que existe sessão e que o usuário da sessão corresponde ao `authUserId`.
+- `is_platform_master_admin` também passou a ser carregado por efeito derivado da sessão e protegido pela mesma confirmação.
+- `loginInProgressRef` foi preservado.
+- `signOut()` existente em `authService.ts` após falha de carregamento de perfil foi preservado deliberadamente.
+- Instrumentação temporária registra somente evento, usuário, presença de sessão e origem/RPC; nunca tokens ou senhas.
+- `tenantAwareFetch` continua funcionalmente inalterado, com apenas logs temporários de presença dos headers para RPCs.
+
+### ARQUIVOS ENVOLVIDOS
+
 - `src/contexts/AuthContext.tsx`
-  - o fluxo explícito de login passou a sinalizar que o login está em andamento;
-  - `onAuthStateChange` não executa sincronização concorrente durante o login;
-  - o tratamento de `SIGNED_OUT` continua limpando o estado local;
-  - falha de sincronização de perfil em segundo plano não executa mais `signOut()` automaticamente.
-- O commit anterior `6c6c77835ced7d16960d70d1821c1b6095031102` foi preservado funcionalmente: `authService.ts` continua usando `select("*")`.
+- `src/lib/authService.ts`
+- `src/lib/supabase.ts`
+- `docs/STATUS-ARQUITETURA.md`
 
-### Banco
-Nenhuma alteração. Não houve mudança de função, RLS, grant, policy, schema ou índice.
+### ALTERAÇÕES REALIZADAS
 
-### Segurança
-Nenhum acesso foi concedido a `anon`. RLS e as funções de autorização permanecem intactos. O `x-tenant-id` continua sendo somente contexto adicional e não substitui o JWT.
+- Sessão Supabase adicionada como estado explícito do AuthContext.
+- Inicialização migrada para `onAuthStateChange(INITIAL_SESSION)`.
+- Guardas de sessão antes dos RPCs protegidos.
+- Remoção da duplicidade de `get_current_clinic_access` no `login()`.
+- Remoção da chamada de `is_platform_master_admin` do `login()`; autorização de plataforma passou a ser derivada da sessão.
+- Logs temporários de autenticação, autorização e transporte RPC.
+- Nenhuma alteração de banco.
 
-### Validação
-- Confirmado no banco: `get_current_clinic_access` é INVOKER; `is_platform_master_admin` é DEFINER; ambas possuem EXECUTE para `authenticated` e não para `anon`.
-- Confirmado nos logs: houve RPC 200 com role `authenticated` e RPC 401 com role `anon` após logout.
-- Confirmado no código da versão 2.101.1: o fetch autenticado preserva um Authorization existente e usa a chave pública somente quando a sessão não está disponível.
-- `npm run lint`, `npm run build` e E2E de produção ainda aguardam execução em ambiente com acesso ao repositório/deployment. 
+### TESTADO AGORA
+
+- Revisão do código atual após implementação.
+- Verificação de que `get_current_clinic_access` aparece em um único ponto de execução no AuthContext.
+- Verificação de que `is_platform_master_admin` aparece em um único ponto de execução no AuthContext.
+- Verificação de que os RPCs possuem guarda de sessão antes da execução.
+- Verificação de que `loginInProgressRef` foi preservado.
+- Verificação de que `signOut()` de proteção no `authService.ts` não foi removido.
+- Verificação de que não houve alteração em `src/lib/supabase.ts` além da instrumentação temporária.
+- Verificação de que não houve migration nem alteração de banco.
+
+### TESTADO ANTERIORMENTE
+
+- Grants e definições dos RPCs.
+- `tenantAwareFetch`.
+- Preservação de `select("*")`.
+- Deploy anterior.
+- Logs Supabase demonstrando chamadas `authenticated` 200 e `anon` 401.
+- Commit `d983a46` preservando a proteção contra corrida entre login explícito e `onAuthStateChange`.
+
+### NÃO VALIDADO
+
+Ainda não foi possível executar diretamente nesta sessão o navegador de produção para comprovar:
+
+- login em janela anônima;
+- logout;
+- re-login;
+- ausência de 401/42501;
+- role `authenticated` em cada RPC;
+- ausência de chamada protegida sem sessão;
+- ausência de duplicidade no Network;
+- usuário autenticado sem acesso clínico retornando `hasAccess=false`;
+- comportamento com sessão expirada/ausente;
+- regressão de tenant access;
+- build/lint do commit final.
+
+### PROBLEMAS INDEPENDENTES
+
+- Bundles/clientes antigos já foram observados fazendo consulta antiga a colunas removidas de `users`; o código atual usa `select("*")`. Isso deve ser tratado como possível cliente/bundle obsoleto e não como correção de grants.
+- A chamada legítima de `supabase.auth.signOut()` em `src/pages/Public.tsx` ocorre após cadastro público de candidato e não pertence ao fluxo de login administrativo; não foi alterada.
+
+### TODO
+
+- Diagnóstico — Concluído parcialmente; causa operacional final aguarda validação de produção.
+- Reprodução — Concluído parcialmente; evidência de `authenticated`/ `anon` já obtida nos logs.
+- Causa-raiz — Em tratamento.
+- Solução — Concluído em código; validação pendente.
+- Implementação — Concluído.
+- Testes — Em tratamento.
+- Regressão — Não iniciado.
+- Documentação — Concluído nesta etapa.
+- Deploy — Não iniciado após este commit.
+- Validação produção — Não iniciado.
+
+### STATUS
+
+**AGUARDANDO VALIDAÇÃO**
+
+A manutenção não deve ser considerada concluída até que os testes de produção comprovem a cadeia:
+
+`SESSION`
+→ `AuthContext`
+→ RPC protegido
+→ role `authenticated`
+
+e comprovem que a ausência de sessão não produz chamada protegida.
+
