@@ -10,15 +10,30 @@ export async function logAudit(
     let currentUserId = userId;
     let currentUserEmail: string | null = null;
 
-    if (!currentUserId) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      currentUserId = user?.id;
-      currentUserEmail = user?.email || null;
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+    const tenantId = getSupabaseTenantId();
+
+    console.info("[LOG DEBUG]", {
+      sessionPresent: Boolean(session),
+      userPresent: Boolean(session?.user),
+      tenantPresent: Boolean(tenantId),
+    });
+
+    if (sessionError || !session?.user) {
+      console.warn(
+        "[AUDIT] Log não enviado porque não existe sessão autenticada.",
+        sessionError?.message || "session_absent",
+      );
+      return;
     }
 
-    const tenantId = getSupabaseTenantId();
+    if (!currentUserId) {
+      currentUserId = session.user.id;
+    }
+    currentUserEmail = session.user.email || null;
 
     const { error } = await supabase.from("logs").insert({
       acao,
