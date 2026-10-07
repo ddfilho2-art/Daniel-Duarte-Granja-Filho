@@ -235,8 +235,8 @@ Os RPCs protegidos chegaram ao PostgREST com `Authorization` equivalente à cred
 - `src/lib/supabase.ts` não substitui o header Authorization: apenas copia os headers recebidos, acrescenta `x-tenant-id` quando aplicável e envia a requisição.
 - O único cliente browser identificado no código da aplicação é criado em `src/lib/supabase.ts`; os demais módulos reutilizam esse cliente.
 - `@supabase/supabase-js` instalado e travado: **2.101.1**.
-- Na versão 2.101.1, o cliente usa `getSession()` internamente para obter o access token de cada requisição PostgREST e usa a chave do cliente como fallback quando não há sessão disponível naquele instante. citeturn4view0
-- O SDK 2.101.1 usa o mecanismo de locks de Auth; a documentação de versões posteriores registra correções relevantes nessa área. Isso é evidência para investigação, não autorização para atualizar a dependência nesta manutenção. citeturn13search0
+- Na versão 2.101.1, o cliente usa `getSession()` internamente para obter o access token de cada requisição PostgREST e usa a chave do cliente como fallback quando não há sessão disponível naquele instante.
+- O SDK 2.101.1 usa o mecanismo de locks de Auth; a documentação de versões posteriores registra correções relevantes nessa área. Isso é evidência para investigação, não autorização para atualizar a dependência nesta manutenção.
 - Não houve alteração de RLS, grants, SECURITY INVOKER/DEFINER ou RPCs.
 
 ### SEQUÊNCIA REAL DOS EVENTOS
