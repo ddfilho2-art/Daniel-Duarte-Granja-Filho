@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { supabase } from "../lib/supabase";
+import type { Session } from "@supabase/supabase-js";
 import {
   loadCurrentProfile,
   loadProfileForAuthUser,
@@ -29,6 +30,7 @@ interface AuthContextType {
   authLoading: boolean;
   profileLoading: boolean;
   tenantMembershipLoading: boolean;
+  authorizationLoading: boolean;
   tenantRoles: TenantRole[];
   clinicRoles: Extract<TenantRole, "clinic_admin" | "clinic_staff">[];
   clinicTenantIds: string[];
@@ -51,6 +53,7 @@ const AuthContext = createContext<AuthContextType>({
   authLoading: true,
   profileLoading: true,
   tenantMembershipLoading: false,
+  authorizationLoading: false,
   tenantRoles: [],
   clinicRoles: [],
   clinicTenantIds: [],
@@ -71,6 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { tenant, isTenantRoute } = useTenant();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authSession, setAuthSession] = useState<Session | null>(null);
+  const [authorizationLoading, setAuthorizationLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
   const [tenantMembershipLoading, setTenantMembershipLoading] = useState(
@@ -89,11 +94,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginInProgressRef = useRef(false);
 
   const synchronizeProfile = useCallback(
-    async (userId: string | null) => {
+    async (userId: string | null, session: Session | null) => {
       const requestId = ++profileRequestId.current;
 
-      if (!userId) {
+      if (!userId || !session || session.user.id !== userId) {
         setAuthUserId(null);
+        setAuthSession(null);
         setProfile(null);
         setTenantRoles([]);
         setClinicRoles([]);
@@ -106,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      setAuthSession(session);
       setProfileLoading(true);
       if (isTenantRoute) setTenantMembershipLoading(true);
       try {
@@ -135,33 +142,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    const initialize = async () => {
-      setAuthLoading(true);
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
-
-      if (error) console.warn("[AUTH] Sessão inválida ou expirada:", error);
-      if (active) await synchronizeProfile(user?.id || null);
-      if (active) setAuthLoading(false);
-    };
-
-    void initialize();
-
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      const userId = session?.user?.id || null;
+      console.info("[AUTH DEBUG]", { event, userId, session: Boolean(session) });
+      setAuthSession(session);
+
       if (event === "SIGNED_OUT") {
         queueMicrotask(() => {
-          if (active) void synchronizeProfile(null);
+          if (active) void synchronizeProfile(null, null);
         });
         return;
       }
 
       queueMicrotask(() => {
         if (active && !loginInProgressRef.current) {
-          void synchronizeProfile(session?.user?.id || null);
+          void synchronizeProfile(userId, session);
         }
       });
     });
@@ -171,12 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
     };
   }, [synchronizeProfile]);
-
   useEffect(() => {
     let active = true;
 
     const loadClinicAccess = async () => {
-      if (!authUserId) {
+      if (!authSession || !authUserId || authSession.user.id !== authUserId) {
         setClinicRoles([]);
         setClinicTenantIds([]);
         setHasClinicAccess(false);
@@ -184,6 +180,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const session = sessionData.session;
+        console.info("[AUTH DEBUG]", {
+          event: session ? "SESSION_PRESENT" : "SESSION_ABSENT",
+          userId: session?.user?.id || authUserId,
+          session: Boolean(session),
+        });
+        if (sessionError || !session || session.user.id !== authUserId) {
+          console.warn("[RPC DEBUG]", {
+            source: "clinic-effect",
+            rpc: "get_current_clinic_access",
+            userId: authUserId,
+            session: false,
+          });
+          if (!active) return;
+          setAuthSession(session || null);
+          setClinicRoles([]);
+          setClinicTenantIds([]);
+          setHasClinicAccess(false);
+          return;
+        }
+        console.info("[RPC DEBUG]", {
+          source: "clinic-effect",
+          rpc: "get_current_clinic_access",
+          userId: session.user.id,
+          session: true,
+        });
         const { data, error } = await supabase.rpc("get_current_clinic_access");
         if (error) throw error;
 
@@ -218,8 +241,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authUserId]);
+  }, [authUserId, authSession]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadPlatformAccess = async () => {
+      if (!authSession || !authUserId || authSession.user.id !== authUserId) {
+        setIsPlatformMasterAdmin(false);
+        return;
+      }
+
+      setAuthorizationLoading(true);
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const session = sessionData.session;
+        console.info("[AUTH DEBUG]", {
+          event: session ? "SESSION_PRESENT" : "SESSION_ABSENT",
+          userId: session?.user?.id || authUserId,
+          session: Boolean(session),
+        });
+        if (sessionError || !session || session.user.id !== authUserId) {
+          console.warn("[RPC DEBUG]", {
+            source: "platform-effect",
+            rpc: "is_platform_master_admin",
+            userId: authUserId,
+            session: false,
+          });
+          if (active) setIsPlatformMasterAdmin(false);
+          return;
+        }
+        console.info("[RPC DEBUG]", {
+          source: "platform-effect",
+          rpc: "is_platform_master_admin",
+          userId: session.user.id,
+          session: true,
+        });
+        const { data, error } = await supabase.rpc("is_platform_master_admin");
+        if (error) throw error;
+        if (active) setIsPlatformMasterAdmin(data === true);
+      } catch (error) {
+        console.warn("[AUTH] Não foi possível sincronizar acesso de plataforma:", error);
+        if (active) setIsPlatformMasterAdmin(false);
+      } finally {
+        if (active) setAuthorizationLoading(false);
+      }
+    };
+
+    void loadPlatformAccess();
+    return () => {
+      active = false;
+    };
+  }, [authUserId, authSession]);
   useEffect(() => {
     let active = true;
 
@@ -306,37 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthUserId(nextProfile.uid);
       setProfile(nextProfile);
 
-      try {
-        const { data: platformMaster } = await supabase.rpc("is_platform_master_admin");
-        setIsPlatformMasterAdmin(platformMaster === true);
-      } catch {
-        setIsPlatformMasterAdmin(false);
-      }
-      try {
-        const { data: clinicAccess } = await supabase.rpc("get_current_clinic_access");
-        const clinicPayload = (clinicAccess || {}) as Record<string, unknown>;
-        setClinicRoles(
-          Array.isArray(clinicPayload.roles)
-            ? clinicPayload.roles.filter(
-                (role): role is "clinic_admin" | "clinic_staff" =>
-                  role === "clinic_admin" || role === "clinic_staff",
-              )
-            : [],
-        );
-        setClinicTenantIds(
-          Array.isArray(clinicPayload.tenantIds)
-            ? clinicPayload.tenantIds.filter(
-                (id): id is string => typeof id === "string",
-              )
-            : [],
-        );
-        setHasClinicAccess(clinicPayload.hasAccess === true);
-      } catch (clinicError) {
-        console.warn("[AUTH] Não foi possível sincronizar acesso da clínica:", clinicError);
-        setClinicRoles([]);
-        setClinicTenantIds([]);
-        setHasClinicAccess(false);
-      }
+      console.info("[AUTH DEBUG]", { event: "LOGIN_PROFILE_SYNCED", userId: nextProfile.uid, session: true });
     } catch (error) {
       const candidateRegistrationRequired =
         error instanceof Error &&
@@ -388,8 +431,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    console.info("[AUTH DEBUG]", { event: "SIGN_OUT_REQUESTED", source: "AuthContext.signOut", userId: authUserId, session: Boolean(authSession) });
     ++profileRequestId.current;
     setAuthUserId(null);
+    setAuthSession(null);
     setProfile(null);
     setTenantRoles([]);
     setClinicRoles([]);
@@ -407,9 +452,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfileLoading(true);
     try {
       const nextProfile = await loadCurrentProfile();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
       if (requestId !== profileRequestId.current) return;
+      if (!session || !nextProfile || session.user.id !== nextProfile.uid) {
+        setAuthSession(session || null);
+        setProfile(null);
+        setAuthUserId(null);
+        return;
+      }
+      setAuthSession(session);
       setProfile(nextProfile);
-      setAuthUserId(nextProfile?.uid || null);
+      setAuthUserId(nextProfile.uid);
     } finally {
       if (requestId === profileRequestId.current) setProfileLoading(false);
     }
@@ -426,6 +480,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authLoading,
       profileLoading,
       tenantMembershipLoading,
+      authorizationLoading,
+      authorizationLoading,
       tenantRoles,
       clinicRoles,
       clinicTenantIds,
@@ -434,7 +490,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canAdministerTenant,
       isPlatformMasterAdmin,
       isAuthenticated: Boolean(authUserId && profile),
-      loading: authLoading || profileLoading || tenantMembershipLoading,
+      loading: authLoading || profileLoading || tenantMembershipLoading || authorizationLoading,
       login,
       signOut,
       refreshProfile,
