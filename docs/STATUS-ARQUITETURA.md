@@ -220,3 +220,36 @@ Os advisors do Supabase ainda registram funções `SECURITY DEFINER` deliberadam
 - [x] Cache, fila idêntica e processamento com lease válido não consomem quota.
 - [x] `stage_input` limitado a 12 KB.
 - [x] O E2E de estágio valida bloqueio por candidato e por empresa antes de qualquer alteração da fila.
+
+
+## Manutenção de autenticação — RPCs de autorização (2026-10-07)
+
+### O que aconteceu
+Após o login, chamadas às RPCs de autorização chegaram ao PostgREST com o JWT de fallback do cliente (role `anon`), produzindo HTTP 401 / PostgreSQL 42501. Os logs também registraram chamadas autenticadas 200 para as mesmas RPCs e, logo depois, eventos de logout.
+
+### Causa-raiz comprovada
+O cliente `@supabase/supabase-js@2.101.1` usa a sessão disponível para montar o header `Authorization`; quando não há sessão disponível, o mecanismo interno faz fallback para a chave pública. A investigação confirmou que o `tenantAwareFetch` preserva os headers e não remove o Authorization.
+
+A causa operacional foi uma corrida entre o fluxo explícito de login e o sincronismo disparado por `onAuthStateChange`. O sincronismo concorrente podia falhar ao carregar o perfil e o código de `synchronizeProfile` executava `signOut()` automaticamente. As chamadas já iniciadas ou disparadas após esse logout passavam a usar o fallback `anon`.
+
+Os logs do Supabase comprovaram a sequência: login 200 → logout emitido pela aplicação → RPCs 401 com role `anon`. Também foi observada uma requisição antiga de perfil usando a lista de colunas inexistentes, enquanto o código atual já usa `select("*")`; isso indica que clientes/bundles antigos ainda podem permanecer ativos e reforça que uma falha de sincronização de perfil não deve derrubar uma sessão válida.
+
+### O que mudou
+- `src/contexts/AuthContext.tsx`
+  - o fluxo explícito de login passou a sinalizar que o login está em andamento;
+  - `onAuthStateChange` não executa sincronização concorrente durante o login;
+  - o tratamento de `SIGNED_OUT` continua limpando o estado local;
+  - falha de sincronização de perfil em segundo plano não executa mais `signOut()` automaticamente.
+- O commit anterior `6c6c77835ced7d16960d70d1821c1b6095031102` foi preservado funcionalmente: `authService.ts` continua usando `select("*")`.
+
+### Banco
+Nenhuma alteração. Não houve mudança de função, RLS, grant, policy, schema ou índice.
+
+### Segurança
+Nenhum acesso foi concedido a `anon`. RLS e as funções de autorização permanecem intactos. O `x-tenant-id` continua sendo somente contexto adicional e não substitui o JWT.
+
+### Validação
+- Confirmado no banco: `get_current_clinic_access` é INVOKER; `is_platform_master_admin` é DEFINER; ambas possuem EXECUTE para `authenticated` e não para `anon`.
+- Confirmado nos logs: houve RPC 200 com role `authenticated` e RPC 401 com role `anon` após logout.
+- Confirmado no código da versão 2.101.1: o fetch autenticado preserva um Authorization existente e usa a chave pública somente quando a sessão não está disponível.
+- `npm run lint`, `npm run build` e E2E de produção ainda aguardam execução em ambiente com acesso ao repositório/deployment. 
