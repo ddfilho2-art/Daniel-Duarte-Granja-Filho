@@ -500,3 +500,11 @@ Este registro foi atualizado nesta manutenção. A regra reutilizável é:
 ### STATUS
 
 **AGUARDANDO VALIDAÇÃO**
+
+
+### Ajuste posterior da instrumentação
+
+- `dbf9d421af33de351bef1733742c35f525b58d05` — instrumentação de `/rest/v1/logs` aplicada efetivamente em `src/lib/supabase.ts`.
+- O log de transporte usa somente metadados booleanos/controlados e não altera a requisição.
+- O commit `a3fe90d6bc0afd0034199b8d9c08dc5e28a7e950` foi apenas uma tentativa intermediária e não deve ser considerado como a alteração efetiva da instrumentação de logs.
+- Estado atual do `main`: `dbf9d421af33de351bef1733742c35f525b58d05`.
