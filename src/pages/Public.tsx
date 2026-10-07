@@ -1073,13 +1073,16 @@ export function Cadastro() {
 
       // A trigger do Auth cria o registro em public.users. A ficha de candidato
       // é criada depois do login, já dentro do tenant correto.
-      await supabase.auth.signOut();
-
+      // O registro de auditoria precisa ocorrer enquanto a sessão recém-criada
+      // ainda está autenticada; depois do signOut o PostgREST passa a tratar a
+      // requisição como anon e a policy de logs deve rejeitá-la.
       await logAudit(
         "Cadastro",
         "Candidato",
         `Novo candidato cadastrado no tenant ${tenant.displayName}: ${formData.nome}.`,
       );
+
+      await supabase.auth.signOut();
 
       sessionStorage.setItem("pending_verify_email", formData.email.trim().toLowerCase());
       sessionStorage.setItem("pending_verify_name", formData.nome.trim());
