@@ -86,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [canAdministerTenant, setCanAdministerTenant] = useState(false);
   const [isPlatformMasterAdmin, setIsPlatformMasterAdmin] = useState(false);
   const profileRequestId = useRef(0);
+  const loginInProgressRef = useRef(false);
 
   const synchronizeProfile = useCallback(
     async (userId: string | null) => {
@@ -124,7 +125,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setHasTenantAccess(!isTenantRoute);
         setCanAdministerTenant(false);
         setTenantMembershipLoading(false);
-        await supabase.auth.signOut();
       } finally {
         if (requestId === profileRequestId.current) setProfileLoading(false);
       }
@@ -151,9 +151,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_OUT") {
+        queueMicrotask(() => {
+          if (active) void synchronizeProfile(null);
+        });
+        return;
+      }
+
       queueMicrotask(() => {
-        if (active) void synchronizeProfile(session?.user?.id || null);
+        if (active && !loginInProgressRef.current) {
+          void synchronizeProfile(session?.user?.id || null);
+        }
       });
     });
 
@@ -259,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (loginInput: string, passwordInput?: string) => {
     let sessionEstablished = false;
+    loginInProgressRef.current = true;
     setAuthLoading(true);
     setProfileLoading(true);
     if (isTenantRoute) setTenantMembershipLoading(true);
@@ -348,6 +358,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTenantMembershipLoading(false);
       throw error;
     } finally {
+      loginInProgressRef.current = false;
       setProfileLoading(false);
       setAuthLoading(false);
     }
