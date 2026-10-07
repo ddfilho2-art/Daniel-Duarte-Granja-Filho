@@ -508,3 +508,186 @@ Este registro foi atualizado nesta manutenção. A regra reutilizável é:
 - O log de transporte usa somente metadados booleanos/controlados e não altera a requisição.
 - O commit `a3fe90d6bc0afd0034199b8d9c08dc5e28a7e950` foi apenas uma tentativa intermediária e não deve ser considerado como a alteração efetiva da instrumentação de logs.
 - Estado atual do `main`: `dbf9d421af33de351bef1733742c35f525b58d05`.
+
+
+## Reclassificação final — POST /rest/v1/logs → 403 — 2026-10-07
+
+A investigação foi concluída com evidência direta no Supabase. A conclusão anterior que atribuía o 403 observado ao fluxo `signOut() → logAudit()` fica **substituída** por esta seção: aquele fluxo era uma hipótese/risco adicional, mas não foi a causa do request 403 analisado.
+
+### Evidência decisiva
+
+Request de produção observado em `edge_logs`:
+
+- `POST /rest/v1/logs`
+- HTTP `403`
+- `response.headers.proxy_status = PostgREST; error=42501`
+- `request.sb.jwt.authorization.payload.role = authenticated`
+- `request.sb.jwt.authorization.payload.subject` identifica o usuário autenticado
+- `request.sb.jwt.apikey.payload.role = anon`
+- o Authorization e a apikey são tokens diferentes; a presença da apikey com role `anon` não significa que a requisição seja `anon`
+- o mesmo usuário conseguiu `GET /rest/v1/logs?... = 200` autenticado imediatamente antes
+
+Portanto, **H3 (POST chegando como anon) está eliminada para o request 403 analisado**.
+
+### Evidência de RLS
+
+A policy vigente antes da correção era:
+
+```sql
+CREATE POLICY "logs_insert_policy"
+ON public.logs
+FOR INSERT
+TO authenticated
+WITH CHECK (tenant_id = current_tenant_id());
+```
+
+O banco confirmou:
+
+- `authenticated` possui INSERT em `public.logs`;
+- `anon` também possui o grant de INSERT, porém não existe policy de INSERT para `anon`;
+- RLS está ativo;
+- não existem triggers em `logs`;
+- `current_tenant_id()` lê exclusivamente o header `x-tenant-id` e retorna `NULL` quando ele não existe/é inválido.
+
+Para o usuário do request 403, simulando exatamente o JWT como `authenticated` no banco:
+
+- `is_platform_master_admin() = true`;
+- `current_tenant_id() = NULL`;
+- um INSERT de `public.logs` com `tenant_id = NULL` falhava com PostgreSQL `42501: new row violates row-level security policy for table "logs"`.
+
+Isso reproduz diretamente o mecanismo do 403 observado em produção.
+
+### CAUSA-RAIZ CONFIRMADA
+
+**A policy de INSERT de `public.logs` não contemplava o contexto raiz do `platform_master_admin`.**
+
+A policy de SELECT já permitia:
+
+```text
+platform master admin
+OU
+tenant atual + administração do tenant
+```
+
+Mas a policy de INSERT exigia somente:
+
+```text
+tenant_id = current_tenant_id()
+```
+
+No portal raiz, o master admin não possui `x-tenant-id`, portanto:
+
+```text
+tenant_id enviado pelo logger = NULL
+current_tenant_id() = NULL
+NULL = NULL → não é TRUE em SQL
+→ WITH CHECK falha
+→ 42501
+→ PostgREST 403
+```
+
+A diferença entre SELECT 200 e INSERT 403 ficou assim explicada sem necessidade de alterar autenticação.
+
+### H1 / H4
+
+- **H1 — RLS bloqueia INSERT:** **Confirmada.**
+- **H4 — authenticated chega sem autorização de INSERT:** **Eliminada.** O grant de INSERT existe; o bloqueio era do `WITH CHECK`.
+- **H5 — logger antes da sessão:** **Não é a causa do request 403 analisado.** O request observado tinha JWT autenticado.
+- **H6 — logging duplicado/antigo:** **Não confirmada.** Há múltiplos chamadores do logger central, mas nenhum mecanismo duplicado foi necessário para explicar o request.
+
+### CORREÇÃO APLICADA
+
+Foi criada a migration:
+
+```text
+supabase/migrations/20261007195500_fix_logs_insert_platform_admin.sql
+```
+
+A policy foi alterada somente para `public.logs`:
+
+```sql
+WITH CHECK (
+  tenant_id = public.current_tenant_id()
+  OR (
+    public.is_platform_master_admin()
+    AND tenant_id IS NULL
+  )
+)
+```
+
+Isso significa:
+
+1. usuário autenticado em tenant continua podendo inserir somente no tenant indicado pelo contexto atual;
+2. usuário não-master não ganha acesso root;
+3. master admin pode registrar eventos root com `tenant_id IS NULL`;
+4. master admin em contexto de tenant continua sujeito à igualdade entre `tenant_id` e `current_tenant_id()`;
+5. não foi criada policy para `anon`;
+6. não foi alterado RLS de nenhuma outra tabela.
+
+### TESTE DE RLS
+
+Antes da correção, o INSERT simulado para o master admin root falhou com `42501`.
+
+Depois da correção, o mesmo INSERT foi executado dentro de transação e **passou**, seguido de `ROLLBACK`; nenhum registro de teste permaneceu.
+
+Também foi executado teste negativo com usuário não-master e contexto root: o INSERT foi corretamente rejeitado por RLS.
+
+### DEPLOY
+
+A correção foi publicada em produção:
+
+- Deployment: `dpl_EPzMiY9FK3U6WZgtZRmGtci2CuZ4`
+- Commit: `0879757232ef820ca315475251599df9c88bfd9d`
+- Estado: `READY`
+- Alias: `daniel-duarte-granja-filho.vercel.app`
+
+### INSTRUMENTAÇÃO
+
+A instrumentação temporária de `/rest/v1/logs` permanece em `src/lib/supabase.ts` para permitir confirmação no navegador sem expor tokens.
+
+Ela registra somente:
+
+- `authorizationPresent`;
+- `authorizationEqualsApiKey`;
+- `authorizationRoleHint`;
+- `apikeyPresent`;
+- `tenantPresent`;
+- método e URL.
+
+Não registra tokens.
+
+### OBSERVAÇÃO SOBRE ALTERAÇÕES FRONTEND ANTERIORES
+
+As alterações de `src/lib/audit.ts` e `src/pages/Public.tsx` feitas durante a investigação anterior permanecem no deployment atual, mas **não são a causa-raiz comprovada deste 403**. A causa comprovada e a correção necessária são a policy de INSERT de `public.logs`.
+
+Essa distinção é mantida para evitar transformar uma hipótese secundária em causa confirmada.
+
+### VALIDAÇÃO FINAL PENDENTE
+
+Ainda não foi possível executar, nesta sessão, a matriz completa de navegador em produção:
+
+- abrir deslogado;
+- login;
+- navegação autenticada;
+- reload;
+- logout;
+- login novamente;
+- teste tenant A/B.
+
+Portanto, o status correto continua sendo:
+
+**AGUARDANDO VALIDAÇÃO**
+
+### TODO FINAL
+
+- Diagnóstico — **Concluído**
+- Causa-raiz — **Concluído**
+- Solução — **Concluído**
+- Implementação — **Concluído**
+- Testes de RLS — **Concluído**
+- Regressão em código — **Aguardando validação**
+- Testes de navegador — **Aguardando validação**
+- Documentação — **Concluído**
+- Base de Conhecimento — **Concluído**
+- Deploy — **Concluído**
+- Validação em produção — **Aguardando validação**
