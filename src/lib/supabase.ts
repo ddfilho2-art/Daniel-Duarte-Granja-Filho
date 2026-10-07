@@ -28,12 +28,20 @@ const tenantAwareFetch: typeof fetch = (input, init: RequestInit = {}) => {
 
   const requestUrl = input instanceof Request ? input.url : String(input);
   if (requestUrl.includes("/rest/v1/rpc/")) {
+    const authorization = headers.get("authorization");
+    const apikey = headers.get("apikey");
+    const authorizationEqualsApiKey =
+      Boolean(authorization && apikey) &&
+      authorization === `Bearer ${apikey}`;
+
     console.info("[RPC TRANSPORT DEBUG]", {
       url: requestUrl,
       method: init.method || (input instanceof Request ? input.method : "GET"),
-      authorization: headers.has("authorization"),
-      apikey: headers.has("apikey"),
-      tenant: headers.has("x-tenant-id"),
+      authorizationPresent: Boolean(authorization),
+      authorizationEqualsApiKey,
+      authorizationRoleHint: authorizationEqualsApiKey ? "anon-key" : authorization ? "access-token-or-custom" : "absent",
+      apikeyPresent: Boolean(apikey),
+      tenantPresent: headers.has("x-tenant-id"),
     });
   }
 
