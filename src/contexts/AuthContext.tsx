@@ -172,84 +172,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
 
-    const loadClinicAccess = async () => {
+    const loadAuthorization = async () => {
       if (!authUserId) {
         setClinicRoles([]);
         setClinicTenantIds([]);
         setHasClinicAccess(false);
-        return;
-      }
-
-      try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        const session = sessionData.session;
-        console.info("[AUTH DEBUG]", {
-          event: session ? "SESSION_PRESENT" : "SESSION_ABSENT",
-          userId: session?.user?.id || authUserId,
-          session: Boolean(session),
-        });
-        if (sessionError || !session || session.user.id !== authUserId) {
-          console.warn("[RPC DEBUG]", {
-            source: "clinic-effect",
-            rpc: "get_current_clinic_access",
-            userId: authUserId,
-            session: false,
-          });
-          if (!active) return;
-          setAuthSession(session || null);
-          setAuthUserId(null);
-          setClinicRoles([]);
-          setClinicTenantIds([]);
-          setHasClinicAccess(false);
-          return;
-        }
-        console.info("[RPC DEBUG]", {
-          source: "clinic-effect",
-          rpc: "get_current_clinic_access",
-          userId: session.user.id,
-          session: true,
-        });
-        const { data, error } = await supabase.rpc("get_current_clinic_access");
-        if (error) throw error;
-
-        const payload = (data || {}) as Record<string, unknown>;
-        const roles = Array.isArray(payload.roles)
-          ? payload.roles.filter(
-              (role): role is "clinic_admin" | "clinic_staff" =>
-                role === "clinic_admin" || role === "clinic_staff",
-            )
-          : [];
-        const tenantIds = Array.isArray(payload.tenantIds)
-          ? payload.tenantIds.filter(
-              (id): id is string => typeof id === "string",
-            )
-          : [];
-
-        if (!active) return;
-        setClinicRoles(roles);
-        setClinicTenantIds(tenantIds);
-        setHasClinicAccess(payload.hasAccess === true);
-      } catch (error) {
-        console.error("[AUTH] Falha ao validar acesso à clínica:", error);
-        if (!active) return;
-        setClinicRoles([]);
-        setClinicTenantIds([]);
-        setHasClinicAccess(false);
-      }
-    };
-
-    void loadClinicAccess();
-
-    return () => {
-      active = false;
-    };
-  }, [authUserId]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadPlatformAccess = async () => {
-      if (!authUserId) {
         setIsPlatformMasterAdmin(false);
         setAuthorizationLoading(false);
         return;
@@ -257,49 +184,106 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setAuthorizationLoading(true);
       try {
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
         const session = sessionData.session;
+
         console.info("[AUTH DEBUG]", {
           event: session ? "SESSION_PRESENT" : "SESSION_ABSENT",
           userId: session?.user?.id || authUserId,
           session: Boolean(session),
         });
+
         if (sessionError || !session || session.user.id !== authUserId) {
           console.warn("[RPC DEBUG]", {
-            source: "platform-effect",
-            rpc: "is_platform_master_admin",
+            source: "authorization-effect",
+            rpc: "protected-authorization",
             userId: authUserId,
             session: false,
           });
           if (active) {
-            setAuthSession(null);
+            setAuthSession(session || null);
             setAuthUserId(null);
+            setClinicRoles([]);
+            setClinicTenantIds([]);
+            setHasClinicAccess(false);
             setIsPlatformMasterAdmin(false);
           }
           return;
         }
+
         console.info("[RPC DEBUG]", {
-          source: "platform-effect",
+          source: "authorization-effect",
           rpc: "is_platform_master_admin",
           userId: session.user.id,
           session: true,
         });
-        const { data, error } = await supabase.rpc("is_platform_master_admin");
-        if (error) throw error;
-        if (active) setIsPlatformMasterAdmin(data === true);
-      } catch (error) {
-        console.warn("[AUTH] Não foi possível sincronizar acesso de plataforma:", error);
-        if (active) setIsPlatformMasterAdmin(false);
+        const {
+          data: platformData,
+          error: platformError,
+        } = await supabase.rpc("is_platform_master_admin");
+
+        if (!active) return;
+
+        if (platformError) {
+          console.warn(
+            "[AUTH] Não foi possível sincronizar acesso de plataforma:",
+            platformError,
+          );
+          setIsPlatformMasterAdmin(false);
+        } else {
+          setIsPlatformMasterAdmin(platformData === true);
+        }
+
+        console.info("[RPC DEBUG]", {
+          source: "authorization-effect",
+          rpc: "get_current_clinic_access",
+          userId: session.user.id,
+          session: true,
+        });
+        const { data: clinicData, error: clinicError } =
+          await supabase.rpc("get_current_clinic_access");
+
+        if (!active) return;
+
+        if (clinicError) {
+          console.error(
+            "[AUTH] Falha ao validar acesso à clínica:",
+            clinicError,
+          );
+          setClinicRoles([]);
+          setClinicTenantIds([]);
+          setHasClinicAccess(false);
+        } else {
+          const payload = (clinicData || {}) as Record<string, unknown>;
+          const roles = Array.isArray(payload.roles)
+            ? payload.roles.filter(
+                (role): role is "clinic_admin" | "clinic_staff" =>
+                  role === "clinic_admin" || role === "clinic_staff",
+              )
+            : [];
+          const tenantIds = Array.isArray(payload.tenantIds)
+            ? payload.tenantIds.filter(
+                (id): id is string => typeof id === "string",
+              )
+            : [];
+
+          setClinicRoles(roles);
+          setClinicTenantIds(tenantIds);
+          setHasClinicAccess(payload.hasAccess === true);
+        }
       } finally {
         if (active) setAuthorizationLoading(false);
       }
     };
 
-    void loadPlatformAccess();
+    void loadAuthorization();
+
     return () => {
       active = false;
     };
   }, [authUserId]);
+
   useEffect(() => {
     let active = true;
 
