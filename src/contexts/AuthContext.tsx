@@ -148,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userId = session?.user?.id || null;
       console.info("[AUTH DEBUG]", { event, userId, session: Boolean(session) });
       setAuthSession(session);
+      if (event === "INITIAL_SESSION") setAuthLoading(false);
 
       if (event === "SIGNED_OUT") {
         queueMicrotask(() => {
@@ -172,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     const loadClinicAccess = async () => {
-      if (!authSession || !authUserId || authSession.user.id !== authUserId) {
+      if (!authUserId) {
         setClinicRoles([]);
         setClinicTenantIds([]);
         setHasClinicAccess(false);
@@ -241,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authUserId, authSession]);
+  }, [authUserId]);
 
   useEffect(() => {
     let active = true;
@@ -481,7 +482,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profileLoading,
       tenantMembershipLoading,
       authorizationLoading,
-      authorizationLoading,
       tenantRoles,
       clinicRoles,
       clinicTenantIds,
@@ -502,6 +502,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authLoading,
       profileLoading,
       tenantMembershipLoading,
+      authorizationLoading,
       tenantRoles,
       clinicRoles,
       clinicTenantIds,
