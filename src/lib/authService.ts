@@ -103,6 +103,12 @@ export async function loginWithLogin(
       password: passwordInput,
     });
 
+  console.info("[AUTH DEBUG]", {
+    event: "SIGN_IN_RESULT",
+    userId: authData.user?.id || null,
+    session: Boolean(authData.session),
+  });
+
   if (authError || !authData.user || !authData.session) {
     throw new Error("Email ou senha inválidos.");
   }
@@ -110,6 +116,12 @@ export async function loginWithLogin(
   try {
     return await loadProfileForAuthUser(authData.user.id);
   } catch (error) {
+    console.warn("[AUTH DEBUG]", {
+      event: "SIGN_OUT_REQUESTED",
+      source: "authService.loginWithLogin.profile-load-failure",
+      userId: authData.user.id,
+      session: Boolean(authData.session),
+    });
     await supabase.auth.signOut();
     throw error;
   }
