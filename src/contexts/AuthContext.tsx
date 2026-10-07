@@ -197,6 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
           if (!active) return;
           setAuthSession(session || null);
+          setAuthUserId(null);
           setClinicRoles([]);
           setClinicTenantIds([]);
           setHasClinicAccess(false);
@@ -248,8 +249,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     const loadPlatformAccess = async () => {
-      if (!authSession || !authUserId || authSession.user.id !== authUserId) {
+      if (!authUserId) {
         setIsPlatformMasterAdmin(false);
+        setAuthorizationLoading(false);
         return;
       }
 
@@ -269,7 +271,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             userId: authUserId,
             session: false,
           });
-          if (active) setIsPlatformMasterAdmin(false);
+          if (active) {
+            setAuthSession(null);
+            setAuthUserId(null);
+            setIsPlatformMasterAdmin(false);
+          }
           return;
         }
         console.info("[RPC DEBUG]", {
@@ -293,7 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authUserId, authSession]);
+  }, [authUserId]);
   useEffect(() => {
     let active = true;
 
