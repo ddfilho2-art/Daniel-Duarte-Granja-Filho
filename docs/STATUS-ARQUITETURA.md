@@ -359,3 +359,144 @@ Ainda não foi possível executar o navegador de produção nem publicar automat
 
 **AGUARDANDO VALIDAÇÃO**
 
+
+
+## Manutenção 2026-10-07 — POST /rest/v1/logs → 403
+
+### PROBLEMA
+
+Em produção foi observado:
+
+`POST /rest/v1/logs → 403 Forbidden`.
+
+O escopo desta manutenção ficou restrito ao logger/auditoria e não reabriu a correção dos RPCs `is_platform_master_admin` e `get_current_clinic_access`.
+
+### EVIDÊNCIAS
+
+- A origem direta do POST foi localizada em `src/lib/audit.ts`.
+- `logAudit()` executa diretamente `supabase.from("logs").insert(...)`.
+- Foram localizados chamadores em `Admin.tsx`, `Candidate.tsx`, `HR.tsx`, `HRRelatorios.tsx` e `Public.tsx`.
+- Em `src/pages/Public.tsx`, o fluxo de cadastro fazia `supabase.auth.signOut()` **antes** de `logAudit()`. Portanto, naquele ponto, o logger tentava gravar sem sessão autenticada.
+- A tabela `public.logs` possui RLS habilitado.
+- A policy de INSERT é `logs_insert_policy`, destinada somente a `authenticated`, com `WITH CHECK (tenant_id = current_tenant_id())`.
+- O banco não foi alterado nesta manutenção.
+- Os grants atualmente observados incluem INSERT para `authenticated` e também para `anon`; a existência do grant para `anon` não autoriza o INSERT porque a policy de RLS de INSERT é restrita a `authenticated`.
+- Não foram encontrados triggers na tabela `public.logs`.
+- A instrumentação temporária foi adicionada para registrar apenas metadados booleanos da requisição, sem JWT, access token, refresh token, anon key ou dados pessoais.
+
+### HIPÓTESES
+
+1. **H1 — RLS bloqueando INSERT anônimo:** **Confirmada como mecanismo de bloqueio quando a chamada chega sem sessão.** A policy de INSERT é exclusiva de `authenticated`; uma chamada anônima não satisfaz essa policy.
+2. **H2 — Frontend grava logs diretamente:** **Confirmada.** O fluxo browser → Supabase PostgREST → `public.logs` existe em `logAudit()`.
+3. **H3 — POST /logs chega como anon:** **Confirmada no fluxo de cadastro identificado**, porque o código fazia `signOut()` antes do INSERT. **Ainda não correlacionada diretamente ao POST 403 observado em produção.**
+4. **H4 — authenticated sem INSERT:** **Eliminada para a configuração atual do banco.** `authenticated` possui INSERT e existe policy de INSERT.
+5. **H5 — logger chamado antes da sessão:** **Confirmada para o fluxo de cadastro após `signOut()`; possível em outros fluxos somente se nova evidência demonstrar.**
+6. **H6 — logging duplicado/antigo:** **Não confirmada.** Foram encontrados múltiplos chamadores de `logAudit()`, mas todos apontam para o mesmo logger central.
+
+### CAUSA-RAIZ
+
+**Causa comprovada no fluxo identificado:** `src/pages/Public.tsx` encerrava a sessão antes de chamar `logAudit()`. O logger então tentava inserir em `public.logs` sem identidade autenticada, enquanto a policy de INSERT aceita somente `authenticated`.
+
+**Limite da conclusão:** ainda não é possível afirmar que esse é o único fluxo responsável pelo POST 403 observado em produção, porque a consulta de Unified Logs do Supabase não pôde ser obtida nesta sessão. A correlação final do request de produção permanece pendente.
+
+### SOLUÇÃO
+
+Menor correção aplicada:
+
+1. registrar o evento de auditoria do cadastro antes do `signOut()`;
+2. fazer `logAudit()` confirmar a existência de uma sessão autenticada antes de executar o INSERT;
+3. manter o comportamento de RLS e grants do banco;
+4. instrumentar somente o transporte de `/rest/v1/logs` para confirmar futuramente `Authorization`, `apikey` e tenant sem expor segredos.
+
+Nenhuma alteração foi feita nos RPCs protegidos nem em `@supabase/supabase-js`.
+
+### IMPLEMENTAÇÃO
+
+Arquivos alterados:
+
+- `src/lib/audit.ts`
+- `src/lib/supabase.ts`
+- `src/pages/Public.tsx`
+- `docs/STATUS-ARQUITETURA.md`
+
+Commits:
+
+- `a3fe90d6bc0afd0034199b8d9c08dc5e28a7e950` — instrumentação segura do transporte de logs.
+- `8c5572444be825a6ca4cd5ae21e4c14f9ebeac08` — exige sessão autenticada antes do logger.
+- `5b9a78d8ab9bac7e94c0b3a91d8581c613317931` — move auditoria do cadastro para antes do logout.
+
+Migrations/policies/grants: **nenhuma alteração**.
+
+### TESTES
+
+#### Testado agora
+
+- Origem do POST localizada no código.
+- Chamadores de `logAudit()` identificados nos principais módulos.
+- `public.logs` inspecionada diretamente no banco.
+- RLS, policy de INSERT, grants e triggers inspecionados.
+- Fluxo de cadastro confirmou a ordem insegura `signOut() → logAudit()`.
+- Correção aplicada para `logAudit() → signOut()`.
+- Logger passou a interromper o INSERT quando não existe sessão.
+- Instrumentação não imprime valores de Authorization/apikey.
+
+#### Testado anteriormente
+
+- Sessão/RPCs protegidos foram corrigidos e validados em etapa anterior.
+- `tenantAwareFetch` foi confirmado como preservador dos headers e sem substituição deliberada de Authorization.
+
+#### Inspecionado
+
+- `src/lib/audit.ts`
+- `src/pages/Admin.tsx`
+- `src/pages/Candidate.tsx`
+- `src/pages/HR.tsx`
+- `src/pages/HRRelatorios.tsx`
+- `src/pages/Public.tsx`
+- `src/components/AuditTrail.tsx`
+- `src/lib/supabase.ts`
+- estrutura/policies/grants/triggers de `public.logs`
+
+#### Não validado
+
+- navegador de produção após o novo commit;
+- status HTTP real do POST após a correção;
+- role efetiva do POST 403 observado anteriormente;
+- resposta textual original do PostgREST para aquele request;
+- validação completa logout/relogin em produção;
+- tenant isolation específica de `logs`.
+
+### REGRESSÃO
+
+A manutenção não alterou:
+
+- login;
+- logout;
+- sessão/AuthContext;
+- tenant;
+- `is_platform_master_admin`;
+- `get_current_clinic_access`;
+- RLS ou grants existentes.
+
+### DOCUMENTAÇÃO
+
+Este registro foi atualizado nesta manutenção. A regra reutilizável é:
+
+> Um logger browser que grava em tabela protegida não deve executar INSERT depois de `signOut()`. Primeiro identificar a sessão efetiva; depois gravar somente dentro do contexto de autorização esperado. Nunca liberar `anon` apenas para eliminar um 403.
+
+### TODO
+
+- Diagnóstico — **Concluído**
+- Causa-raiz — **Concluído para o fluxo identificado / correlação de produção pendente**
+- Solução — **Concluído**
+- Implementação — **Concluído**
+- Testes — **Aguardando validação**
+- Regressão — **Aguardando validação**
+- Documentação — **Concluído**
+- Base de Conhecimento — **Concluído nesta documentação**
+- Deploy — **Aguardando**
+- Validação em produção — **Aguardando validação**
+
+### STATUS
+
+**AGUARDANDO VALIDAÇÃO**
