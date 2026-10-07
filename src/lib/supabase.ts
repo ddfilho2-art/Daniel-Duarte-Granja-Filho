@@ -26,6 +26,17 @@ const tenantAwareFetch: typeof fetch = (input, init: RequestInit = {}) => {
   new Headers(init.headers).forEach((value, key) => headers.set(key, value));
   if (activeTenantId) headers.set("x-tenant-id", activeTenantId);
 
+  const requestUrl = input instanceof Request ? input.url : String(input);
+  if (requestUrl.includes("/rest/v1/rpc/")) {
+    console.info("[RPC TRANSPORT DEBUG]", {
+      url: requestUrl,
+      method: init.method || (input instanceof Request ? input.method : "GET"),
+      authorization: headers.has("authorization"),
+      apikey: headers.has("apikey"),
+      tenant: headers.has("x-tenant-id"),
+    });
+  }
+
   return globalThis.fetch(input, {
     ...init,
     headers,
