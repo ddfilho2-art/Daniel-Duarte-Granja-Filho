@@ -120,6 +120,10 @@ export async function activateTenant(tenantId: string): Promise<void> {
   await callEdge("activate", { tenantId });
 }
 
+export async function endTenantContract(tenantId: string): Promise<void> {
+  await callEdge("end_contract", { tenantId });
+}
+
 // ── Branding ───────────────────────────────────────────────────────────────
 
 export async function createBrandingDraft(
