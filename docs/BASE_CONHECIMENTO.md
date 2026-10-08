@@ -53,3 +53,20 @@ A mensagem genérica de `functions.invoke` não deve ser tratada como causa-raiz
 - Edge Function `tenant-admin-management` publicada e ACTIVE; bundle validado pelo serviço de deploy.
 - Build completo da aplicação e fluxo E2E de navegador ainda não validados nesta etapa.
 - Deploy Vercel não realizado; permanece sob controle manual do projeto.
+
+
+## 2026-10-08 — Ciclo de vida do contrato da empresa
+
+### Regra
+- `tenants.created_at` é a data de criação do cadastro e não precisa de campo duplicado.
+- `tenants.contract_ended_at` passa a registrar a **data de encerramento do contrato**.
+- `status=archived` é apresentado na interface como **Contrato encerrado**.
+- Encerrar contrato grava `contract_ended_at` e `archived_at`, bloqueando imediatamente o acesso tenant porque o acesso efetivo exige tenant ativo.
+- Empresa com contrato encerrado permanece no cadastro e no histórico macro; não há exclusão automática nesta etapa.
+- Empresa encerrada não pode ser reativada pelo fluxo de ativação. Para um novo contrato, a decisão deve ser tratada como novo ciclo comercial, sem apagar o histórico anterior.
+
+### Validação
+- Migration `20261008204500_add_tenant_contract_end_date.sql` aplicada com sucesso.
+- Edge Function `tenant-provisioning` versão 5 publicada ACTIVE com a ação `end_contract`.
+- O fluxo de ativação foi ajustado para não reativar tenant arquivado.
+- Validação E2E do clique de encerramento e bloqueio no navegador ainda está pendente.
