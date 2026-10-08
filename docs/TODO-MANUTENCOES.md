@@ -44,3 +44,18 @@
 - [x] Correção aplicada em `src/lib/tenant-provisioning.ts`.
 - [ ] Build Vite/Vercel pós-correção — **Aguardando validação**.
 - [ ] E2E da ação Encerrar contrato — **Aguardando validação**.
+
+## Manutenção atual — Navegação e identidade visual (2026-10-08)
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Registrar os problemas relatados no perfil Master | Concluído | Destaque incorreto do Dashboard, editor técnico e logo por empresa registrados |
+| Corrigir seleção do menu pela rota atual | Concluído (código) | `/master` tratado como raiz exata em `DashboardLayouts.tsx`; build e navegação real pendentes |
+| Reorganizar editor com linguagem simples | Concluído (código) | Opções com explicação e prévia que destaca a região selecionada |
+| Adicionar upload de logo por empresa | Em tratamento | UI e upload para `tenant-branding` criados; autorização e upload real pendentes |
+| Confirmar persistência e leitura do caminho do logo no tema publicado | Aguardando validação | Verificar `create_tenant_branding_draft` e `get_public_tenant_context` no ambiente real |
+| Promover `dist/logo.png` a asset de origem estático | Em tratamento | Arquivo localizado em `dist/logo.png`; cópia binária para `public/logo.png` ou `src/assets` ainda pendente |
+| Build / type-check / regressão | Aguardando validação | Executar CI/build após o lote de alterações |
+| Teste visual integrado no perfil Master e portal de empresa | Aguardando validação | Uma rodada após build: navegação, editor, upload, rascunho, publicação e logo público |
+| Atualizar Base de Conhecimento | Concluído | Causa, alterações, riscos e limitações registrados |
+| Deploy Vercel | Não iniciado | Deploy continua sob controle manual do usuário |
