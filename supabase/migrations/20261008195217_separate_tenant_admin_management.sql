@@ -69,7 +69,7 @@ create table if not exists public.tenant_admin_operation_attachments (
   created_at timestamptz not null default now(),
   constraint tenant_admin_operation_attachments_path_check
     check (
-    '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/'
     ),
   constraint tenant_admin_operation_attachments_name_check
     check (length(trim(file_name)) between 1 and 255),
