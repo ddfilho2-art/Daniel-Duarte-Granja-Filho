@@ -26,6 +26,10 @@ type ProvisionAction =
       tenantId?: string;
     }
   | {
+      action: "end_contract";
+      tenantId?: string;
+    }
+  | {
       action: "list_tenants";
     }
   | {
@@ -150,7 +154,7 @@ Deno.serve(async (request) => {
       const { data: tenants, error } = await admin
         .from("tenants")
         .select(
-          "id, kind, cnpj, legal_name, display_name, slug, status, created_at, updated_at",
+          "id, kind, cnpj, legal_name, display_name, slug, status, created_at, updated_at, contract_ended_at",
         )
         .order("created_at", { ascending: false });
 
@@ -177,7 +181,7 @@ Deno.serve(async (request) => {
       const { data: tenant, error } = await admin
         .from("tenants")
         .select(
-          "id, kind, cnpj, legal_name, display_name, slug, status, metadata, published_branding_id, created_at, updated_at",
+          "id, kind, cnpj, legal_name, display_name, slug, status, metadata, published_branding_id, created_at, updated_at, contract_ended_at, archived_at",
         )
         .eq("id", tenantId)
         .maybeSingle();
@@ -219,9 +223,35 @@ Deno.serve(async (request) => {
         );
       }
 
+      const { data: currentTenant, error: currentTenantError } = await admin
+        .from("tenants")
+        .select("status")
+        .eq("id", tenantId)
+        .maybeSingle();
+
+      if (currentTenantError) throw currentTenantError;
+      if (!currentTenant) {
+        return jsonResponse(
+          { success: false, code: "TENANT_NOT_FOUND", requestId: currentRequestId },
+          404,
+          cors,
+        );
+      }
+      if (currentTenant.status === "archived") {
+        return jsonResponse(
+          { success: false, code: "CONTRACT_ENDED", message: "Contract already ended", requestId: currentRequestId },
+          409,
+          cors,
+        );
+      }
+
       const { error } = await admin
         .from("tenants")
-        .update({ status: "suspended", suspended_at: new Date().toISOString() })
+        .update({
+          status: "suspended",
+          suspended_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", tenantId);
 
       if (error) throw error;
@@ -254,11 +284,34 @@ Deno.serve(async (request) => {
         );
       }
 
+      const { data: currentTenant, error: currentTenantError } = await admin
+        .from("tenants")
+        .select("status")
+        .eq("id", tenantId)
+        .maybeSingle();
+
+      if (currentTenantError) throw currentTenantError;
+      if (!currentTenant) {
+        return jsonResponse(
+          { success: false, code: "TENANT_NOT_FOUND", requestId: currentRequestId },
+          404,
+          cors,
+        );
+      }
+      if (currentTenant.status === "archived") {
+        return jsonResponse(
+          { success: false, code: "CONTRACT_ENDED_CANNOT_ACTIVATE", message: "A contract-ended company cannot be reactivated.", requestId: currentRequestId },
+          409,
+          cors,
+        );
+      }
+
       const { error } = await admin
         .from("tenants")
         .update({
           status: "active",
           suspended_at: null,
+          contract_ended_at: null,
           updated_at: new Date().toISOString(),
         })
         .eq("id", tenantId);
@@ -276,6 +329,64 @@ Deno.serve(async (request) => {
 
       return jsonResponse(
         { success: true, code: "TENANT_ACTIVATED", requestId: currentRequestId },
+        200,
+        cors,
+      );
+    }
+
+    // ── END CONTRACT ───────────────────────────────────────────────────────
+    if (body.action === "end_contract") {
+      const tenantId = String(body.tenantId || "").trim();
+      if (!UUID_PATTERN.test(tenantId)) {
+        return jsonResponse(
+          { success: false, code: "INVALID_TENANT_ID", requestId: currentRequestId },
+          400,
+          cors,
+        );
+      }
+
+      const endedAt = new Date().toISOString();
+      const { data: currentTenant, error: currentTenantError } = await admin
+        .from("tenants")
+        .select("id, status")
+        .eq("id", tenantId)
+        .maybeSingle();
+
+      if (currentTenantError) throw currentTenantError;
+      if (!currentTenant) {
+        return jsonResponse(
+          { success: false, code: "TENANT_NOT_FOUND", requestId: currentRequestId },
+          404,
+          cors,
+        );
+      }
+
+      if (currentTenant.status !== "archived") {
+        const { error } = await admin
+          .from("tenants")
+          .update({
+            status: "archived",
+            contract_ended_at: endedAt,
+            archived_at: endedAt,
+            suspended_at: null,
+            updated_at: endedAt,
+          })
+          .eq("id", tenantId);
+
+        if (error) throw error;
+
+        await admin.from("tenant_audit_logs").insert({
+          tenant_id: tenantId,
+          actor_id: authData.user.id,
+          action: "platform.tenant.contract_ended",
+          resource_type: "tenant",
+          resource_id: tenantId,
+          details: { contract_ended_at: endedAt },
+        });
+      }
+
+      return jsonResponse(
+        { success: true, code: "TENANT_CONTRACT_ENDED", requestId: currentRequestId },
         200,
         cors,
       );
