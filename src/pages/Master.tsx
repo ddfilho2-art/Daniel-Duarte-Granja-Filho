@@ -231,7 +231,7 @@ export function MasterTenantList() {
                           </button>
                         )}
                         <a
-                          href={`/t/${t.slug}`}
+                          href={`/empresa/${t.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="rounded px-2 py-1 text-xs bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -365,7 +365,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
           )}
           <p className="mt-1 text-xs text-slate-600">
             URL:{" "}
-            <code>{window.location.origin}/t/{form.slug || "empresa-x"}</code>
+            <code>{window.location.origin}/empresa/{form.slug || "empresa-x"}</code>
           </p>
         </div>
         <FormField
