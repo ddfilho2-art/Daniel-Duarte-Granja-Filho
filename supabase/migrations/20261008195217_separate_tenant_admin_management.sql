@@ -142,7 +142,6 @@ with check (
   bucket_id = 'tenant-admin-attachments'
   and public.is_platform_master_admin()
   and array_length(storage.foldername(name), 1) >= 2
-);
 
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
@@ -800,7 +799,6 @@ comment on table public.tenant_admin_assignments is
 comment on table public.tenant_admin_operation_attachments is
   'Private attachments associated with tenant administrator management operations.';
 
-);
 
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
@@ -1130,7 +1128,6 @@ comment on table public.tenant_admin_assignments is
 comment on table public.tenant_admin_operation_attachments is
   'Private attachments associated with tenant administrator management operations.';
 
-);
 
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
@@ -1460,7 +1457,6 @@ comment on table public.tenant_admin_assignments is
 comment on table public.tenant_admin_operation_attachments is
   'Private attachments associated with tenant administrator management operations.';
 
-);
 
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
@@ -1790,7 +1786,6 @@ comment on table public.tenant_admin_assignments is
 comment on table public.tenant_admin_operation_attachments is
   'Private attachments associated with tenant administrator management operations.';
 
-);
 
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
@@ -2120,7 +2115,6 @@ comment on table public.tenant_admin_assignments is
 comment on table public.tenant_admin_operation_attachments is
   'Private attachments associated with tenant administrator management operations.';
 
-);
 
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
