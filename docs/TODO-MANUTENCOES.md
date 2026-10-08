@@ -29,3 +29,11 @@
 | Documentação / Base de Conhecimento | Concluído | KB e TODO atualizados |
 | Deploy Vercel | Não iniciado | Projeto mantém deploy manual |
 | Validação de produção após deploy | Não iniciado | Depende do deploy manual |
+
+
+### Onboarding separado
+- Criação de empresa sem administrador: **Concluído** — RPC/Edge/UI ajustados.
+- Status inicial configuring: **Concluído** — enum e fluxo aplicados.
+- Primeiro administrador ativa empresa: **Concluído** — RPC validada com fixture real de banco.
+- Remover legado de provisionamento empresa+admin: **Concluído** — assinatura antiga removida do banco.
+- E2E navegador do onboarding separado: **Aguardando validação**.
