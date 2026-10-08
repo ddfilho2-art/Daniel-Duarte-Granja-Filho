@@ -28,13 +28,13 @@ serve a aplicação.
 
 O frontend identifica o tenant por:
 
-`/t/{slug}`
+`/empresa/{slug}`
 
 Exemplo conceitual:
 
-- `/t/empresa-a`;
-- `/t/empresa-b`;
-- `/t/empresa-c`.
+- `/empresa/empresa-a`;
+- `/empresa/empresa-b`;
+- `/empresa/empresa-c`.
 
 O `TenantContext` consulta o tenant pelo slug e aplica:
 
@@ -98,7 +98,7 @@ Em mudanças de banco críticas, deve existir compatibilidade temporária entre 
 
 O sistema já trabalha com slug em caminho:
 
-`recrutaai.../t/empresa-a`
+`recrutaai.../empresa/empresa-a`
 
 ### Evolução recomendada
 
@@ -186,3 +186,6 @@ Para crescimento, devemos monitorar:
 - limites do plano Vercel/Supabase.
 
 O Supabase recomenda indexar colunas usadas em RLS e avaliar o plano de execução das políticas para evitar degradação com crescimento. citeturn0search0
+
+
+> **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
