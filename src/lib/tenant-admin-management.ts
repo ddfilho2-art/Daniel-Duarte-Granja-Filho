@@ -118,44 +118,13 @@ export function revokeTenantAdmin(payload: {
   );
 }
 
-export async function uploadTenantAdminAttachment(
-  operationId: string,
-  file: File,
-): Promise<AdminAttachment> {
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
-  const path = \`\${operationId}/\${crypto.randomUUID()}-\${safeName}\`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("tenant-admin-attachments")
-    .upload(path, file, {
-      contentType: file.type || "application/octet-stream",
-      upsert: false,
-    });
-
-  if (uploadError) throw new Error(uploadError.message);
-
-  try {
-    return await callEdge<AdminAttachment>("register_attachment", {
-      tenantId: "",
-      operationId: operationId,
-      storagePath: path,
-      fileName: file.name,
-      mimeType: file.type || null,
-      sizeBytes: file.size,
-    });
-  } catch (error) {
-    await supabase.storage.from("tenant-admin-attachments").remove([path]);
-    throw error;
-  }
-}
-
 export async function createTenantAdminAttachment(
   tenantId: string,
   operationId: string,
   file: File,
 ): Promise<AdminAttachment> {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 180);
-  const path = \`\${operationId}/\${crypto.randomUUID()}-\${safeName}\`;
+  const path = operationId + "/" + crypto.randomUUID() + "-" + safeName;
 
   const { error: uploadError } = await supabase.storage
     .from("tenant-admin-attachments")
