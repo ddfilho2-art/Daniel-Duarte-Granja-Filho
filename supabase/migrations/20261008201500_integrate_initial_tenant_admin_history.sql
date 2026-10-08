@@ -90,3 +90,5 @@ to service_role;
 
 revoke all on function public.provision_tenant(uuid, public.tenant_kind, text, text, text, text, uuid)
 from public, anon, authenticated;
+
+drop function if exists public.provision_tenant(uuid, public.tenant_kind, text, text, text, text, uuid);
