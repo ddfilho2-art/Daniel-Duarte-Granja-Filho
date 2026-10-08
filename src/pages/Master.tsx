@@ -266,12 +266,22 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [slugError, setSlugError] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setSuccess("");
+
+    if (!/^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/.test(form.slug)) {
+      setError(
+        "O slug deve ter 3 a 63 caracteres e usar somente letras minúsculas, números e hífen, sem hífen no início ou no fim.",
+      );
+      setLoading(false);
+      return;
+    }
+
     try {
       await provisionTenant(form);
       setSuccess("Empresa provisionada com sucesso!");
@@ -330,17 +340,34 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
           value={form.displayName}
           onChange={(v) => setForm({ ...form, displayName: v })}
         />
-        <FormField
-          label="Slug (URL)"
-          value={form.slug}
-          onChange={(v) =>
-            setForm({
-              ...form,
-              slug: v.toLowerCase().replace(/[^a-z0-9-]/g, "-"),
-            })
-          }
-          placeholder="empresa-x"
-        />
+        <div>
+          <FormField
+            label="Slug da empresa"
+            value={form.slug}
+            onChange={(v) => {
+              const slug = v.toLowerCase();
+              setForm({ ...form, slug });
+              setSlugError(
+                slug && !/^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]?$/.test(slug)
+                  ? "Use somente letras minúsculas, números e hífen."
+                  : "",
+              );
+            }}
+            placeholder="empresa-x"
+          />
+          <p className="mt-1 text-xs text-slate-500">
+            Informe apenas o identificador da empresa. Não digite
+            <code className="mx-1 rounded bg-slate-100 px-1">https://</code>
+            nem <code className="mx-1 rounded bg-slate-100 px-1">/</code>.
+          </p>
+          {slugError && (
+            <p className="mt-1 text-xs text-red-600">{slugError}</p>
+          )}
+          <p className="mt-1 text-xs text-slate-600">
+            URL:{" "}
+            <code>{window.location.origin}/t/{form.slug || "empresa-x"}</code>
+          </p>
+        </div>
         <FormField
           label="E-mail do Admin"
           value={form.adminEmail}
@@ -365,7 +392,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
         </button>
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !!slugError}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
           {loading ? "Provisionando..." : "Provisionar"}
