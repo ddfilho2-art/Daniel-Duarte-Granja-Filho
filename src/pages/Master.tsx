@@ -305,7 +305,6 @@ export function MasterTenantList() {
 // A senha fica apenas em memória durante a navegação SPA e nunca é gravada no storage.
 const TENANT_PROVISION_DRAFT_KEY = "recrutaai:master:tenant-provision-draft";
 const TENANT_PROVISION_FORM_OPEN_KEY = "recrutaai:master:tenant-provision-form-open";
-let tenantProvisionPasswordInMemory = "";
 
 function isTenantProvisionFormOpen(): boolean {
   try {
@@ -317,11 +316,8 @@ function isTenantProvisionFormOpen(): boolean {
 
 function setTenantProvisionFormOpen(open: boolean) {
   try {
-    if (open) {
-      sessionStorage.setItem(TENANT_PROVISION_FORM_OPEN_KEY, "true");
-    } else {
-      sessionStorage.removeItem(TENANT_PROVISION_FORM_OPEN_KEY);
-    }
+    if (open) sessionStorage.setItem(TENANT_PROVISION_FORM_OPEN_KEY, "true");
+    else sessionStorage.removeItem(TENANT_PROVISION_FORM_OPEN_KEY);
   } catch {
     // O estado React continua funcionando durante a montagem atual.
   }
@@ -333,30 +329,26 @@ const emptyTenantProvisionForm = (): ProvisionPayload => ({
   legalName: "",
   displayName: "",
   slug: "",
-  adminEmail: "",
-  adminPassword: "",
 });
 
 function loadTenantProvisionDraft(): ProvisionPayload {
   const empty = emptyTenantProvisionForm();
   try {
     const saved = sessionStorage.getItem(TENANT_PROVISION_DRAFT_KEY);
-    if (!saved) return { ...empty, adminPassword: tenantProvisionPasswordInMemory };
+    if (!saved) return empty;
     const parsed = JSON.parse(saved) as Partial<ProvisionPayload>;
     return {
       ...empty,
       ...parsed,
       kind:
         parsed.kind === "occupational_health_provider" ? parsed.kind : "employer",
-      adminPassword: tenantProvisionPasswordInMemory,
     };
   } catch {
-    return { ...empty, adminPassword: tenantProvisionPasswordInMemory };
+    return empty;
   }
 }
 
 function saveTenantProvisionDraft(form: ProvisionPayload) {
-  tenantProvisionPasswordInMemory = form.adminPassword;
   try {
     sessionStorage.setItem(
       TENANT_PROVISION_DRAFT_KEY,
@@ -366,16 +358,14 @@ function saveTenantProvisionDraft(form: ProvisionPayload) {
         legalName: form.legalName,
         displayName: form.displayName,
         slug: form.slug,
-        adminEmail: form.adminEmail,
       }),
     );
   } catch {
-    // O rascunho continua preservado em memória durante a navegação SPA.
+    // O rascunho continua preservado durante a navegação SPA.
   }
 }
 
 function clearTenantProvisionDraft() {
-  tenantProvisionPasswordInMemory = "";
   setTenantProvisionFormOpen(false);
   try {
     sessionStorage.removeItem(TENANT_PROVISION_DRAFT_KEY);
@@ -417,8 +407,10 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
     try {
       await provisionTenant(form);
       clearTenantProvisionDraft();
-      setSuccess("Empresa provisionada com sucesso!");
-      setTimeout(onCreated, 1500);
+      setSuccess(
+        "Empresa criada em configuração. Agora cadastre o primeiro administrador na seção Administradores das Empresas.",
+      );
+      setTimeout(onCreated, 1800);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -427,13 +419,13 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-slate-200 bg-white p-6 space-y-4"
-    >
-      <h2 className="text-lg font-semibold text-slate-800">
-        Provisionar Nova Empresa
-      </h2>
+    <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-800">Nova Empresa</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Cadastre somente os dados da empresa. O primeiro administrador será incluído separadamente.
+        </p>
+      </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -493,26 +485,11 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
             <code className="mx-1 rounded bg-slate-100 px-1">https://</code>
             nem <code className="mx-1 rounded bg-slate-100 px-1">/</code>.
           </p>
-          {slugError && (
-            <p className="mt-1 text-xs text-red-600">{slugError}</p>
-          )}
+          {slugError && <p className="mt-1 text-xs text-red-600">{slugError}</p>}
           <p className="mt-1 text-xs text-slate-600">
-            URL:{" "}
-            <code>{window.location.origin}/empresa/{form.slug || "empresa-x"}</code>
+            URL: <code>{window.location.origin}/empresa/{form.slug || "empresa-x"}</code>
           </p>
         </div>
-        <FormField
-          label="E-mail do Admin"
-          value={form.adminEmail}
-          onChange={(v) => setForm({ ...form, adminEmail: v })}
-          type="email"
-        />
-        <FormField
-          label="Senha do Admin"
-          value={form.adminPassword}
-          onChange={(v) => setForm({ ...form, adminPassword: v })}
-          type="password"
-        />
       </div>
 
       <div className="flex justify-end gap-3">
@@ -528,7 +505,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
           disabled={loading || !!slugError}
           className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
         >
-          {loading ? "Provisionando..." : "Provisionar"}
+          {loading ? "Criando..." : "Criar Empresa"}
         </button>
       </div>
     </form>
