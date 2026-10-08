@@ -182,6 +182,18 @@ export function MasterTenantList() {
       setActionLoading(null);
     }
   };
+  const handleEndContract = async (id: string) => {
+    if (!confirm("Encerrar o contrato desta empresa? O acesso será bloqueado imediatamente e a empresa permanecerá no histórico.")) return;
+    setActionLoading(id);
+    try {
+      await endTenantContract(id);
+      await fetchTenants();
+    } catch (err) {
+      alert("Erro: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -218,6 +230,8 @@ export function MasterTenantList() {
                   <th className="px-4 py-2">Slug</th>
                   <th className="px-4 py-2">Tipo</th>
                   <th className="px-4 py-2">Status</th>
+                  <th className="px-4 py-2">Criação</th>
+                  <th className="px-4 py-2">Encerramento do contrato</th>
                   <th className="px-4 py-2">Ações</th>
                 </tr>
               </thead>
@@ -229,9 +243,15 @@ export function MasterTenantList() {
                     <td className="px-4 py-2 font-mono text-xs">{t.slug}</td>
                     <td className="px-4 py-2">{t.kind === "employer" ? "Empregador" : "Clínica"}</td>
                     <td className="px-4 py-2"><StatusBadge status={t.status} /></td>
+                    <td className="px-4 py-2 text-xs text-slate-500">
+                      {t.created_at ? new Date(t.created_at).toLocaleDateString("pt-BR") : "-"}
+                    </td>
+                    <td className="px-4 py-2 text-xs text-slate-500">
+                      {t.contract_ended_at ? new Date(t.contract_ended_at).toLocaleDateString("pt-BR") : "-"}
+                    </td>
                     <td className="px-4 py-2">
                       <div className="flex gap-2">
-                        {t.status === "active" ? (
+                        {t.status === "active" && (
                           <button
                             onClick={() => handleSuspend(t.id)}
                             disabled={actionLoading === t.id}
@@ -239,13 +259,23 @@ export function MasterTenantList() {
                           >
                             Suspender
                           </button>
-                        ) : (
+                        )}
+                        {t.status === "suspended" && (
                           <button
                             onClick={() => handleActivate(t.id)}
                             disabled={actionLoading === t.id}
                             className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50"
                           >
                             Reativar
+                          </button>
+                        )}
+                        {t.status !== "archived" && (
+                          <button
+                            onClick={() => handleEndContract(t.id)}
+                            disabled={actionLoading === t.id}
+                            className="rounded px-2 py-1 text-xs bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-50"
+                          >
+                            Encerrar contrato
                           </button>
                         )}
                         <a
@@ -761,7 +791,7 @@ function StatusBadge({ status }: { status: string }) {
     published: "Publicado",
     suspended: "Suspenso",
     draft: "Draft",
-    archived: "Arquivado",
+    archived: "Contrato encerrado",
   };
   return (
     <span
