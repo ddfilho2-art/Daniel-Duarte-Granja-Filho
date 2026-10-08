@@ -260,17 +260,14 @@ begin
     else
       update public.tenant_memberships
       set
-        roles = case
-          when roles @> array['tenant_admin'::public.tenant_role']
-            then roles
-          else roles || array['tenant_admin'::public.tenant_role]
-        end,
+        roles = array_append(roles, 'tenant_admin'::public.tenant_role),
         status = 'active',
         activated_at = coalesce(activated_at, coalesce(p_effective_at, v_now)),
         revoked_at = null,
         suspended_at = null,
         updated_at = v_now
-      where id = v_membership_id;
+      where id = v_membership_id
+        and not (roles @> array['tenant_admin'::public.tenant_role]);
     end if;
   end if;
 
