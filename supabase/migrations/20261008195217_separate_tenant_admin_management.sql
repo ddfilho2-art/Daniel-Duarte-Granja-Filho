@@ -240,6 +240,7 @@ as 'declare
   v_membership_id uuid;
   v_now timestamptz := now();
   v_remaining_roles public.tenant_role[];
+  v_tenant_status public.tenant_status;
 begin
   if not exists (
     select 1 from public.platform_user_roles pur
@@ -259,8 +260,17 @@ begin
 
   perform pg_advisory_xact_lock(hashtextextended(''tenant-admin:'' || p_tenant_id::text, 0));
 
-  if not exists (select 1 from public.tenants where id = p_tenant_id) then
+  select status into v_tenant_status
+  from public.tenants
+  where id = p_tenant_id
+  for update;
+
+  if not found then
     raise exception using errcode = ''P0002'', message = ''tenant_not_found'';
+  end if;
+
+  if v_tenant_status = ''archived'' and p_operation_type in (''add'', ''replace'') then
+    raise exception using errcode = ''40901'', message = ''contract_ended'';
   end if;
 
   if p_operation_type in (''add'', ''replace'') then
@@ -297,6 +307,13 @@ begin
         suspended_at = null,
         updated_at = v_now
       where id = v_membership_id;
+    end if;
+
+    if v_tenant_status = ''configuring'' then
+      update public.tenants
+      set status = ''active'', updated_at = v_now
+      where id = p_tenant_id;
+      v_tenant_status := ''active'';
     end if;
   end if;
 
@@ -444,7 +461,8 @@ begin
     ''assignment_id'', v_assignment_id,
     ''tenant_id'', p_tenant_id,
     ''target_user_id'', p_target_user_id,
-    ''previous_user_id'', p_previous_user_id
+    ''previous_user_id'', p_previous_user_id,
+    ''tenant_status'', v_tenant_status
   );
 end;'
 
