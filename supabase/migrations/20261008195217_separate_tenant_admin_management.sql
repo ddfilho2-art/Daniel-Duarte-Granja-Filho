@@ -185,12 +185,41 @@ deferrable initially deferred
 for each row
 execute function public.enforce_active_tenant_admin();
 
+create or replace function public.enforce_active_tenant_admin_status()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as 'declare
+  v_tenant_id uuid;
+begin
+  v_tenant_id := coalesce(new.id, old.id);
+
+  if exists (
+    select 1 from public.tenants
+    where id = v_tenant_id and status = ''active''
+  )
+  and not exists (
+    select 1
+    from public.tenant_memberships tm
+    where tm.tenant_id = v_tenant_id
+      and tm.status = ''active''
+      and tm.roles @> ARRAY[''tenant_admin'']::public.tenant_role[]
+  ) then
+    raise exception using errcode = ''23514'', message = ''active_tenant_requires_active_admin'';
+  end if;
+
+  return coalesce(new, old);
+end;';
+
+revoke all on function public.enforce_active_tenant_admin_status() from public, anon, authenticated;
+
 drop trigger if exists tenants_require_admin on public.tenants;
 create constraint trigger tenants_require_admin
 after insert or update of status on public.tenants
 deferrable initially deferred
 for each row
-execute function public.enforce_active_tenant_admin();
+execute function public.enforce_active_tenant_admin_status();
 
 create or replace function public.record_tenant_admin_operation(
   p_actor_id uuid,
