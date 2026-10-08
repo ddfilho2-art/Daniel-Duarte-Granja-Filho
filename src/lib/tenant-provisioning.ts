@@ -12,6 +12,8 @@ export interface TenantListItem {
   status: string;
   created_at: string;
   updated_at: string;
+  contract_ended_at?: string | null;
+  archived_at?: string | null;
 }
 
 export interface TenantDetail extends TenantListItem {
