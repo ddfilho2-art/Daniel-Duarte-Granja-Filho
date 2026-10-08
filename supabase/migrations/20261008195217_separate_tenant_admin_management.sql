@@ -210,6 +210,7 @@ as 'declare
   v_assignment_id uuid;
   v_membership_id uuid;
   v_now timestamptz := now();
+  v_remaining_roles public.tenant_role[];
 begin
   if not exists (
     select 1 from public.platform_user_roles pur
@@ -250,7 +251,7 @@ begin
       )
       values (
         p_tenant_id, p_target_user_id,
-        array[''tenant_admin''::public.tenant_role],
+        ARRAY[''tenant_admin'']::public.tenant_role[],
         ''active'', p_actor_id, coalesce(p_effective_at, v_now)
       )
       returning id into v_membership_id;
@@ -258,7 +259,7 @@ begin
       update public.tenant_memberships
       set
         roles = case
-          when roles @> array[''tenant_admin''::public.tenant_role''] then roles
+          when roles @> ARRAY[''tenant_admin'']::public.tenant_role[] then roles
           else array_append(roles, ''tenant_admin''::public.tenant_role)
         end,
         status = ''active'',
@@ -280,7 +281,7 @@ begin
       where tm.tenant_id = p_tenant_id
         and tm.user_id = p_previous_user_id
         and tm.status = ''active''
-        and tm.roles @> array[''tenant_admin''::public.tenant_role]
+        and tm.roles @> ARRAY[''tenant_admin'']::public.tenant_role[]
     ) then
       raise exception using errcode = ''22023'', message = ''previous_admin_not_active'';
     end if;
@@ -301,7 +302,7 @@ begin
          select 1 from public.tenant_memberships tm
          where tm.id = v_membership_id
            and tm.status = ''active''
-           and tm.roles @> array[''tenant_admin''::public.tenant_role]
+           and tm.roles @> ARRAY[''tenant_admin'']::public.tenant_role[]
        ) then
       raise exception using errcode = ''22023'', message = ''target_admin_not_active'';
     end if;
@@ -310,7 +311,7 @@ begin
       select count(*) from public.tenant_memberships tm
       where tm.tenant_id = p_tenant_id
         and tm.status = ''active''
-        and tm.roles @> array[''tenant_admin''::public.tenant_role]
+        and tm.roles @> ARRAY[''tenant_admin'']::public.tenant_role[]
     ) <= 1
     and exists (
       select 1 from public.tenants t
@@ -349,8 +350,16 @@ begin
       and user_id = p_previous_user_id
       and ends_at is null;
 
+    select array_remove(roles, ''tenant_admin''::public.tenant_role)
+    into v_remaining_roles
+    from public.tenant_memberships
+    where tenant_id = p_tenant_id and user_id = p_previous_user_id
+    for update;
+
     update public.tenant_memberships
-    set roles = array_remove(roles, ''tenant_admin''::public.tenant_role),
+    set roles = v_remaining_roles,
+        status = case when cardinality(v_remaining_roles) = 0 then ''revoked'' else status end,
+        revoked_at = case when cardinality(v_remaining_roles) = 0 then coalesce(p_effective_at, v_now) else revoked_at end,
         updated_at = v_now
     where tenant_id = p_tenant_id and user_id = p_previous_user_id;
 
@@ -364,6 +373,12 @@ begin
     returning id into v_assignment_id;
 
   elsif p_operation_type = ''revoke'' then
+    select array_remove(roles, ''tenant_admin''::public.tenant_role)
+    into v_remaining_roles
+    from public.tenant_memberships
+    where tenant_id = p_tenant_id and user_id = p_target_user_id
+    for update;
+
     update public.tenant_admin_assignments
     set ends_at = coalesce(p_effective_at, v_now),
         ended_by = p_actor_id,
@@ -373,7 +388,9 @@ begin
       and ends_at is null;
 
     update public.tenant_memberships
-    set roles = array_remove(roles, ''tenant_admin''::public.tenant_role),
+    set roles = v_remaining_roles,
+        status = case when cardinality(v_remaining_roles) = 0 then ''revoked'' else status end,
+        revoked_at = case when cardinality(v_remaining_roles) = 0 then coalesce(p_effective_at, v_now) else revoked_at end,
         updated_at = v_now
     where tenant_id = p_tenant_id and user_id = p_target_user_id;
   end if;
@@ -400,7 +417,7 @@ begin
     ''target_user_id'', p_target_user_id,
     ''previous_user_id'', p_previous_user_id
   );
-end;';
+end;'
 
 revoke all on function public.record_tenant_admin_operation(uuid, uuid, text, uuid, uuid, timestamptz, text)
   from public, anon, authenticated;
