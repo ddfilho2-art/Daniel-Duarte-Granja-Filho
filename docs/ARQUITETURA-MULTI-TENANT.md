@@ -187,7 +187,7 @@ Não devemos apagar essa flexibilidade sem avaliar se ela é necessária para fu
 
 Hoje o frontend resolve o tenant por URL:
 
-`/t/{slug}`
+`/empresa/{slug}`
 
 O `TenantContext` consulta:
 
@@ -255,4 +255,7 @@ Essa abordagem é compatível com a arquitetura de plataformas multi-tenant da V
 - `tenant_memberships` recebe o papel `candidate` somente na empresa em que o candidato se registra.
 - A mesma pessoa pode ter várias fichas de candidato, uma por empresa, sem compartilhar currículo entre tenants.
 - O UUID do Auth não é mais usado como `candidato_id`; a ficha de candidato possui seu próprio identificador.
-- O candidato só entra em `/candidato` dentro do portal `/t/{slug}` da empresa.
+- O candidato só entra em `/candidato` dentro do portal `/empresa/{slug}` da empresa.
+
+
+> **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
