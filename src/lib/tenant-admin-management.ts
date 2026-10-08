@@ -148,3 +148,31 @@ export async function createTenantAdminAttachment(
     throw error;
   }
 }
+
+
+export async function listTenantAdminAttachments(
+  operationId: string,
+): Promise<AdminAttachment[]> {
+  const { data, error } = await supabase
+    .from("tenant_admin_operation_attachments")
+    .select("*")
+    .eq("operation_id", operationId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function createTenantAdminAttachmentSignedUrl(
+  storagePath: string,
+): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("tenant-admin-attachments")
+    .createSignedUrl(storagePath, 300);
+
+  if (error || !data?.signedUrl) {
+    throw new Error(error?.message || "Não foi possível abrir o anexo.");
+  }
+
+  return data.signedUrl;
+}
