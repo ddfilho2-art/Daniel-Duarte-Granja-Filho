@@ -402,12 +402,15 @@ begin
     where tenant_id = p_tenant_id and user_id = p_previous_user_id
     for update;
 
-    update public.tenant_memberships
-    set roles = v_remaining_roles,
-        status = case when cardinality(v_remaining_roles) = 0 then ''revoked'' else status end,
-        revoked_at = case when cardinality(v_remaining_roles) = 0 then coalesce(p_effective_at, v_now) else revoked_at end,
-        updated_at = v_now
-    where tenant_id = p_tenant_id and user_id = p_previous_user_id;
+    if cardinality(v_remaining_roles) = 0 then
+      delete from public.tenant_memberships
+      where tenant_id = p_tenant_id and user_id = p_previous_user_id;
+    else
+      update public.tenant_memberships
+      set roles = v_remaining_roles,
+          updated_at = v_now
+      where tenant_id = p_tenant_id and user_id = p_previous_user_id;
+    end if;
 
     insert into public.tenant_admin_assignments (
       tenant_id, user_id, membership_id, starts_at, created_by, start_operation_id
@@ -433,12 +436,15 @@ begin
       and user_id = p_target_user_id
       and ends_at is null;
 
-    update public.tenant_memberships
-    set roles = v_remaining_roles,
-        status = case when cardinality(v_remaining_roles) = 0 then ''revoked'' else status end,
-        revoked_at = case when cardinality(v_remaining_roles) = 0 then coalesce(p_effective_at, v_now) else revoked_at end,
-        updated_at = v_now
-    where tenant_id = p_tenant_id and user_id = p_target_user_id;
+    if cardinality(v_remaining_roles) = 0 then
+      delete from public.tenant_memberships
+      where tenant_id = p_tenant_id and user_id = p_target_user_id;
+    else
+      update public.tenant_memberships
+      set roles = v_remaining_roles,
+          updated_at = v_now
+      where tenant_id = p_tenant_id and user_id = p_target_user_id;
+    end if;
   end if;
 
   insert into public.tenant_audit_logs (
