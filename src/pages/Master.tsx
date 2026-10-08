@@ -24,6 +24,7 @@ import {
   type BrandingDraftPayload,
 } from "../lib/tenant-provisioning";
 import { supabase } from "../lib/supabase";
+import DFLlogo from "../assets/DFLlogo.svg";
 import {
   listTenantAdmins,
   listTenantAdminHistory,
@@ -672,7 +673,7 @@ export function MasterBrandingEditor() {
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-3">Prévia da marca</p>
                 {logoPreview ? <img src={logoPreview} alt="Prévia do logo da empresa" className="mx-auto max-h-20 max-w-full object-contain" /> : <div className="py-5 text-sm text-slate-400">O logo escolhido aparecerá aqui.</div>}
                 <div className="mt-3 border-t border-slate-200 pt-3">
-                  <img src="/logo.png" alt="Recruta AÍ" className="mx-auto h-7 max-w-36 object-contain" />
+                  <img src={DFLlogo} alt="Recruta AÍ" className="mx-auto h-7 max-w-36 object-contain" />
                   <p className="mt-1 text-xs text-slate-500">Recruta AÍ — plataforma de recrutamento</p>
                 </div>
               </div>
