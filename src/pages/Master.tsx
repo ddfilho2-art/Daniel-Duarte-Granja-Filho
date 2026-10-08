@@ -279,6 +279,12 @@ export function MasterTenantList() {
                           </button>
                         )}
                         <a
+                          href={`/master/administradores?tenant=${t.id}`}
+                          className="rounded px-2 py-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
+                        >
+                          Administradores
+                        </a>
+                        <a
                           href={`/empresa/${t.slug}`}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -892,7 +898,13 @@ export function MasterTenantAdminManagement() {
 
   useEffect(() => {
     listTenants()
-      .then(setTenants)
+      .then((items) => {
+        setTenants(items);
+        const requestedTenant = new URLSearchParams(window.location.search).get("tenant");
+        if (requestedTenant && items.some((tenant) => tenant.id === requestedTenant)) {
+          setSelectedTenant(requestedTenant);
+        }
+      })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)));
   }, []);
 
