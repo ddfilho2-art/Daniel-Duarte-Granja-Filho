@@ -46,7 +46,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function env(name: string): string {
   const value = Deno.env.get(name)?.trim();
-  if (!value) throw new Error(\`missing_secret:\${name}\`);
+  if (!value) throw new Error("missing_secret:" + name);
   return value;
 }
 
