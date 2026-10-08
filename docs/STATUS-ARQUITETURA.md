@@ -22,7 +22,7 @@ A arquitetura, porém, ainda não está alinhada 100% ao modelo de negócio defi
 | Clínica | PARCIAL | estrutura suporta múltiplos providers; negócio atual prevê equipe clínica comum |
 | RLS | PARCIAL | isolamento estrutural validado; ainda há revisão contínua de policies públicas e SECURITY DEFINER |
 | Branding por empresa | OK | tenant branding versionado |
-| URL por empresa | OK | `/t/{slug}` |
+| URL por empresa | OK | `/empresa/{slug}` |
 | Deploy multi-tenant | OK | uma aplicação Vercel atende todos os tenants |
 | Domínio personalizado | FUTURO | ainda não necessário |
 | Gestão de usuários | OK/PARCIAL | backend protegido e escopos consolidados; UI completa ainda requer homologação funcional |
@@ -691,3 +691,6 @@ Portanto, o status correto continua sendo:
 - Base de Conhecimento — **Concluído**
 - Deploy — **Concluído**
 - Validação em produção — **Aguardando validação**
+
+
+> **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
