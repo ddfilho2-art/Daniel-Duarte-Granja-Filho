@@ -97,3 +97,14 @@ A separação elimina o acoplamento entre cadastro empresarial e identidade do a
 
 ### Correção importante
 O membership de um administrador revogado que não possui outros papéis não pode receber `roles=[]`, porque existe constraint de papéis não vazios. Nesse caso o membership é removido; a história permanece nas tabelas de administração e a identidade Auth não é apagada por sair de uma empresa.
+
+
+## 2026-10-08 — Build Vercel: export ausente de endTenantContract
+
+**Sintoma:** Vite/Rollup falhou em `src/pages/Master.tsx:18` com `"endTenantContract" is not exported by "src/lib/tenant-provisioning.ts"`.
+
+**Causa-raiz:** a tela já importava e chamava a operação de encerramento do contrato, e a Edge Function `tenant-provisioning` já implementava a ação `end_contract`, mas faltava a função exportada no módulo cliente `src/lib/tenant-provisioning.ts`. Não era erro de banco ou da Edge Function.
+
+**Correção:** adicionada `endTenantContract(tenantId)`, delegando a `callEdge("end_contract", { tenantId })`. Alteração na `main`, commit `a2d7dcc7d879b0d828472cf2126e5cb2cd834e6b`.
+
+**Validação:** inspeção confirmou que a ação `end_contract` já existe na Edge Function e a exportação foi adicionada ao módulo importado. O build após a correção ainda precisa ser executado pelo próximo build Vercel/CI; não marcar como build aprovado antes disso.
