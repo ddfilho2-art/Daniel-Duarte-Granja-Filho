@@ -46,6 +46,8 @@ const MasterBrandingEditor = lazyNamed(
   "MasterBrandingEditor",
 );
 
+const MasterProfile = lazyNamed(() => import("./pages/PerfilAdmin"), "PerfilAdmin");
+
 const AdminDashboard = lazyNamed(() => import("./pages/Admin"), "AdminDashboard");
 const AdminTransferencias = lazyNamed(
   () => import("./pages/Admin"),
@@ -301,7 +303,8 @@ const App = () => {
             >
               <Route index element={<MasterDashboard />} />
               <Route path="tenants" element={<MasterTenantList />} />
-              <Route path="branding" element={<MasterBrandingEditor />} />\n              <Route path="perfil" element={<MasterProfile />} />
+              <Route path="branding" element={<MasterBrandingEditor />} />
+              <Route path="perfil" element={<MasterProfile />} />
             </Route>
 
             <Route
