@@ -45,6 +45,7 @@ export interface BrandingDraftPayload {
   secondary_color?: string;
   link_color?: string;
   focus_ring_color?: string;
+  logo_primary_path?: string;
 }
 
 interface EdgeResponse {
