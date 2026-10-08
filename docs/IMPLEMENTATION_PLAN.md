@@ -11,8 +11,8 @@ Transformar a aplicação atual, criada para uma única empresa e com regras de
 negócio concentradas no frontend, em uma plataforma de recrutamento:
 
 - multi-tenant, com isolamento integral entre empresas;
-- acessada por URL canônica no formato `/t/:empresa`, por exemplo
-  `https://processflow-hub.vercel.app/t/empresa-x`;
+- acessada por URL canônica no formato `/empresa/:empresa`, por exemplo
+  `https://processflow-hub.vercel.app/empresa/empresa-x`;
 - administrada por um `Platform Master Admin`;
 - com identidade visual individual por empresa, configurada pelo Master Admin;
 - com administradores titulares e substitutos por empresa;
@@ -152,7 +152,7 @@ Ao trabalhar em qualquer item:
 
 | ID | Status | Decisão |
 |---|---|---|
-| ARC-001 | ✅ | Usar rota canônica `/t/:tenantSlug`, não `\empresa` |
+| ARC-001 | ✅ | Usar rota canônica `/empresa/:tenantSlug`, não `\empresa` |
 | ARC-002 | ✅ | Manter uma única aplicação Vercel e um único projeto Supabase inicialmente |
 | ARC-003 | ✅ | Isolamento principal no PostgreSQL com `tenant_id` + RLS |
 | ARC-004 | ✅ | Clínica ocupacional recebe acesso por encaminhamento, não por membership global no tenant contratante |
@@ -175,11 +175,11 @@ Ao trabalhar em qualquer item:
 ```text
 https://processflow-hub.vercel.app/                 -> portal/plataforma
 https://processflow-hub.vercel.app/master           -> Master Admin
-https://processflow-hub.vercel.app/t/empresa-x      -> site público da empresa
-https://processflow-hub.vercel.app/t/empresa-x/login
-https://processflow-hub.vercel.app/t/empresa-x/admin
-https://processflow-hub.vercel.app/t/empresa-x/rh
-https://processflow-hub.vercel.app/t/empresa-x/candidato
+https://processflow-hub.vercel.app/empresa/empresa-x      -> site público da empresa
+https://processflow-hub.vercel.app/empresa/empresa-x/login
+https://processflow-hub.vercel.app/empresa/empresa-x/admin
+https://processflow-hub.vercel.app/empresa/empresa-x/rh
+https://processflow-hub.vercel.app/empresa/empresa-x/candidato
 https://processflow-hub.vercel.app/saude-ocupacional -> portal da clínica
 ```
 
@@ -260,7 +260,7 @@ O caractere `\` não deve ser usado em URL web. O padrão correto é `/`.
 | ID | Status | Ação | Critério de aceite |
 |---|---|---|---|
 | URL-001 | 🔄 | Criar `TenantProvider` | Resolve slug e mantém contexto imutável da navegação |
-| URL-002 | 🔄 | Prefixar rotas públicas e privadas com `/t/:slug` | Links e redirects preservam tenant |
+| URL-002 | 🔄 | Prefixar rotas públicas e privadas com `/empresa/:slug` | Links e redirects preservam tenant |
 | URL-003 | 🔄 | Validar membership após login | Usuário sem vínculo não entra no tenant |
 | URL-004 | 🔄 | Aplicar branding por empresa | Nome, logos e tokens vêm da projeção pública do slug ativo |
 | URL-005 | 🔄 | Aplicar tema aos menus | Sidebar, navegação, estados ativo/hover e textos usam tokens validados |
@@ -409,7 +409,7 @@ As policies deverão exigir simultaneamente:
 | DEP-003 | ⏳ | Configurar secrets das Edge Functions | Secrets server-side por ambiente |
 | DEP-004 | ⏳ | Publicar Edge Functions | Versões e JWT settings corretos |
 | DEP-005 | ⏳ | Configurar Vercel Preview/Production | Variáveis públicas apenas |
-| DEP-006 | ⏳ | Configurar SPA rewrite | Deep links `/t/:slug/...` funcionam |
+| DEP-006 | ⏳ | Configurar SPA rewrite | Deep links `/empresa/:slug/...` funcionam |
 | DEP-007 | ⏳ | Configurar domínios e URLs de Auth | Redirects permitidos e tenant preservado |
 | DEP-008 | ⏳ | Executar smoke test em preview | Tenant A, B, Master e clínica validados |
 | DEP-009 | ⏳ | Promover para produção | Checklist e aprovação registrados |
@@ -513,7 +513,7 @@ Testes negativos obrigatórios:
 1. Admin A tenta consultar/alterar vaga B;
 2. RH A tenta consultar candidato B;
 3. candidato altera `tenant_id` manualmente no payload;
-4. usuário abre URL `/t/tenant-b` mantendo sessão do Tenant A;
+4. usuário abre URL `/empresa/tenant-b` mantendo sessão do Tenant A;
 5. clínica tenta listar vagas/currículos sem referral;
 6. clínica tenta abrir referral de outra clínica;
 7. RH B tenta abrir chat médico do Tenant A;
@@ -597,7 +597,7 @@ Todos devem ser negados no banco/servidor, não apenas ocultados na UI.
 
 - criado `docs/IMPLEMENTATION_PLAN.md`;
 - consolidado o objetivo multi-tenant e o portal da clínica;
-- adotada a rota `/t/:tenantSlug`;
+- adotada a rota `/empresa/:tenantSlug`;
 - registrada a identidade visual por tenant, editável pelo Platform Master Admin;
 - definidos tokens iniciais para menu lateral, página inicial e logos;
 - proibido CSS arbitrário e previsto versionamento/rollback do tema;
@@ -627,7 +627,7 @@ Todos devem ser negados no banco/servidor, não apenas ocultados na UI.
 
 - itens `URL-001`, `URL-002`, `URL-004` a `URL-010` movidos para
   `🔄 Em andamento`;
-- definida a utilização de `BrowserRouter.basename` em `/t/:slug` para preservar
+- definida a utilização de `BrowserRouter.basename` em `/empresa/:slug` para preservar
   links existentes;
 - definido header dinâmico `x-tenant-id` no cliente Supabase após resolução do
   slug;
@@ -638,7 +638,7 @@ Todos devem ser negados no banco/servidor, não apenas ocultados na UI.
 - `SEC-011` e `URL-003` movidos para `🔄 Em andamento`;
 - autenticação passará a depender de uma sessão Supabase válida, e não do JSON em
   `localStorage`;
-- rotas privadas em `/t/:slug` passarão a exigir membership ativa no tenant.
+- rotas privadas em `/empresa/:slug` passarão a exigir membership ativa no tenant.
 
 ## 2026-08-01 — Sessão e autorização tenant-aware endurecidas
 
@@ -1016,3 +1016,6 @@ aplicados em um banco de staging nem validados com build/testes.
 - **Risco corrigido:** reduzida a possibilidade de criar análises associadas a uma vaga/tenant sem uma candidatura correspondente e corrigido o uso incorreto do contexto de autenticação na RPC de autorização.
 - **Validação de código:** confirmados payload `candidato_id`/`vaga_id`, cliente autenticado para `get_current_tenant_access`, validação tenant/vaga/candidato/candidatura e vínculo `candidatura_id` no insert.
 - **Não realizado:** a Edge Function não foi implantada nesta etapa; deploy/cutover continuam fora do escopo sem autorização explícita.
+
+
+> **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
