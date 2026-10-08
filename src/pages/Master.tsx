@@ -253,20 +253,73 @@ export function MasterTenantList() {
 
 // ── Provision Form ────────────────────────────────────────────────────────────
 
+// Dados não sensíveis sobrevivem à navegação e até a uma atualização da página.
+// A senha fica apenas em memória durante a navegação SPA e nunca é gravada no storage.
+const TENANT_PROVISION_DRAFT_KEY = "recrutaai:master:tenant-provision-draft";
+let tenantProvisionPasswordInMemory = "";
+
+const emptyTenantProvisionForm = (): ProvisionPayload => ({
+  kind: "employer",
+  cnpj: "",
+  legalName: "",
+  displayName: "",
+  slug: "",
+  adminEmail: "",
+  adminPassword: "",
+});
+
+function loadTenantProvisionDraft(): ProvisionPayload {
+  const empty = emptyTenantProvisionForm();
+  try {
+    const saved = sessionStorage.getItem(TENANT_PROVISION_DRAFT_KEY);
+    if (!saved) return { ...empty, adminPassword: tenantProvisionPasswordInMemory };
+    const parsed = JSON.parse(saved) as Partial<ProvisionPayload>;
+    return {
+      ...empty,
+      ...parsed,
+      kind:
+        parsed.kind === "occupational_health_provider" ? parsed.kind : "employer",
+      adminPassword: tenantProvisionPasswordInMemory,
+    };
+  } catch {
+    return { ...empty, adminPassword: tenantProvisionPasswordInMemory };
+  }
+}
+
+function saveTenantProvisionDraft(form: ProvisionPayload) {
+  tenantProvisionPasswordInMemory = form.adminPassword;
+  try {
+    const { adminPassword: _neverPersistPassword, ...safeDraft } = form;
+    sessionStorage.setItem(TENANT_PROVISION_DRAFT_KEY, JSON.stringify(safeDraft));
+  } catch {
+    // O rascunho continua preservado em memória durante a navegação SPA.
+  }
+}
+
+function clearTenantProvisionDraft() {
+  tenantProvisionPasswordInMemory = "";
+  try {
+    sessionStorage.removeItem(TENANT_PROVISION_DRAFT_KEY);
+  } catch {
+    // O formulário ainda pode ser limpo mesmo se o storage estiver indisponível.
+  }
+}
+
 function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
-  const [form, setForm] = useState<ProvisionPayload>({
-    kind: "employer",
-    cnpj: "",
-    legalName: "",
-    displayName: "",
-    slug: "",
-    adminEmail: "",
-    adminPassword: "",
-  });
+  const [form, setForm] = useState<ProvisionPayload>(loadTenantProvisionDraft);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [slugError, setSlugError] = useState("");
+
+  useEffect(() => {
+    saveTenantProvisionDraft(form);
+  }, [form]);
+
+  const cancelForm = () => {
+    clearTenantProvisionDraft();
+    onCreated();
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -284,6 +337,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
 
     try {
       await provisionTenant(form);
+      clearTenantProvisionDraft();
       setSuccess("Empresa provisionada com sucesso!");
       setTimeout(onCreated, 1500);
     } catch (err) {
@@ -385,7 +439,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
       <div className="flex justify-end gap-3">
         <button
           type="button"
-          onClick={onCreated}
+          onClick={cancelForm}
           className="rounded-lg border border-slate-200 px-4 py-2 text-sm hover:bg-slate-50"
         >
           Cancelar
