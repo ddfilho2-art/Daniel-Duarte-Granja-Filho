@@ -41,6 +41,10 @@ const OccupationalHealthPortal = lazyNamed(
 
 const MasterDashboard = lazyNamed(() => import("./pages/Master"), "MasterDashboard");
 const MasterTenantList = lazyNamed(() => import("./pages/Master"), "MasterTenantList");
+const MasterTenantAdminManagement = lazyNamed(
+  () => import("./pages/Master"),
+  "MasterTenantAdminManagement",
+);
 const MasterBrandingEditor = lazyNamed(
   () => import("./pages/Master"),
   "MasterBrandingEditor",
@@ -303,6 +307,7 @@ const App = () => {
             >
               <Route index element={<MasterDashboard />} />
               <Route path="tenants" element={<MasterTenantList />} />
+              <Route path="administradores" element={<MasterTenantAdminManagement />} />
               <Route path="branding" element={<MasterBrandingEditor />} />
               <Route path="perfil" element={<MasterProfile />} />
             </Route>
