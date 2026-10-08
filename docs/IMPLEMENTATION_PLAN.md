@@ -1089,3 +1089,10 @@ aplicados em um banco de staging nem validados com build/testes.
 
 
 > **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
+
+
+### Correção de build — 2026-10-08
+- Erro Vite: `endTenantContract` importado em `Master.tsx`, mas ausente em `tenant-provisioning.ts`.
+- Correção commitada na `main`: `a2d7dcc7d879b0d828472cf2126e5cb2cd834e6b`.
+- Documentação/KB/TODO atualizados.
+- **Build pós-correção:** Aguardando validação; não houve deploy manual nem confirmação de build verde nesta etapa.
