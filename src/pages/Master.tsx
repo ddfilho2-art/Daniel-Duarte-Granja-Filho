@@ -768,6 +768,7 @@ function StatusBadge({ status }: { status: string }) {
     published: "Publicado",
     suspended: "Suspenso",
     draft: "Draft",
+    configuring: "Em configuração",
     archived: "Contrato encerrado",
   };
   return (
