@@ -718,3 +718,37 @@ Portanto, o status correto continua sendo:
 | Deploy produção | Concluído | Usuário realizou deploy manual e confirmou funcionamento em 2026-10-08 |
 | Validação funcional em produção | Parcialmente validado | Confirmação do usuário registrada; matriz individual de rotas pendente |
 | Documentação | Concluído | ADR, arquitetura, deploy, status e plano atualizados |
+
+
+## Manutenção 2026-10-08 — preservar rascunho no cadastro de empresa
+
+### Problema
+Ao abrir o cadastro de empresa em `/master/tenants`, navegar para outra página e retornar, os campos digitados eram perdidos. O formulário também desaparece ao sair da página porque seu componente é desmontado na troca de rota.
+
+### Causa
+Os dados existiam somente no estado local React de `TenantProvisionForm`, sem restauração de rascunho após desmontagem/remontagem do componente.
+
+### Solução implementada
+- `src/pages/Master.tsx`: persistir os campos não secretos do rascunho em `sessionStorage`, para sobreviver à navegação e a atualizações da página na mesma aba.
+- A senha do administrador fica somente em memória JavaScript durante a navegação SPA; não é gravada em `sessionStorage` ou `localStorage`.
+- O rascunho é removido ao cancelar ou após provisionamento bem-sucedido.
+- O fluxo de provisionamento, validação do slug, backend, RLS e regras multi-tenant não foram alterados.
+
+### Validação e limitações
+- Inspeção de código confirmou a causa e a implementação de salvamento/restauração.
+- **Não executado nesta etapa:** build, type-check, teste automatizado de navegação ou teste manual no navegador.
+- A senha é preservada ao navegar entre páginas dentro da mesma sessão SPA. Se a aba for atualizada ou a aplicação for recarregada, os demais campos podem ser restaurados, mas a senha deve ser digitada novamente; essa restrição evita armazenar credenciais no storage do navegador.
+
+### TODO
+| Etapa | Status | Critério |
+|---|---|---|
+| Diagnóstico da perda do formulário | Concluído | Causa localizada no estado local do componente |
+| Implementação do rascunho persistente | Concluído no código | Campos não secretos salvos/restaurados; senha só em memória |
+| Limpeza ao cancelar/concluir | Concluído no código | Rascunho removido nos dois fluxos |
+| Build e type-check | Aguardando validação | CI/build concluído com sucesso |
+| Teste de regressão de navegação | Aguardando validação | Preencher, navegar para outra página e voltar; conferir todos os campos |
+| Teste de cancelamento e sucesso | Aguardando validação | Confirmar que o rascunho não reaparece após cancelar ou provisionar |
+| Deploy | Aguardando validação | Solicitar ao usuário; deploy é sempre manual pelo usuário |
+| Validação em produção | Aguardando validação | Repetir o roteiro após o deploy manual |
+
+**Status geral: AGUARDANDO VALIDAÇÃO.** O código está commitado em `main`, mas a manutenção não deve ser considerada concluída até passar pelo build e pela validação funcional.
