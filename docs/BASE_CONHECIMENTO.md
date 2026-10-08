@@ -79,3 +79,21 @@ A mensagem genérica de `functions.invoke` não deve ser tratada como causa-raiz
 - Revogação do último administrador foi bloqueada por `active_tenant_requires_active_admin`.
 - Durante a validação foi identificado que `tenant_memberships.roles` não aceita array vazio; a correção passou a remover o membership quando o administrador revogado não possui outros papéis, preservando o histórico em `tenant_admin_assignments` e `tenant_admin_operations`.
 - Todos os tenants usados nos testes foram removidos ao final; não há fixture de teste persistida.
+
+
+## 2026-10-08 — Separação definitiva do onboarding
+
+### Decisão de arquitetura
+A criação de empresa não cria mais usuário administrador. O fluxo é:
+1. Master cria somente os dados da empresa.
+2. Tenant nasce em status `configuring`.
+3. Master acessa **Administradores das Empresas** e cadastra o primeiro administrador.
+4. O primeiro administrador ativa o tenant atomicamente.
+5. A partir daí podem existir múltiplos administradores; troca/revogação mantém histórico.
+6. Uma empresa ativa nunca pode ficar sem administrador.
+
+### Motivo
+A separação elimina o acoplamento entre cadastro empresarial e identidade do administrador, reduz a superfície de falha do provisionamento e atende à regra de responsabilidades independentes.
+
+### Correção importante
+O membership de um administrador revogado que não possui outros papéis não pode receber `roles=[]`, porque existe constraint de papéis não vazios. Nesse caso o membership é removido; a história permanece nas tabelas de administração e a identidade Auth não é apagada por sair de uma empresa.
