@@ -752,3 +752,51 @@ Os dados existiam somente no estado local React de `TenantProvisionForm`, sem re
 | Validação em produção | Aguardando validação | Repetir o roteiro após o deploy manual |
 
 **Status geral: AGUARDANDO VALIDAÇÃO.** O código está commitado em `main`, mas a manutenção não deve ser considerada concluída até passar pelo build e pela validação funcional.
+
+
+## Complemento de manutenção 2026-10-08 — formulário ocultado ao retornar à aba Empresas
+
+### Reprodução e evidência
+
+Após o deploy da primeira correção, o usuário abriu **Empresas → Nova Empresa**, navegou para outra aba e retornou. O formulário não estava visível.
+
+A inspeção do código confirmou que:
+- os campos do formulário eram salvos/restaurados pelo mecanismo de rascunho;
+- o estado `showForm` ficava exclusivamente no estado local de `MasterTenantList`, inicializado como `false`;
+- ao navegar, `MasterTenantList` era desmontado; ao retornar, a lista era remontada e ocultava o formulário.
+
+### Causa-raiz
+
+A primeira manutenção persistia os dados, mas não persistia o estado de abertura do formulário. Portanto, a restauração dos campos não era suficiente para tornar o formulário visível após a navegação.
+
+### Correção aplicada
+
+Em `src/pages/Master.tsx`:
+- adicionada a chave `recrutaai:master:tenant-provision-form-open` no `sessionStorage`;
+- a inicialização de `showForm` agora recupera esse estado;
+- o botão **Nova Empresa** atualiza o estado visual e a persistência da abertura;
+- cancelar ou concluir o provisionamento limpa também a indicação de formulário aberto e o rascunho;
+- não houve alteração no backend, banco, RLS, autorização, isolamento multi-tenant ou fluxo de provisionamento.
+
+Commit: `d0a064e9de1ed43528c1f7f08f38d6e319c0d391`.
+
+### Validação
+
+- **Inspecionado agora:** alteração aplicada em `main`; estado inicial lê a chave persistida; o botão sincroniza a chave; a limpeza do rascunho remove a chave de abertura.
+- **Não validado:** build, type-check, testes automatizados, teste manual após o novo deploy e regressão de cancelamento/provisionamento.
+- **Deploy:** manual pelo usuário; não executado nesta sessão.
+
+### TODO atualizado
+
+| Etapa | Status | Critério |
+|---|---|---|
+| Diagnóstico da falha após o primeiro deploy | Concluído | Confirmado que `showForm` voltava a `false` após remontagem |
+| Persistir estado de abertura | Concluído no código | Formulário inicializa pelo estado salvo em sessão |
+| Limpar estado ao cancelar/concluir | Concluído no código | Chave e rascunho são removidos |
+| Build e type-check | Aguardando validação | CI/build concluído com sucesso |
+| Regressão de navegação e campos | Aguardando validação | Abrir, digitar, navegar para outra aba e retornar; formulário e dados permanecem |
+| Cancelamento e provisionamento bem-sucedido | Aguardando validação | Confirmar limpeza do rascunho e do estado aberto |
+| Deploy manual | Aguardando validação | Usuário publica a `main` |
+| Validação em produção | Aguardando validação | Repetir roteiro na produção após o deploy |
+
+**Status geral: EM TRATAMENTO — aguardando build e validação após novo deploy.**
