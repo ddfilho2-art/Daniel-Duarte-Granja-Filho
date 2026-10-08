@@ -74,7 +74,7 @@ Ao trabalhar em qualquer item:
 
 ## Resumo executivo atual
 
-**Atualizado em:** 2026-09-26
+**Atualizado em:** 2026-10-08
 
 | Fase | Situação | Progresso estimado |
 |---|---|---:|
@@ -85,15 +85,15 @@ Ao trabalhar em qualquer item:
 | 4. Fundação SQL multi-tenant | ✅ Concluída | 100% |
 | 5. Migração dos dados atuais | 🔄 Em andamento | 40% |
 | 6. RLS e isolamento por tenant | ✅ Concluída | 90% |
-| 7. Provisionamento pelo Master Admin | ✅ Concluída | 85% |
-| 8. Administrador titular e substituto | ⏳ Pendente | 0% |
+| 7. Provisionamento pelo Master Admin | 🔄 Em andamento | 90% |
+| 8. Administrador titular e substituto | 🔄 Em andamento | 70% |
 | 9. URLs e contexto de tenant | 🔄 Em andamento | 35% |
 | 10. Engine de recrutamento em RPC/SQL | ⏳ Pendente | 0% |
 | 11. Clínica ocupacional | ✅ Concluída | 80% |
 | 12. Chat e anexos do exame médico | 🔄 Em andamento | 60% |
 | 13. Edge Functions e integrações | 🔄 Em andamento | 60% |
-| 14. Refatoração do frontend | 🔄 Em andamento | 20% |
-| 15. Testes e CI | 🔄 Em andamento | 30% |
+| 14. Refatoração do frontend | 🔄 Em andamento | 25% |
+| 15. Testes e CI | 🔄 Em andamento | 35% |
 | 16. Documentação final | 🔄 Em andamento | 10% |
 | 17. Deploy Supabase/Vercel | ⏳ Pendente | 0% |
 | 18. Cutover e operação | ⏳ Pendente | 0% |
@@ -101,6 +101,61 @@ Ao trabalhar em qualquer item:
 > O percentual representa avanço técnico aproximado, não prazo decorrido.
 
 ---
+
+
+---
+
+## Registro de andamento — 2026-10-08
+
+### Manutenção: separar Empresas de Administradores das Empresas
+
+**Problema:** o provisionamento anterior misturava empresa e administrador e podia apresentar apenas o erro genérico "Edge Function returned a non-2xx status code".
+
+**Decisão:** a tela **Empresas** passa a tratar somente dados da empresa. A criação não cadastra usuário administrador. A empresa nasce em status **configuring**; ao cadastrar o primeiro administrador pela seção **Administradores das Empresas**, o backend ativa a empresa na mesma transação. Uma empresa **active** nunca pode ficar sem administrador ativo.
+
+**Implementado:**
+- tenant_status=configuring.
+- tenant_admin_operations, tenant_admin_assignments e tenant_admin_operation_attachments.
+- múltiplos administradores simultâneos.
+- bloqueio transacional de empresa ativa sem administrador.
+- adição, troca e revogação com justificativa e anexo opcional.
+- primeiro administrador ativa automaticamente uma empresa em configuração.
+- tenant-provisioning deixou de criar Auth user no cadastro da empresa.
+- tratamento de erro non-2xx passou a ler o corpo da Edge Function.
+- nova seção /master/administradores.
+- data de criação existente via created_at.
+- nova contract_ended_at e ação Encerrar contrato; archived é exibido como Contrato encerrado e não pode ser reativado.
+
+**Arquivos principais:**
+- src/pages/Master.tsx
+- src/lib/tenant-provisioning.ts
+- src/lib/tenant-admin-management.ts
+- src/App.tsx
+- src/components/layouts/DashboardLayouts.tsx
+- supabase/functions/tenant-provisioning/index.ts
+- supabase/functions/tenant-admin-management/index.ts
+- migrations 20261008195217, 20261008201500, 20261008204500, 20261008211000
+
+**Validação já executada:**
+- novas tabelas confirmadas no Supabase;
+- índice antigo de administrador único removido;
+- triggers confirmados;
+- tentativa de criar empresa active sem administrador bloqueada por active_tenant_requires_active_admin;
+- tenant de teste não persistiu após o teste negativo;
+- RPC de administração instalada e validação de tenant inexistente confirmada;
+- tenant-provisioning versão 5 publicada ACTIVE;
+- tenant-admin-management versão 1 publicada ACTIVE;
+- migration de contract_ended_at aplicada;
+- migration de configuring aplicada.
+
+**Ainda não validado:**
+- build/typecheck da aplicação;
+- E2E autenticado de criação da empresa sem administrador;
+- E2E de primeiro administrador ativando a empresa;
+- E2E de segundo administrador, troca e revogação;
+- upload e abertura real de anexo;
+- E2E de encerramento de contrato;
+- deploy Vercel e smoke test de produção.
 
 # Backlog detalhado
 
