@@ -128,7 +128,7 @@ export function MasterDashboard() {
 export function MasterTenantList() {
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(isTenantProvisionFormOpen);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const fetchTenants = useCallback(async () => {
@@ -174,7 +174,11 @@ export function MasterTenantList() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Gestão de Empresas</h1>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            const next = !showForm;
+            setShowForm(next);
+            setTenantProvisionFormOpen(next);
+          }}
           className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
           <Plus className="h-4 w-4" /> Nova Empresa
@@ -256,7 +260,28 @@ export function MasterTenantList() {
 // Dados não sensíveis sobrevivem à navegação e até a uma atualização da página.
 // A senha fica apenas em memória durante a navegação SPA e nunca é gravada no storage.
 const TENANT_PROVISION_DRAFT_KEY = "recrutaai:master:tenant-provision-draft";
+const TENANT_PROVISION_FORM_OPEN_KEY = "recrutaai:master:tenant-provision-form-open";
 let tenantProvisionPasswordInMemory = "";
+
+function isTenantProvisionFormOpen(): boolean {
+  try {
+    return sessionStorage.getItem(TENANT_PROVISION_FORM_OPEN_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function setTenantProvisionFormOpen(open: boolean) {
+  try {
+    if (open) {
+      sessionStorage.setItem(TENANT_PROVISION_FORM_OPEN_KEY, "true");
+    } else {
+      sessionStorage.removeItem(TENANT_PROVISION_FORM_OPEN_KEY);
+    }
+  } catch {
+    // O estado React continua funcionando durante a montagem atual.
+  }
+}
 
 const emptyTenantProvisionForm = (): ProvisionPayload => ({
   kind: "employer",
@@ -307,6 +332,7 @@ function saveTenantProvisionDraft(form: ProvisionPayload) {
 
 function clearTenantProvisionDraft() {
   tenantProvisionPasswordInMemory = "";
+  setTenantProvisionFormOpen(false);
   try {
     sessionStorage.removeItem(TENANT_PROVISION_DRAFT_KEY);
   } catch {
