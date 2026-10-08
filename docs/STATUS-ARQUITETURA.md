@@ -800,3 +800,56 @@ Commit: `d0a064e9de1ed43528c1f7f08f38d6e319c0d391`.
 | Validação em produção | Aguardando validação | Repetir roteiro na produção após o deploy |
 
 **Status geral: EM TRATAMENTO — aguardando build e validação após novo deploy.**
+
+
+## Planejamento de manutenção 2026-10-08 — encerramento contratual e expurgo de dados por tenant
+
+**Status geral: EM TRATAMENTO — diagnóstico de dados concluído parcialmente; implementação e expurgo ainda não validados.**
+
+### Requisito aprovado
+
+- Registrar automaticamente a data de cadastro da empresa (já existe em `tenants.created_at`).
+- Registrar a data efetiva de encerramento do contrato, separada de suspensão temporária.
+- Bloquear o acesso da empresa no encerramento contratual.
+- Preservar o cadastro comercial e indicadores agregados que não identifiquem pessoas.
+- Programar a eliminação de dados pessoais após prazo de retenção configurável; prazo inicial proposto: **90 dias**, sujeito a confirmação de obrigações legais e retenções específicas.
+- Auditar o processo de expurgo sem manter dados pessoais desnecessários no próprio log.
+
+### Evidências do diagnóstico
+
+- `public.tenants` já possui `created_at`, `suspended_at` e `archived_at`; o enum `tenant_status` admite `active`, `suspended` e `archived`.
+- `public.tenant_memberships` possui estado de vínculo e campos de revogação.
+- Dados de candidatos e processos estão distribuídos entre `candidatos`, `candidaturas`, `candidatura_eventos`, `mensagens`, `fases_processo`, `banco_talentos`, `analise_ia_candidato`, `ai_analysis_requests`, `provas`, `resultados_provas` e `visualizacoes_rh`.
+- Há referências com regras FK `NO ACTION` e `RESTRICT`; uma exclusão simples de candidato/usuário pode falhar ou deixar dados relacionados.
+- `medical_referrals` e `occupational_health_contracts` relacionam empresa e clínica. Dados médicos não devem ser apagados por uma rotina genérica de encerramento de empresa empregadora sem avaliar o papel da clínica, as obrigações legais e a titularidade dos registros.
+- Os buckets `anexos`, `avatars` e `medical-referral-attachments` exigem tratamento de objetos separado do banco; a estrutura de caminhos/ownership ainda precisa ser mapeada.
+- A tabela `tenant_audit_logs` permite preservar trilha operacional com cuidado para não manter identificadores pessoais desnecessários.
+
+### Decisões de segurança
+
+1. Encerrar contrato não equivale a excluir a empresa nem apagar imediatamente os dados.
+2. O encerramento deve ser idempotente e revogar os vínculos do tenant, sem revogar contas globais ou usuários que ainda tenham vínculo legítimo com outro tenant.
+3. O expurgo será executado por backend privilegiado, nunca pelo cliente; o acesso à fila de expurgo deve ser restrito a `service_role`.
+4. O processo deve ser transacional para cada lote, idempotente, auditável, reexecutável após falhas e ter estado explícito `scheduled / processing / completed / blocked`.
+5. Antes de eliminar registros, deve haver uma allowlist de tabelas/dados a expurgar e uma lista explícita de dados que precisam ser preservados por retenção legal ou vínculo com prestador de saúde ocupacional.
+6. Não executar expurgo destrutivo até validar chaves estrangeiras, objetos Storage, usuários Auth e a separação entre dados pessoais e macroindicadores.
+
+### TODO
+
+| Etapa | Status | Critério de conclusão |
+|---|---|---|
+| Inventariar datas e status atuais do tenant | Concluído | Colunas e enum inspecionados no banco |
+| Mapear tabelas pessoais e relações FK | Em tratamento | Todas as tabelas relacionadas, referências cruzadas e regras de exclusão documentadas |
+| Mapear arquivos e metadados de Storage | Não iniciado | Identificar caminhos por tenant/usuário e política de exclusão |
+| Definir retenção padrão e exceções legais | Aguardando validação | Prazo configurável confirmado e retenções específicas definidas |
+| Criar migration versionada para datas/fila de expurgo | Não iniciado | Migration revisada e versionada no repositório |
+| Implementar ação administrativa de encerramento | Não iniciado | Autorização master, confirmação explícita, revogação de memberships e auditoria |
+| Implementar worker de expurgo idempotente | Não iniciado | Allowlist revisada, lotes transacionais, falhas recuperáveis e logs sem PII |
+| Testes negativos multi-tenant | Não iniciado | Garantir que empresa A nunca expurgue dados de B, nem usuários com outros vínculos |
+| Testes de retenção e arquivos | Não iniciado | Antes/depois conferido para banco e Storage |
+| Atualizar UI e documentação de operação | Não iniciado | Datas/status visíveis e runbook atualizado |
+| Build, testes e validação de produção | Não iniciado | Evidências registradas; deploy manual pelo usuário |
+
+### Limitação atual
+
+Nenhuma data de encerramento foi gravada, nenhum acesso foi revogado e nenhum dado foi apagado nesta etapa. O diagnóstico identificou dependências importantes; a implementação deve continuar por migrations versionadas e backend, sem executar exclusões genéricas.
