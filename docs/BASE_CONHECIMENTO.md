@@ -70,3 +70,12 @@ A mensagem genérica de `functions.invoke` não deve ser tratada como causa-raiz
 - Edge Function `tenant-provisioning` versão 5 publicada ACTIVE com a ação `end_contract`.
 - O fluxo de ativação foi ajustado para não reativar tenant arquivado.
 - Validação E2E do clique de encerramento e bloqueio no navegador ainda está pendente.
+
+
+### Validações adicionais de banco
+- Empresa de teste em `configuring` recebeu o primeiro administrador via RPC e passou para `active` na mesma transação lógica; membership ficou ativo e o histórico registrou a justificativa.
+- Empresa ativa com dois administradores foi validada: contagem chegou a 2.
+- Revogação de um dos dois administradores foi validada com sucesso e preservou o outro.
+- Revogação do último administrador foi bloqueada por `active_tenant_requires_active_admin`.
+- Durante a validação foi identificado que `tenant_memberships.roles` não aceita array vazio; a correção passou a remover o membership quando o administrador revogado não possui outros papéis, preservando o histórico em `tenant_admin_assignments` e `tenant_admin_operations`.
+- Todos os tenants usados nos testes foram removidos ao final; não há fixture de teste persistida.
