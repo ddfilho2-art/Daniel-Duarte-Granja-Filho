@@ -702,7 +702,9 @@ Portanto, o status correto continua sendo:
 - **Causa/impacto:** o prefixo estava concentrado no resolvedor `src/lib/tenant-routing.ts` e em links/documentação; banco, RLS, RPCs, AuthContext e rotas internas não dependem do prefixo.
 - **Implementado:** `resolveTenantRoute()` aceita `/empresa/:slug` e mantém `/t/:slug` temporariamente compatível; links gerados pelo Master usam `/empresa/:slug`; documentação arquitetural foi atualizada.
 - **Segurança:** nenhuma política, RPC, migration, RLS ou regra de isolamento foi alterada.
-- **Validação:** resolução de `/empresa/empresa1`, `/empresa/empresa1/vagas`, `/t/empresa1` e `/t/empresa1/vagas` foi verificada estaticamente; build/deploy de produção ainda não foram validados.
+- **Validação estática:** resolução de `/empresa/empresa1`, `/empresa/empresa1/vagas`, `/t/empresa1` e `/t/empresa1/vagas` foi inspecionada no código.
+- **Validação de produção:** em 2026-10-08, o usuário confirmou após o deploy manual que a aplicação está funcionando. Isso confirma o funcionamento observado, mas não substitui uma matriz independente de testes para cada deep link.
+- **Limitações:** build automatizado e testes E2E/deep links não foram executados nesta etapa; não declarar esses itens como testados.
 
 ### TODO — migração de rota
 
@@ -710,8 +712,9 @@ Portanto, o status correto continua sendo:
 |---|---|---|
 | Auditoria das referências `/t/` | Concluído | Referências funcionais e documentais identificadas |
 | Implementação `/empresa/:slug` | Concluído | Nova rota reconhecida e usada nos novos links |
-| Compatibilidade `/t/:slug` | Concluído | Links históricos continuam reconhecidos pelo frontend |
+| Compatibilidade `/t/:slug` | Concluído | Parser mantém reconhecimento dos links históricos |
 | Validação de build | Aguardando validação | Build Vercel/CI concluído com sucesso |
-| Validação E2E/deep links | Aguardando validação | Portal, vagas e login validados em `/empresa/:slug` |
-| Deploy produção | Bloqueado | Ferramenta Vercel retornou 403 de escopo da equipe |
+| Validação E2E/deep links | Aguardando validação | Cada rota pública e deep link relevante validado individualmente |
+| Deploy produção | Concluído | Usuário realizou deploy manual e confirmou funcionamento em 2026-10-08 |
+| Validação funcional em produção | Parcialmente validado | Confirmação do usuário registrada; matriz individual de rotas pendente |
 | Documentação | Concluído | ADR, arquitetura, deploy, status e plano atualizados |
