@@ -152,31 +152,29 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $fn$
-declare
+as 'declare
   v_tenant_id uuid;
 begin
   v_tenant_id := coalesce(new.tenant_id, old.tenant_id);
 
   if exists (
     select 1 from public.tenants
-    where id = v_tenant_id and status = 'active'
+    where id = v_tenant_id and status = ''active''
   )
   and not exists (
     select 1
     from public.tenant_memberships tm
     where tm.tenant_id = v_tenant_id
-      and tm.status = 'active'
-      and tm.roles @> array['tenant_admin'::public.tenant_role]
+      and tm.status = ''active''
+      and tm.roles @> array[''tenant_admin''::public.tenant_role]
   ) then
     raise exception using
-      errcode = '23514',
-      message = 'active_tenant_requires_active_admin';
+      errcode = ''23514'',
+      message = ''active_tenant_requires_active_admin'';
   end if;
 
   return coalesce(new, old);
-end;
-$fn$;
+end;';
 
 revoke all on function public.enforce_active_tenant_admin() from public, anon, authenticated;
 
@@ -207,8 +205,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public, pg_temp
-as $fn$
-declare
+as 'declare
   v_operation_id uuid;
   v_assignment_id uuid;
   v_membership_id uuid;
@@ -217,29 +214,29 @@ begin
   if not exists (
     select 1 from public.platform_user_roles pur
     where pur.user_id = p_actor_id
-      and pur.role = 'platform_master_admin'
+      and pur.role = ''platform_master_admin''
       and pur.active
       and pur.revoked_at is null
   ) then
-    raise exception using errcode = '42501', message = 'master_admin_required';
+    raise exception using errcode = ''42501'', message = ''master_admin_required'';
   end if;
 
   if p_tenant_id is null
-     or p_operation_type not in ('add', 'replace', 'revoke')
-     or length(trim(coalesce(p_justification, ''))) < 5 then
-    raise exception using errcode = '22023', message = 'invalid_admin_operation';
+     or p_operation_type not in (''add'', ''replace'', ''revoke'')
+     or length(trim(coalesce(p_justification, ''''))) < 5 then
+    raise exception using errcode = ''22023'', message = ''invalid_admin_operation'';
   end if;
 
-  perform pg_advisory_xact_lock(hashtextextended('tenant-admin:' || p_tenant_id::text, 0));
+  perform pg_advisory_xact_lock(hashtextextended(''tenant-admin:'' || p_tenant_id::text, 0));
 
   if not exists (select 1 from public.tenants where id = p_tenant_id) then
-    raise exception using errcode = 'P0002', message = 'tenant_not_found';
+    raise exception using errcode = ''P0002'', message = ''tenant_not_found'';
   end if;
 
-  if p_operation_type in ('add', 'replace') then
+  if p_operation_type in (''add'', ''replace'') then
     if p_target_user_id is null
        or not exists (select 1 from auth.users where id = p_target_user_id) then
-      raise exception using errcode = '22023', message = 'target_auth_user_required';
+      raise exception using errcode = ''22023'', message = ''target_auth_user_required'';
     end if;
 
     select tm.id into v_membership_id
@@ -253,43 +250,45 @@ begin
       )
       values (
         p_tenant_id, p_target_user_id,
-        array['tenant_admin'::public.tenant_role],
-        'active', p_actor_id, coalesce(p_effective_at, v_now)
+        array[''tenant_admin''::public.tenant_role],
+        ''active'', p_actor_id, coalesce(p_effective_at, v_now)
       )
       returning id into v_membership_id;
     else
       update public.tenant_memberships
       set
-        roles = array_append(roles, 'tenant_admin'::public.tenant_role),
-        status = 'active',
+        roles = case
+          when roles @> array[''tenant_admin''::public.tenant_role''] then roles
+          else array_append(roles, ''tenant_admin''::public.tenant_role)
+        end,
+        status = ''active'',
         activated_at = coalesce(activated_at, coalesce(p_effective_at, v_now)),
         revoked_at = null,
         suspended_at = null,
         updated_at = v_now
-      where id = v_membership_id
-        and not (roles @> array['tenant_admin'::public.tenant_role]);
+      where id = v_membership_id;
     end if;
   end if;
 
-  if p_operation_type = 'replace' then
+  if p_operation_type = ''replace'' then
     if p_previous_user_id is null or p_previous_user_id = p_target_user_id then
-      raise exception using errcode = '22023', message = 'previous_admin_required';
+      raise exception using errcode = ''22023'', message = ''previous_admin_required'';
     end if;
 
     if not exists (
       select 1 from public.tenant_memberships tm
       where tm.tenant_id = p_tenant_id
         and tm.user_id = p_previous_user_id
-        and tm.status = 'active'
-        and tm.roles @> array['tenant_admin'::public.tenant_role]
+        and tm.status = ''active''
+        and tm.roles @> array[''tenant_admin''::public.tenant_role]
     ) then
-      raise exception using errcode = '22023', message = 'previous_admin_not_active';
+      raise exception using errcode = ''22023'', message = ''previous_admin_not_active'';
     end if;
   end if;
 
-  if p_operation_type = 'revoke' then
+  if p_operation_type = ''revoke'' then
     if p_target_user_id is null then
-      raise exception using errcode = '22023', message = 'target_admin_required';
+      raise exception using errcode = ''22023'', message = ''target_admin_required'';
     end if;
 
     select tm.id into v_membership_id
@@ -301,23 +300,23 @@ begin
        or not exists (
          select 1 from public.tenant_memberships tm
          where tm.id = v_membership_id
-           and tm.status = 'active'
-           and tm.roles @> array['tenant_admin'::public.tenant_role]
+           and tm.status = ''active''
+           and tm.roles @> array[''tenant_admin''::public.tenant_role]
        ) then
-      raise exception using errcode = '22023', message = 'target_admin_not_active';
+      raise exception using errcode = ''22023'', message = ''target_admin_not_active'';
     end if;
 
     if (
       select count(*) from public.tenant_memberships tm
       where tm.tenant_id = p_tenant_id
-        and tm.status = 'active'
-        and tm.roles @> array['tenant_admin'::public.tenant_role']
+        and tm.status = ''active''
+        and tm.roles @> array[''tenant_admin''::public.tenant_role]
     ) <= 1
     and exists (
       select 1 from public.tenants t
-      where t.id = p_tenant_id and t.status = 'active'
+      where t.id = p_tenant_id and t.status = ''active''
     ) then
-      raise exception using errcode = '23514', message = 'active_tenant_requires_active_admin';
+      raise exception using errcode = ''23514'', message = ''active_tenant_requires_active_admin'';
     end if;
   end if;
 
@@ -331,7 +330,7 @@ begin
   )
   returning id into v_operation_id;
 
-  if p_operation_type = 'add' then
+  if p_operation_type = ''add'' then
     insert into public.tenant_admin_assignments (
       tenant_id, user_id, membership_id, starts_at, created_by, start_operation_id
     )
@@ -341,7 +340,7 @@ begin
     )
     returning id into v_assignment_id;
 
-  elsif p_operation_type = 'replace' then
+  elsif p_operation_type = ''replace'' then
     update public.tenant_admin_assignments
     set ends_at = coalesce(p_effective_at, v_now),
         ended_by = p_actor_id,
@@ -351,7 +350,7 @@ begin
       and ends_at is null;
 
     update public.tenant_memberships
-    set roles = array_remove(roles, 'tenant_admin'::public.tenant_role),
+    set roles = array_remove(roles, ''tenant_admin''::public.tenant_role),
         updated_at = v_now
     where tenant_id = p_tenant_id and user_id = p_previous_user_id;
 
@@ -364,7 +363,7 @@ begin
     )
     returning id into v_assignment_id;
 
-  elsif p_operation_type = 'revoke' then
+  elsif p_operation_type = ''revoke'' then
     update public.tenant_admin_assignments
     set ends_at = coalesce(p_effective_at, v_now),
         ended_by = p_actor_id,
@@ -374,7 +373,7 @@ begin
       and ends_at is null;
 
     update public.tenant_memberships
-    set roles = array_remove(roles, 'tenant_admin'::public.tenant_role),
+    set roles = array_remove(roles, ''tenant_admin''::public.tenant_role),
         updated_at = v_now
     where tenant_id = p_tenant_id and user_id = p_target_user_id;
   end if;
@@ -384,25 +383,24 @@ begin
   )
   values (
     p_tenant_id, p_actor_id,
-    'platform.tenant_admin.' || p_operation_type,
-    'tenant_admin_operation', v_operation_id::text,
+    ''platform.tenant_admin.'' || p_operation_type,
+    ''tenant_admin_operation'', v_operation_id::text,
     jsonb_build_object(
-      'target_user_id', p_target_user_id,
-      'previous_user_id', p_previous_user_id,
-      'effective_at', coalesce(p_effective_at, v_now),
-      'justification', trim(p_justification)
+      ''target_user_id'', p_target_user_id,
+      ''previous_user_id'', p_previous_user_id,
+      ''effective_at'', coalesce(p_effective_at, v_now),
+      ''justification'', trim(p_justification)
     )
   );
 
   return jsonb_build_object(
-    'operation_id', v_operation_id,
-    'assignment_id', v_assignment_id,
-    'tenant_id', p_tenant_id,
-    'target_user_id', p_target_user_id,
-    'previous_user_id', p_previous_user_id
+    ''operation_id'', v_operation_id,
+    ''assignment_id'', v_assignment_id,
+    ''tenant_id'', p_tenant_id,
+    ''target_user_id'', p_target_user_id,
+    ''previous_user_id'', p_previous_user_id
   );
-end;
-$fn$;
+end;';
 
 revoke all on function public.record_tenant_admin_operation(uuid, uuid, text, uuid, uuid, timestamptz, text)
   from public, anon, authenticated;
