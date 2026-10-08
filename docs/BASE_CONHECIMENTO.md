@@ -108,3 +108,29 @@ O membership de um administrador revogado que não possui outros papéis não po
 **Correção:** adicionada `endTenantContract(tenantId)`, delegando a `callEdge("end_contract", { tenantId })`. Alteração na `main`, commit `a2d7dcc7d879b0d828472cf2126e5cb2cd834e6b`.
 
 **Validação:** inspeção confirmou que a ação `end_contract` já existe na Edge Function e a exportação foi adicionada ao módulo importado. O build após a correção ainda precisa ser executado pelo próximo build Vercel/CI; não marcar como build aprovado antes disso.
+
+## 2026-10-08 — Navegação Master e editor de identidade visual
+
+### Problemas registrados
+- Em rotas `/master/*`, o item Dashboard permanecia ativo porque a regra de navegação tratava `/master` como uma rota comum e o prefixo correspondia a todas as páginas filhas.
+- O editor de identidade visual expunha termos técnicos sem orientação e não mostrava a região afetada.
+- A experiência de personalização precisava incluir a identidade da empresa, além das cores.
+
+### Alterações aplicadas
+- `src/components/layouts/DashboardLayouts.tsx`: a rota raiz `/master` agora recebe tratamento exato como as raízes dos demais perfis; o dashboard não deve ficar destacado nas subrotas.
+- `src/pages/Master.tsx`: editor reorganizado em linguagem simples, com prévia interativa e destaque da região associada à opção escolhida.
+- Editor inclui seleção de arquivo de logo PNG/JPG/WebP até 2 MB; upload ao bucket `tenant-branding` em pasta associada ao tenant; a operação cria um rascunho de identidade visual e não publica automaticamente.
+- `src/lib/tenant-provisioning.ts`: payload de branding tipado para receber `logo_primary_path`.
+- A prévia da marca mantém o logo da plataforma importado de `src/assets/DFLlogo.svg` para não depender de `dist` durante o build.
+
+### Validação e limitações
+- Inspeção de código confirmou a causa da navegação e a alteração da condição.
+- Inspeção confirmou validação de tipo/tamanho de arquivo e uso do tenant selecionado no caminho de armazenamento.
+- **Build e testes automatizados ainda não foram executados nesta sessão.**
+- Upload real depende da configuração/permissões do bucket `tenant-branding`; não foi validado no ambiente autenticado.
+- A persistência do campo `logo_primary_path` e sua leitura por `get_public_tenant_context` precisam ser confirmadas no fluxo real antes de considerar o logo da empresa concluído.
+- O novo arquivo `dist/logo.png` foi localizado no repositório, mas a cópia para uma pasta de origem estática ainda não foi feita. Não usar `dist` como fonte permanente porque o build pode recriar essa pasta.
+- Nenhum deploy de Vercel foi realizado; continua manual.
+
+### Aprendizado
+Arquivos de produção dentro de `dist` não devem ser tratados como fonte estática. Assets que precisam sobreviver a `vite build` devem estar em `public` ou em `src/assets`. Para personalização multi-tenant, o upload precisa ser associado ao tenant e o caminho deve fazer parte do tema publicado; salvar somente o arquivo não altera a identidade exibida.
