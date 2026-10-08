@@ -1008,6 +1008,7 @@ export function Cadastro() {
     tenantMembershipLoading,
     tenantRoles,
     canAdministerTenant,
+    isPlatformMasterAdmin,
     isTenantRoute,
     navigate,
   ]);
