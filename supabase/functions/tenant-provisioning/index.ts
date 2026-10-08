@@ -4,7 +4,7 @@ import {
   jsonResponse,
   readJsonBody,
   requestId,
-} from "shared/http.ts";
+} from "./_shared/http.ts";
 
 type ProvisionAction =
   | {
