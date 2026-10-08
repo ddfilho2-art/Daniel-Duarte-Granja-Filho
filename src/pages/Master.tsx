@@ -289,8 +289,17 @@ function loadTenantProvisionDraft(): ProvisionPayload {
 function saveTenantProvisionDraft(form: ProvisionPayload) {
   tenantProvisionPasswordInMemory = form.adminPassword;
   try {
-    const { adminPassword: _neverPersistPassword, ...safeDraft } = form;
-    sessionStorage.setItem(TENANT_PROVISION_DRAFT_KEY, JSON.stringify(safeDraft));
+    sessionStorage.setItem(
+      TENANT_PROVISION_DRAFT_KEY,
+      JSON.stringify({
+        kind: form.kind,
+        cnpj: form.cnpj,
+        legalName: form.legalName,
+        displayName: form.displayName,
+        slug: form.slug,
+        adminEmail: form.adminEmail,
+      }),
+    );
   } catch {
     // O rascunho continua preservado em memória durante a navegação SPA.
   }
