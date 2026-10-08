@@ -23,6 +23,7 @@ import {
   type ProvisionPayload,
   type BrandingDraftPayload,
 } from "../lib/tenant-provisioning";
+import { supabase } from "../lib/supabase";
 import {
   listTenantAdmins,
   listTenantAdminHistory,
