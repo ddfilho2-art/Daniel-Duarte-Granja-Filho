@@ -526,35 +526,84 @@ export function MasterBrandingEditor() {
   const [versions, setVersions] = useState<Record<string, unknown>[]>([]);
   const [theme, setTheme] = useState<BrandingDraftPayload>({});
   const [reason, setReason] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [selectedColor, setSelectedColor] = useState<keyof BrandingDraftPayload>("sidebar_background");
 
   useEffect(() => {
-    listTenants().then(setTenants).catch(() => {});
+    listTenants().then(setTenants).catch((err) =>
+      setError(err instanceof Error ? err.message : "Não foi possível carregar as empresas."),
+    );
   }, []);
 
   useEffect(() => {
-    if (selectedTenant) {
-      getBrandingVersions(selectedTenant)
-        .then(setVersions)
-        .catch(() => setVersions([]));
+    if (!selectedTenant) {
+      setVersions([]);
+      return;
     }
+    getBrandingVersions(selectedTenant)
+      .then(setVersions)
+      .catch((err) => setError(err instanceof Error ? err.message : "Não foi possível carregar o histórico."));
   }, [selectedTenant]);
+
+  useEffect(() => {
+    if (!logoFile) {
+      setLogoPreview("");
+      return;
+    }
+    const url = URL.createObjectURL(logoFile);
+    setLogoPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logoFile]);
+
+  const colorFields: { key: keyof BrandingDraftPayload; label: string; help: string; sample: "sidebar" | "text" | "active" | "hover" | "page" | "hero" | "heroText" | "button" | "accent" | "primary" | "secondary" | "link" | "focus" }[] = [
+    { key: "sidebar_background", label: "Fundo do menu lateral", help: "A faixa vertical que contém os menus.", sample: "sidebar" },
+    { key: "sidebar_text", label: "Texto do menu", help: "A cor dos nomes das opções do menu.", sample: "text" },
+    { key: "sidebar_active", label: "Opção selecionada", help: "O fundo do menu que indica a página atual.", sample: "active" },
+    { key: "sidebar_hover", label: "Ao passar o mouse", help: "O fundo de uma opção quando o mouse está sobre ela.", sample: "hover" },
+    { key: "home_background", label: "Fundo da página", help: "A cor de fundo da área principal.", sample: "page" },
+    { key: "hero_background", label: "Banner principal", help: "O fundo da área de destaque do portal da empresa.", sample: "hero" },
+    { key: "hero_text", label: "Texto do banner", help: "A cor do texto sobre o banner principal.", sample: "heroText" },
+    { key: "primary_action", label: "Botões principais", help: "A cor de botões como candidatar-se ou salvar.", sample: "button" },
+    { key: "accent", label: "Destaques", help: "Elementos que precisam chamar a atenção.", sample: "accent" },
+    { key: "primary_color", label: "Cor principal", help: "A cor institucional usada em elementos importantes.", sample: "primary" },
+    { key: "secondary_color", label: "Cor secundária", help: "A segunda cor institucional do portal.", sample: "secondary" },
+    { key: "link_color", label: "Links", help: "A cor de textos clicáveis.", sample: "link" },
+    { key: "focus_ring_color", label: "Realce de campos", help: "A borda que indica o campo atualmente selecionado.", sample: "focus" },
+  ];
 
   const handleCreateDraft = async () => {
     if (!selectedTenant || !reason.trim()) {
-      setError("Selecione uma empresa e informe o motivo.");
+      setError("Selecione uma empresa e informe o motivo da alteração.");
       return;
     }
+    if (logoFile && (!["image/png", "image/jpeg", "image/webp"].includes(logoFile.type) || logoFile.size > 2 * 1024 * 1024)) {
+      setError("Use um logo PNG, JPG ou WebP de até 2 MB.");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      const result = await createBrandingDraft(selectedTenant, theme, reason);
-      setSuccess(`Draft v${result.version} criado com sucesso!`);
-      const updated = await getBrandingVersions(selectedTenant);
-      setVersions(updated);
+      let draftTheme: BrandingDraftPayload = { ...theme };
+      if (logoFile) {
+        const extension = logoFile.type === "image/png" ? "png" : logoFile.type === "image/webp" ? "webp" : "jpg";
+        const storagePath = `${selectedTenant}/logo-primary-${Date.now()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("tenant-branding")
+          .upload(storagePath, logoFile, { upsert: true, contentType: logoFile.type });
+        if (uploadError) throw new Error("Não foi possível enviar o logo: " + uploadError.message);
+        draftTheme = { ...draftTheme, logo_primary_path: storagePath } as BrandingDraftPayload;
+      }
+      const result = await createBrandingDraft(selectedTenant, draftTheme, reason.trim());
+      setSuccess(`Rascunho da identidade visual v${result.version ?? ""} criado. Revise a prévia e publique no histórico quando estiver pronto.`);
+      setLogoFile(null);
+      setReason("");
+      setVersions(await getBrandingVersions(selectedTenant));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -569,11 +618,11 @@ export function MasterBrandingEditor() {
     }
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
-      await publishBranding(selectedTenant, brandingId, reason);
-      setSuccess("Tema publicado com sucesso!");
-      const updated = await getBrandingVersions(selectedTenant);
-      setVersions(updated);
+      await publishBranding(selectedTenant, brandingId, reason.trim());
+      setSuccess("Identidade visual publicada com sucesso.");
+      setVersions(await getBrandingVersions(selectedTenant));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -581,157 +630,139 @@ export function MasterBrandingEditor() {
     }
   };
 
-  const colorFields: { key: keyof BrandingDraftPayload; label: string }[] = [
-    { key: "sidebar_background", label: "Sidebar Fundo" },
-    { key: "sidebar_text", label: "Sidebar Texto" },
-    { key: "sidebar_active", label: "Sidebar Ativo" },
-    { key: "sidebar_hover", label: "Sidebar Hover" },
-    { key: "home_background", label: "Home Fundo" },
-    { key: "hero_background", label: "Hero Fundo" },
-    { key: "hero_text", label: "Hero Texto" },
-    { key: "primary_action", label: "Ação Primária" },
-    { key: "accent", label: "Destaque" },
-    { key: "primary_color", label: "Cor Primária" },
-    { key: "secondary_color", label: "Cor Secundária" },
-    { key: "link_color", label: "Links" },
-    { key: "focus_ring_color", label: "Foco" },
-  ];
+  const colorValue = (key: keyof BrandingDraftPayload, fallback: string) =>
+    String(theme[key] || fallback);
+  const selectedField = colorFields.find((field) => field.key === selectedColor) || colorFields[0];
 
   return (
     <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-slate-900">Identidade Visual</h1>
-
-      <div className="flex gap-4 items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-700 mb-1">
-            Empresa
-          </label>
-          <select
-            value={selectedTenant}
-            onChange={(e) => setSelectedTenant(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-          >
-            <option value="">Selecione...</option>
-            {tenants.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.display_name} ({t.slug})
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">Identidade Visual</h1>
+        <p className="mt-1 text-sm text-slate-600">Personalize a aparência de cada empresa e veja onde cada mudança será aplicada.</p>
       </div>
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          <XCircle className="h-4 w-4" /> {error}
-        </div>
-      )}
-      {success && (
-        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-          <CheckCircle2 className="h-4 w-4" /> {success}
-        </div>
-      )}
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
+        <select value={selectedTenant} onChange={(e) => { setSelectedTenant(e.target.value); setTheme({}); setLogoFile(null); }}
+          className="w-full max-w-2xl rounded-lg border border-slate-200 px-3 py-2 text-sm">
+          <option value="">Selecione uma empresa...</option>
+          {tenants.map((t) => <option key={t.id} value={t.id}>{t.display_name} ({t.slug})</option>)}
+        </select>
+        <p className="mt-2 text-xs text-slate-500">As alterações ficam separadas por empresa. Você poderá revisar cada rascunho antes de publicar.</p>
+      </div>
+
+      {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><XCircle className="inline h-4 w-4 mr-2" />{error}</div>}
+      {success && <div role="status" className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700"><CheckCircle2 className="inline h-4 w-4 mr-2" />{success}</div>}
 
       {selectedTenant && (
         <>
-          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-800">
-              <Palette className="inline h-5 w-5 mr-2" />
-              Editor de Cores
-            </h2>
+          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+            <h2 className="text-lg font-semibold text-slate-800">Logotipo da empresa</h2>
+            <p className="text-sm text-slate-600">O logo da empresa aparece no topo do portal. A marca Recruta AÍ ficará menor logo abaixo, identificando a plataforma.</p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">Escolha o arquivo do logo</label>
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2" />
+                <p className="text-xs text-slate-500">PNG, JPG ou WebP; até 2 MB. O envio cria um rascunho, não publica automaticamente.</p>
+                {logoFile && <button type="button" onClick={() => setLogoFile(null)} className="text-sm text-red-700 underline">Remover arquivo selecionado</button>}
+              </div>
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-3">Prévia da marca</p>
+                {logoPreview ? <img src={logoPreview} alt="Prévia do logo da empresa" className="mx-auto max-h-20 max-w-full object-contain" /> : <div className="py-5 text-sm text-slate-400">O logo escolhido aparecerá aqui.</div>}
+                <div className="mt-3 border-t border-slate-200 pt-3">
+                  <img src="/logo.png" alt="Recruta AÍ" className="mx-auto h-7 max-w-36 object-contain" />
+                  <p className="mt-1 text-xs text-slate-500">Recruta AÍ — plataforma de recrutamento</p>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-              {colorFields.map(({ key, label }) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">
-                    {label}
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="color"
-                      value={(theme as Record<string, string>)[key] || "#000000"}
-                      onChange={(e) =>
-                        setTheme({ ...theme, [key]: e.target.value.toUpperCase() })
-                      }
-                      className="h-8 w-8 cursor-pointer rounded border border-slate-200"
-                    />
-                    <input
-                      type="text"
-                      value={(theme as Record<string, string>)[key] || ""}
-                      onChange={(e) =>
-                        setTheme({ ...theme, [key]: e.target.value.toUpperCase() })
-                      }
-                      placeholder="#000000"
-                      className="flex-1 rounded border border-slate-200 px-2 py-1 text-xs font-mono"
-                    />
+          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+            <h2 className="text-lg font-semibold text-slate-800"><Palette className="inline h-5 w-5 mr-2" />Aparência do portal</h2>
+            <p className="text-sm text-slate-600">Selecione uma área abaixo. A prévia destacará onde a cor será aplicada.</p>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                {colorFields.map(({ key, label, help }) => (
+                  <button key={key} type="button" onClick={() => setSelectedColor(key)}
+                    className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedColor === key ? "border-blue-500 bg-blue-50 ring-1 ring-blue-200" : "border-slate-200 hover:bg-slate-50"}`}>
+                    <span className="block text-sm font-medium text-slate-800">{label}</span>
+                    <span className="block text-xs text-slate-500 mt-1">{help}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+                  <div className="bg-slate-100 px-4 py-2 text-xs text-slate-600">Prévia ilustrativa do portal</div>
+                  <div className="flex min-h-64">
+                    <aside className="w-2/5 p-3 space-y-3" style={{ backgroundColor: colorValue("sidebar_background", "#27336D"), color: colorValue("sidebar_text", "#FFFFFF"), outline: ["sidebar_background","sidebar_text"].includes(selectedColor) ? "3px solid #F59E0B" : undefined }}>
+                      <div className="rounded-md p-2 text-xs font-semibold" style={{ backgroundColor: colorValue("sidebar_active", "#0054A6"), outline: selectedColor === "sidebar_active" ? "3px solid #F59E0B" : undefined }}>Empresas</div>
+                      <div className="rounded-md p-2 text-xs" style={{ backgroundColor: selectedColor === "sidebar_hover" ? colorValue("sidebar_hover", "#33417E") : "transparent", outline: selectedColor === "sidebar_hover" ? "3px solid #F59E0B" : undefined }}>Administradores</div>
+                      <div className="text-xs">Identidade Visual</div>
+                    </aside>
+                    <section className="flex-1 p-3 space-y-3" style={{ backgroundColor: colorValue("home_background", "#F8FAFC"), outline: selectedColor === "home_background" ? "3px solid #F59E0B" : undefined }}>
+                      <div className="rounded-md p-3" style={{ backgroundColor: colorValue("hero_background", "#0054A6"), color: colorValue("hero_text", "#FFFFFF"), outline: ["hero_background","hero_text"].includes(selectedColor) ? "3px solid #F59E0B" : undefined }}>
+                        <p className="text-xs font-semibold">Oportunidades para sua equipe</p>
+                        <p className="text-[10px] mt-1">Banner principal do portal</p>
+                      </div>
+                      <button type="button" className="rounded-md px-3 py-2 text-xs font-medium text-white" style={{ backgroundColor: colorValue("primary_action", "#00A859"), outline: selectedColor === "primary_action" ? "3px solid #F59E0B" : undefined }}>Botão principal</button>
+                      <p className="text-xs" style={{ color: colorValue("link_color", "#0054A6"), outline: selectedColor === "link_color" ? "2px solid #F59E0B" : undefined }}>Link de exemplo</p>
+                      <div className="rounded-md border p-2 text-xs" style={{ borderColor: colorValue("focus_ring_color", "#38BDF8"), outline: selectedColor === "focus_ring_color" ? "3px solid #F59E0B" : undefined }}>Campo selecionado</div>
+                      <div className="flex gap-2">
+                        <span className="h-5 w-5 rounded-full" title="Destaque" style={{ backgroundColor: colorValue("accent", "#0054A6"), outline: selectedColor === "accent" ? "3px solid #F59E0B" : undefined }} />
+                        <span className="h-5 w-5 rounded-full" title="Cor principal" style={{ backgroundColor: colorValue("primary_color", "#0054A6"), outline: selectedColor === "primary_color" ? "3px solid #F59E0B" : undefined }} />
+                        <span className="h-5 w-5 rounded-full" title="Cor secundária" style={{ backgroundColor: colorValue("secondary_color", "#27336D"), outline: selectedColor === "secondary_color" ? "3px solid #F59E0B" : undefined }} />
+                      </div>
+                    </section>
                   </div>
                 </div>
-              ))}
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-sm font-semibold text-slate-800">Área selecionada: {selectedField.label}</p>
+                  <p className="mt-1 text-sm text-slate-600">{selectedField.help} A borda laranja mostra a região relacionada na prévia.</p>
+                </div>
+                <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+                  <label className="block text-sm font-medium text-slate-700">Escolha a cor</label>
+                  <div className="flex items-center gap-3">
+                    <input aria-label={selectedField.label} type="color" value={colorValue(selectedColor, "#0054A6")}
+                      onChange={(e) => setTheme({ ...theme, [selectedColor]: e.target.value.toUpperCase() })}
+                      className="h-10 w-12 cursor-pointer rounded border border-slate-200" />
+                    <input aria-label={`Código da cor para ${selectedField.label}`} type="text" value={String(theme[selectedColor] || "")}
+                      onChange={(e) => setTheme({ ...theme, [selectedColor]: e.target.value.toUpperCase() })}
+                      placeholder="#0054A6" pattern="^#[0-9A-Fa-f]{6}$"
+                      className="w-36 rounded border border-slate-200 px-3 py-2 text-sm font-mono" />
+                    <span className="text-xs text-slate-500">Cor atual: {colorValue(selectedColor, "#0054A6")}</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Motivo da alteração
-              </label>
-              <input
-                type="text"
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="Ex: Atualização da identidade visual Q3"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              />
+              <label className="block text-sm font-medium text-slate-700 mb-1">Por que deseja alterar?</label>
+              <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={500}
+                placeholder="Ex.: atualizar as cores para combinar com a marca da empresa."
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <p className="mt-1 text-xs text-slate-500">Obrigatório para manter o histórico da alteração.</p>
             </div>
-
             <div className="flex justify-end">
-              <button
-                onClick={handleCreateDraft}
-                disabled={loading}
-                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-              >
-                {loading ? "Salvando..." : "Criar Draft"}
+              <button type="button" onClick={handleCreateDraft} disabled={loading || !reason.trim()}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
+                {loading ? "Salvando..." : "Salvar como rascunho"}
               </button>
             </div>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-            <div className="border-b border-slate-200 px-4 py-3">
-              <h2 className="font-semibold text-slate-800">Histórico de Versões</h2>
-            </div>
-            {versions.length === 0 ? (
-              <p className="p-6 text-sm text-slate-500">Nenhuma versão encontrada.</p>
-            ) : (
+            <div className="border-b border-slate-200 px-4 py-3"><h2 className="font-semibold text-slate-800">Histórico e publicação</h2></div>
+            {versions.length === 0 ? <p className="p-6 text-sm text-slate-500">Nenhuma versão encontrada.</p> : (
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-                  <tr>
-                    <th className="px-4 py-2">Versão</th>
-                    <th className="px-4 py-2">Status</th>
-                    <th className="px-4 py-2">Criado em</th>
-                    <th className="px-4 py-2">Ações</th>
-                  </tr>
-                </thead>
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-4 py-2">Versão</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Criada em</th><th className="px-4 py-2">Ações</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
-                  {versions.map((v) => (
-                    <tr key={v.id as string} className="hover:bg-slate-50">
-                      <td className="px-4 py-2 font-mono text-xs">v{v.version as number}</td>
-                      <td className="px-4 py-2">
-                        <StatusBadge status={v.status as string} />
-                      </td>
-                      <td className="px-4 py-2 text-xs text-slate-500">
-                        {new Date(v.created_at as string).toLocaleString("pt-BR")}
-                      </td>
-                      <td className="px-4 py-2">
-                        {v.status === "draft" && (
-                          <button
-                            onClick={() => handlePublish(v.id as string)}
-                            disabled={loading}
-                            className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50"
-                          >
-                            Publicar
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {versions.map((v) => <tr key={v.id as string} className="hover:bg-slate-50">
+                    <td className="px-4 py-2 font-mono text-xs">v{v.version as number}</td>
+                    <td className="px-4 py-2"><StatusBadge status={v.status as string} /></td>
+                    <td className="px-4 py-2 text-xs text-slate-500">{new Date(v.created_at as string).toLocaleString("pt-BR")}</td>
+                    <td className="px-4 py-2">{v.status === "draft" && <button type="button" onClick={() => handlePublish(v.id as string)} disabled={loading || !reason.trim()} className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">Publicar</button>}</td>
+                  </tr>)}
                 </tbody>
               </table>
             )}
