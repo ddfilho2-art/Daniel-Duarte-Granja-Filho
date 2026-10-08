@@ -69,6 +69,19 @@ async function callEdge(
   );
 
   if (error) {
+    const context = (error as unknown as { context?: Response }).context;
+    if (context) {
+      try {
+        const payload = await context.clone().json();
+        throw new Error(
+          String(payload?.message || payload?.code || error.message || "Edge function error"),
+        );
+      } catch (contextError) {
+        if (contextError instanceof Error && contextError.message !== error.message) {
+          throw contextError;
+        }
+      }
+    }
     throw new Error(error.message || "Edge function error");
   }
 
