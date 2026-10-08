@@ -68,7 +68,7 @@ function SidebarItem({
 }) {
   const location = useLocation();
   const isDashboardRoot =
-    to === "/rh" || to === "/admin" || to === "/candidato";
+    to === "/rh" || to === "/admin" || to === "/candidato" || to === "/master";
   const isActive = isDashboardRoot
     ? location.pathname === to
     : location.pathname === to || location.pathname.startsWith(to + "/");
