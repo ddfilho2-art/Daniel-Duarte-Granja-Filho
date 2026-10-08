@@ -1259,6 +1259,7 @@ export function Login() {
     clinicRoles,
     hasTenantAccess,
     canAdministerTenant,
+    isPlatformMasterAdmin,
     login,
     registerCandidateForTenant,
   } = useAuth();
@@ -1282,6 +1283,7 @@ export function Login() {
         roles: tenantRoles,
         clinicRoles,
         canAdministerTenant,
+        isPlatformMasterAdmin,
       },
     );
 
