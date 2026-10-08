@@ -37,3 +37,10 @@
 - Primeiro administrador ativa empresa: **Concluído** — RPC validada com fixture real de banco.
 - Remover legado de provisionamento empresa+admin: **Concluído** — assinatura antiga removida do banco.
 - E2E navegador do onboarding separado: **Aguardando validação**.
+
+
+### Regressão de build — 2026-10-08
+- [x] Causa diagnosticada: faltava export `endTenantContract` no módulo cliente, embora a tela e a Edge Function já tivessem a operação.
+- [x] Correção aplicada em `src/lib/tenant-provisioning.ts`.
+- [ ] Build Vite/Vercel pós-correção — **Aguardando validação**.
+- [ ] E2E da ação Encerrar contrato — **Aguardando validação**.
