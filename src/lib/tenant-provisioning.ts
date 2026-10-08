@@ -28,8 +28,6 @@ export interface ProvisionPayload {
   legalName: string;
   displayName: string;
   slug: string;
-  adminEmail: string;
-  adminPassword: string;
 }
 
 export interface BrandingDraftPayload {
