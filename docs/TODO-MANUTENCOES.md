@@ -18,10 +18,10 @@
 | Anexos privados | Em tratamento | Bucket, RLS e fluxo de upload/registro criados; teste real pendente |
 | Tratamento de erro non-2xx no cliente de empresas | Concluído | `error.context` agora é lido antes da mensagem genérica |
 | Teste de criação real de empresa | Aguardando validação | Requer execução no ambiente autenticado |
-| Teste de adicionar segundo administrador | Aguardando validação | Requer usuário Auth real |
-| Teste de troca de administrador | Aguardando validação | Requer usuário Auth real |
-| Teste de revogar último administrador | Aguardando validação | Backend já possui bloqueio; falta E2E |
-| Teste de justificativa obrigatória | Aguardando validação | Regra no RPC/Edge Function; falta E2E |
+| Teste de adicionar segundo administrador | Concluído | RPC validada com dois usuários Auth existentes; 2 admins ativos confirmados |
+| Teste de troca de administrador | Aguardando validação | Regra implementada; falta teste completo com usuário Auth novo |
+| Teste de revogar último administrador | Concluído | RPC bloqueou com active_tenant_requires_active_admin; fixture removida |
+| Teste de justificativa obrigatória | Concluído | RPC exige mínimo de 5 caracteres; Edge Function valida antes do RPC |
 | Teste de anexo | Aguardando validação | Upload + registro + signed URL pendentes de teste real |
 | Data de criação e encerramento do contrato | Concluído | `created_at` existente; `contract_ended_at` criado e exibido |
 | Encerramento do contrato e bloqueio de reativação | Concluído | Ação `end_contract` publicada; `activate` bloqueia status arquivado |
