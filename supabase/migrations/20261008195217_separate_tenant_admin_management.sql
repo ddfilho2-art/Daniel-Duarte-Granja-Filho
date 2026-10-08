@@ -472,8 +472,6 @@ comment on table public.tenant_admin_assignments is
 comment on table public.tenant_admin_operation_attachments is
   'Private attachments associated with tenant administrator management operations.';
 
-);
-
 drop policy if exists tenant_admin_attachments_platform_select on storage.objects;
 create policy tenant_admin_attachments_platform_select
 on storage.objects
