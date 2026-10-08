@@ -23,6 +23,8 @@
 | Teste de revogar último administrador | Aguardando validação | Backend já possui bloqueio; falta E2E |
 | Teste de justificativa obrigatória | Aguardando validação | Regra no RPC/Edge Function; falta E2E |
 | Teste de anexo | Aguardando validação | Upload + registro + signed URL pendentes de teste real |
+| Data de criação e encerramento do contrato | Concluído | `created_at` existente; `contract_ended_at` criado e exibido |
+| Encerramento do contrato e bloqueio de reativação | Concluído | Ação `end_contract` publicada; `activate` bloqueia status arquivado |
 | Regressão de Empresas/Branding | Aguardando validação | Build e execução do fluxo pendentes |
 | Documentação / Base de Conhecimento | Concluído | KB e TODO atualizados |
 | Deploy Vercel | Não iniciado | Projeto mantém deploy manual |
