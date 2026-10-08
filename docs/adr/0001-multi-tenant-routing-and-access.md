@@ -23,13 +23,13 @@ Também existem dois atores especiais:
 Cada empresa utilizará uma rota por slug:
 
 ```text
-/t/:tenantSlug
+/empresa/:tenantSlug
 ```
 
 Exemplo:
 
 ```text
-https://processflow-hub.vercel.app/t/empresa-x
+https://processflow-hub.vercel.app/empresa/empresa-x
 ```
 
 O caractere `\` não será usado. Em URLs web, o separador correto é `/`.
@@ -122,10 +122,13 @@ tenant se o banco não validasse o vínculo.
 
 ### Subdomínio obrigatório desde o início
 
-Adiado. `/t/:slug` funciona em previews e produção sem DNS dinâmico. A resolução
+Adiado. `/empresa/:slug` funciona em previews e produção sem DNS dinâmico. A resolução
 por host poderá ser adicionada depois sem mudar `tenant_id` ou RLS.
 
 ### CSS customizado pelo Master Admin
 
 Rejeitado por risco de XSS, quebra de layout, baixa acessibilidade e manutenção.
 O tema será composto somente por tokens validados.
+
+
+> **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
