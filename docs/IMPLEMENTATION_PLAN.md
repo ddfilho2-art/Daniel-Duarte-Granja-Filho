@@ -149,6 +149,13 @@ Ao trabalhar em qualquer item:
 - migration de configuring aplicada.
 
 **Validações adicionais concluídas:**
+
+- onboarding separado validado no banco: criação em configuring sem administrador e primeiro admin promove para active;
+- assinatura antiga de provision_tenant que criava administrador foi removida;
+- tentativa de revogar último administrador bloqueada;
+- múltiplos administradores confirmados;
+- membership sem outros papéis é removido na revogação, preservando histórico.
+
 - teste de primeiro administrador: empresa configuring -> active confirmado;
 - teste de múltiplos administradores: 2 admins ativos confirmados;
 - teste de revogação de um entre dois admins: aprovado;
