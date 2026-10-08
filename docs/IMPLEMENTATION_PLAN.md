@@ -148,6 +148,14 @@ Ao trabalhar em qualquer item:
 - migration de contract_ended_at aplicada;
 - migration de configuring aplicada.
 
+**Validações adicionais concluídas:**
+- teste de primeiro administrador: empresa configuring -> active confirmado;
+- teste de múltiplos administradores: 2 admins ativos confirmados;
+- teste de revogação de um entre dois admins: aprovado;
+- teste de revogação do último admin: bloqueado corretamente;
+- teste identificou e corrigiu a restrição de roles vazios em tenant_memberships;
+- fixtures de teste removidas após validação.
+
 **Ainda não validado:**
 - build/typecheck da aplicação;
 - E2E autenticado de criação da empresa sem administrador;
