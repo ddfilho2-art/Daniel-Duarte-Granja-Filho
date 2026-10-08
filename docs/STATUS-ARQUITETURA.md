@@ -694,3 +694,24 @@ Portanto, o status correto continua sendo:
 
 
 > **Decisão de rota pública (2026-10-08):** `/empresa/:tenantSlug` é a rota canônica para portais de empresa. A rota histórica `/t/:tenantSlug` permanece temporariamente compatível no frontend para preservar links existentes; novos links devem usar `/empresa/:tenantSlug`.
+
+## Manutenção 2026-10-08 — migração da rota pública de tenant
+
+- **Problema:** a rota pública histórica `/t/:tenantSlug` era pouco intuitiva para o portal de candidatos.
+- **Decisão:** `/empresa/:tenantSlug` passa a ser a rota canônica.
+- **Causa/impacto:** o prefixo estava concentrado no resolvedor `src/lib/tenant-routing.ts` e em links/documentação; banco, RLS, RPCs, AuthContext e rotas internas não dependem do prefixo.
+- **Implementado:** `resolveTenantRoute()` aceita `/empresa/:slug` e mantém `/t/:slug` temporariamente compatível; links gerados pelo Master usam `/empresa/:slug`; documentação arquitetural foi atualizada.
+- **Segurança:** nenhuma política, RPC, migration, RLS ou regra de isolamento foi alterada.
+- **Validação:** resolução de `/empresa/empresa1`, `/empresa/empresa1/vagas`, `/t/empresa1` e `/t/empresa1/vagas` foi verificada estaticamente; build/deploy de produção ainda não foram validados.
+
+### TODO — migração de rota
+
+| Etapa | Status | Critério |
+|---|---|---|
+| Auditoria das referências `/t/` | Concluído | Referências funcionais e documentais identificadas |
+| Implementação `/empresa/:slug` | Concluído | Nova rota reconhecida e usada nos novos links |
+| Compatibilidade `/t/:slug` | Concluído | Links históricos continuam reconhecidos pelo frontend |
+| Validação de build | Aguardando validação | Build Vercel/CI concluído com sucesso |
+| Validação E2E/deep links | Aguardando validação | Portal, vagas e login validados em `/empresa/:slug` |
+| Deploy produção | Bloqueado | Ferramenta Vercel retornou 403 de escopo da equipe |
+| Documentação | Concluído | ADR, arquitetura, deploy, status e plano atualizados |
