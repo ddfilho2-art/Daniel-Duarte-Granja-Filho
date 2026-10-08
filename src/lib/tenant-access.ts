@@ -77,10 +77,19 @@ export async function loadCurrentTenantAccess(
 export function resolveAuthorizedHomePath(
   legacyProfile: string | null | undefined,
   isTenantRoute: boolean,
-  access: Pick<TenantAccess, "roles" | "canAdministerTenant"> & {
+  access: Pick<
+    TenantAccess,
+    "roles" | "canAdministerTenant" | "isPlatformMasterAdmin"
+  > & {
     clinicRoles?: Extract<TenantRole, "clinic_admin" | "clinic_staff">[];
   },
 ): string | null {
+  // Administrador da plataforma é global e não deve cair no painel
+  // administrativo de uma empresa.
+  if (!isTenantRoute && access.isPlatformMasterAdmin) {
+    return "/master";
+  }
+
   if (isTenantRoute) {
     if (access.canAdministerTenant) return "/admin";
     if (access.roles.includes("hr")) return "/rh";
