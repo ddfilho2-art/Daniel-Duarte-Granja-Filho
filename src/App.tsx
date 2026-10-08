@@ -301,7 +301,7 @@ const App = () => {
             >
               <Route index element={<MasterDashboard />} />
               <Route path="tenants" element={<MasterTenantList />} />
-              <Route path="branding" element={<MasterBrandingEditor />} />
+              <Route path="branding" element={<MasterBrandingEditor />} />\n              <Route path="perfil" element={<MasterProfile />} />
             </Route>
 
             <Route
