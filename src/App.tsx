@@ -181,6 +181,16 @@ const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
+  // O /admin representa a administração de uma empresa (tenant).
+  // O administrador da plataforma usa exclusivamente a área /master.
+  if (
+    location.pathname.startsWith("/admin") &&
+    !isTenantRoute &&
+    isPlatformMasterAdmin
+  ) {
+    return <Navigate to="/master" replace />;
+  }
+
   if (
     location.pathname.startsWith("/admin") &&
     !isTenantRoute &&
