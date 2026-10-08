@@ -14,8 +14,6 @@ type ProvisionAction =
       legalName?: string;
       displayName?: string;
       slug?: string;
-      adminEmail?: string;
-      adminPassword?: string;
     }
   | {
       action: "suspend";
@@ -51,22 +49,10 @@ type ProvisionAction =
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
 function requiredEnv(name: string): string {
   const value = Deno.env.get(name)?.trim();
   if (!value) throw new Error(`missing_secret:${name}`);
   return value;
-}
-
-function validPassword(value: string): boolean {
-  return (
-    value.length >= 8 &&
-    value.length <= 128 &&
-    /[a-z]/.test(value) &&
-    /[A-Z]/.test(value) &&
-    /\d/.test(value)
-  );
 }
 
 Deno.serve(async (request) => {
@@ -452,81 +438,6 @@ Deno.serve(async (request) => {
       const legalName = String(body.legalName || "").trim();
       const displayName = String(body.displayName || "").trim();
       const slug = String(body.slug || "").trim();
-      const adminEmail = String(body.adminEmail || "").trim().toLowerCase();
-      const adminPassword = String(body.adminPassword || "");
-
-      // Validation
-      if (
-        legalName.length < 2 ||
-        legalName.length > 200 ||
-        displayName.length < 2 ||
-        displayName.length > 160 ||
-        slug.length < 3 ||
-        slug.length > 63 ||
-        !EMAIL_PATTERN.test(adminEmail) ||
-        !validPassword(adminPassword)
-      ) {
-        return jsonResponse(
-          {
-            success: false,
-            code: "INVALID_INPUT",
-            message: "Validation failed for one or more fields",
-            requestId: currentRequestId,
-          },
-          400,
-          cors,
-        );
-      }
-
-      // Create the admin user via Supabase Auth
-      const { data: newUser, error: createError } =
-        await admin.auth.admin.createUser({
-          email: adminEmail,
-          password: adminPassword,
-          email_confirm: true,
-          user_metadata: {
-            nome: displayName + " Admin",
-            perfil: "Admin",
-          },
-        });
-
-      if (createError || !newUser.user) {
-        return jsonResponse(
-          {
-            success: false,
-            code: "AUTH_CREATE_FAILED",
-            message: createError?.message || "Failed to create admin user",
-            requestId: currentRequestId,
-          },
-          400,
-          cors,
-        );
-      }
-
-      const adminUserId = newUser.user.id;
-
-      // Create the legacy users row
-      const { error: profileError } = await admin.from("users").upsert(
-        {
-          id: adminUserId,
-          uid: adminUserId,
-          nome: displayName + " Admin",
-          email: adminEmail,
-          login: adminEmail.split("@")[0],
-          login_lower: adminEmail.split("@")[0].toLowerCase(),
-          perfil: "Admin",
-          status: "Ativo",
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" },
-      );
-
-      if (profileError) {
-        await admin.auth.admin.deleteUser(adminUserId).catch(() => undefined);
-        throw profileError;
-      }
-
-      // Call provision_tenant RPC
       const { data: result, error: rpcError } = await admin.rpc(
         "provision_tenant",
         {
@@ -536,12 +447,10 @@ Deno.serve(async (request) => {
           p_legal_name: legalName,
           p_display_name: displayName,
           p_slug: slug,
-          p_admin_user_id: adminUserId,
         },
       );
 
       if (rpcError) {
-        await admin.auth.admin.deleteUser(adminUserId).catch(() => undefined);
         return jsonResponse(
           {
             success: false,
@@ -557,7 +466,7 @@ Deno.serve(async (request) => {
       return jsonResponse(
         {
           success: true,
-          code: "TENANT_PROVISIONED",
+          code: "TENANT_CREATED",
           requestId: currentRequestId,
           result,
         },
