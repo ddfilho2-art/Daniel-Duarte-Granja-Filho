@@ -81,3 +81,12 @@
 - `0e25edb5a9f6b6d1961048fee9d76da9ff4c1186` — esclarece o cabeçalho da métrica de vínculos.
 
 **Conclusão:** a Edge Function está implantada no Supabase, mas a manutenção ainda não está concluída em produção. Faltam build/type-check e regressão, validação autenticada da ação, e deploy manual do frontend na Vercel seguido de teste visual/funcional.
+
+
+## Atualização — Paginação do Storage (2026-10-09)
+
+Foi corrigido em `supabase/functions/tenant-provisioning/index.ts` o limite silencioso da listagem de identidade visual: a consulta agora percorre páginas de até 1.000 objetos e acumula contagem/tamanho de todas as páginas, em vez de considerar somente o primeiro lote.
+
+- **Implementado na main:** commit `d62f15ccf6a26b2e0fcf8ebca08460fbf9b1b5c6`.
+- **Ainda não validado:** deploy da Edge Function, build/type-check, teste com mais de 1.000 objetos, teste autenticado Master/403 para usuário comum e regressão visual.
+- A métrica continua parcial e não estima CPU, RAM, tamanho de tabelas ou arquivos sem atribuição inequívoca.
