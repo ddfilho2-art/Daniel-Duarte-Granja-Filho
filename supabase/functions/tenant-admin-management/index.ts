@@ -39,6 +39,13 @@ type Action =
       fileName?: string;
       mimeType?: string;
       sizeBytes?: number;
+    }
+  | {
+      action: "reset_admin_password";
+      tenantId?: string;
+      userId?: string;
+      newPassword?: string;
+      justification?: string;
     };
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -343,6 +350,80 @@ Deno.serve(async (request) => {
 
     const actorId = await assertPlatformAdmin(request, admin, userClient);
     const body = await bodyOf<Action>(request);
+
+    if (body.action === "reset_admin_password") {
+      const tenantId = tenantIdOf(body.tenantId);
+      const targetUserId = String(body.userId || "").trim();
+      const newPassword = String(body.newPassword || "");
+      const justification = String(body.justification || "").trim();
+
+      if (!UUID.test(targetUserId)) throw new Error("invalid_user_id");
+      if (!validPassword(newPassword)) throw new Error("invalid_password_policy");
+      if (justification.length < 5 || justification.length > 2000) throw new Error("justification_required");
+
+      const { data: membership, error: membershipError } = await admin
+        .from("tenant_memberships")
+        .select("user_id, roles, status")
+        .eq("tenant_id", tenantId)
+        .eq("user_id", targetUserId)
+        .eq("status", "active")
+        .contains("roles", ["tenant_admin"])
+        .maybeSingle();
+      if (membershipError) throw membershipError;
+      if (!membership) throw new Error("active_tenant_admin_not_found");
+
+      await assertNotPlatformMaster(admin, targetUserId);
+
+      const { data: targetProfile, error: profileError } = await admin
+        .from("users")
+        .select("id")
+        .eq("id", targetUserId)
+        .maybeSingle();
+      if (profileError) throw profileError;
+      if (!targetProfile) throw new Error("tenant_admin_profile_not_found");
+
+      const { data: audit, error: auditError } = await admin
+        .from("tenant_admin_password_reset_audit")
+        .insert({
+          tenant_id: tenantId,
+          target_user_id: targetUserId,
+          actor_user_id: actorId,
+          justification,
+          status: "requested",
+        })
+        .select("id")
+        .single();
+      if (auditError) throw auditError;
+
+      try {
+        const { error: updateError } = await admin.auth.admin.updateUserById(targetUserId, {
+          password: newPassword,
+        });
+        if (updateError) throw updateError;
+
+        const { error: auditUpdateError } = await admin
+          .from("tenant_admin_password_reset_audit")
+          .update({ status: "succeeded", completed_at: new Date().toISOString() })
+          .eq("id", audit.id);
+        if (auditUpdateError) throw auditUpdateError;
+      } catch (resetError) {
+        await admin
+          .from("tenant_admin_password_reset_audit")
+          .update({
+            status: "failed",
+            failure_code: "password_update_failed",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", audit.id);
+        throw resetError;
+      }
+
+      return response({
+        success: true,
+        data: { auditId: audit.id },
+        requestId: id,
+      }, 200, cors);
+    }
 
     if (body.action === "list_admins") {
       const tenantId = tenantIdOf(body.tenantId);
