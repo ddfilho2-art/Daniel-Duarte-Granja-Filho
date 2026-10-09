@@ -68,3 +68,12 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 **Validação:** inspeção do código e commit confirmados. Build, type-check, testes automatizados e reprodução no navegador ainda não foram executados. Deploy Vercel não realizado; permanece manual.
 
 **Riscos/regressão a testar:** login/logout, renovação de token, navegação repetida entre páginas protegidas, mudança entre portal Master e tenant, usuário sem membership e RPC de autorização com erro. Não remover a espera de autorização nem permitir acesso por timeout; erros devem terminar em estado seguro.
+
+
+## Revisão da correção de sincronização (2026-10-09)
+
+- **Retorno do usuário:** após a primeira correção, o comportamento piorou e o primeiro login do Master ficou mais lento.
+- **Revisão:** a versão com `authorizationSyncVersion` fazia a sincronização de perfil disparar novamente a consulta de autorização a cada renovação/evento de sessão, podendo aumentar chamadas e latência. Essa estratégia foi removida.
+- **Correção atual em `main`:** commit `29dff80d19a0b3a246ffbda37315c0f646ea43e5`. Foi adicionado `lastProfileSyncUserIdRef` para evitar recarregar perfil e reabrir o bloqueio de autorização quando o mesmo usuário já foi sincronizado; o contador de sincronização foi removido. A primeira sincronização e a autorização inicial continuam obrigatórias.
+- **Validação:** inspeção e commit confirmados; build, type-check e teste de navegador ainda não executados. Deploy Vercel não realizado.
+- **Status:** correção anterior substituída; validar login Master, renovação de sessão, navegação e acesso negado antes de considerar concluído.
