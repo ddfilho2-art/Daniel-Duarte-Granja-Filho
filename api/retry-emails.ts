@@ -87,46 +87,37 @@ export default async function handler(req: any, res: any) {
     }
 
     const cronSecret = process.env.CRON_SECRET || "";
-    const providedCronSecret =
-      typeof req.headers?.["x-cron-secret"] === "string"
-        ? req.headers["x-cron-secret"]
-        : "";
-    const authorization =
-      typeof req.headers?.authorization === "string"
-        ? req.headers.authorization
-        : "";
+    const providedCronSecret = typeof req.headers?.["x-cron-secret"] === "string" ? req.headers["x-cron-secret"] : "";
+    const isCronRequest = Boolean(cronSecret && providedCronSecret === cronSecret);
+    const authorization = typeof req.headers?.authorization === "string" ? req.headers.authorization : "";
+    let tenantId: string | null = null;
+    let authorized = isCronRequest;
 
-    let authorized = Boolean(cronSecret && providedCronSecret === cronSecret);
+    if (!isCronRequest) {
+      if (!authClient || !authorization.startsWith("Bearer ")) return res.status(401).json({ success: false, code: "UNAUTHORIZED", requestId });
+      const { data: userData, error: userError } = await authClient.auth.getUser(authorization.slice("Bearer ".length).trim());
+      if (userError || !userData.user) return res.status(401).json({ success: false, code: "INVALID_SESSION", requestId });
 
-    if (!authorized && authClient && authorization.startsWith("Bearer ")) {
-      const token = authorization.slice("Bearer ".length).trim();
-      const { data: userData } = await authClient.auth.getUser(token);
-      if (userData.user) {
-        const { data: privilegedUser } = await supabase
-          .from("users")
-          .select("id,uid,perfil,status")
-          .or(`id.eq.${userData.user.id},uid.eq.${userData.user.id}`)
-          .maybeSingle();
+      const requestedTenantId = typeof req.headers?.["x-tenant-id"] === "string" ? req.headers["x-tenant-id"].trim() : "";
+      const tenantUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (!tenantUuidPattern.test(requestedTenantId)) return res.status(400).json({ success: false, code: "TENANT_REQUIRED", requestId });
 
-        authorized = Boolean(
-          privilegedUser &&
-            ["admin", "rh"].includes(
-              String(privilegedUser.perfil || "").toLowerCase(),
-            ) &&
-            !["inativo", "inactive", "suspended"].includes(
-              String(privilegedUser.status || "ativo").toLowerCase(),
-            ),
-        );
+      const [{ data: membership, error: membershipError }, { data: tenant, error: tenantError }] = await Promise.all([
+        supabase.from("tenant_memberships").select("tenant_id,roles,status").eq("user_id", userData.user.id).eq("tenant_id", requestedTenantId).eq("status", "active").maybeSingle(),
+        supabase.from("tenants").select("id,kind,status").eq("id", requestedTenantId).maybeSingle(),
+      ]);
+      if (membershipError || tenantError) {
+        console.error("[RETRY-EMAILS] tenant authorization lookup failed", { requestId, membershipError: membershipError?.message, tenantError: tenantError?.message });
+        return res.status(503).json({ success: false, code: "AUTHORIZATION_CHECK_FAILED", requestId });
       }
+      const roles = Array.isArray(membership?.roles) ? membership.roles : [];
+      if (!membership || !roles.some((role: string) => ["tenant_admin", "tenant_admin_substitute"].includes(role)) || tenant?.kind !== "employer" || tenant?.status !== "active") {
+        return res.status(403).json({ success: false, code: "TENANT_ADMIN_REQUIRED", requestId });
+      }
+      tenantId = requestedTenantId;
+      authorized = true;
     }
-
-    if (!authorized) {
-      return res.status(401).json({
-        success: false,
-        code: "UNAUTHORIZED",
-        requestId,
-      });
-    }
+    if (!authorized) return res.status(401).json({ success: false, code: "UNAUTHORIZED", requestId });
 
     const resendApiKey = process.env.RESEND_API_KEY;
     if (!resendApiKey) {
@@ -137,13 +128,15 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    const { data: queuingEmails, error: fetchError } = await supabase
+    let queueQuery = supabase
       .from("email_queue")
       .select("*")
       .in("status", ["pending", "failed"])
       .lt("attempts", MAX_RETRIES)
       .order("created_at", { ascending: true })
       .limit(20);
+    if (tenantId) queueQuery = queueQuery.eq("tenant_id", tenantId);
+    const { data: queuingEmails, error: fetchError } = await queueQuery;
 
     if (fetchError) {
       throw new Error(`Error fetching queue: ${fetchError.message}`);
@@ -177,7 +170,7 @@ export default async function handler(req: any, res: any) {
       // Atomic optimistic claim:
       // only the worker that successfully writes the lease may process the row.
       // A stale lease can be recovered after 15 minutes.
-      const { data: claimedRows, error: claimError } = await supabase
+      let claimQuery = supabase
         .from("email_queue")
         .update({
           processing_token: claimToken,
@@ -190,9 +183,9 @@ export default async function handler(req: any, res: any) {
         .lt("attempts", MAX_RETRIES)
         .or(
           `processing_token.is.null,processing_started_at.lt.${claimCutoff}`,
-        )
-        .select("*")
-        .limit(1);
+        );
+      if (tenantId) claimQuery = claimQuery.eq("tenant_id", tenantId);
+      const { data: claimedRows, error: claimError } = await claimQuery.select("*").limit(1);
 
       if (claimError) {
         console.error(
@@ -244,7 +237,7 @@ export default async function handler(req: any, res: any) {
           },
           async (attempt: number) => {
             lastProviderAttempt = attempt + 1;
-            await supabase
+            const attemptUpdate = supabase
               .from("email_queue")
               .update({
                 attempts: Math.min(
@@ -255,10 +248,12 @@ export default async function handler(req: any, res: any) {
               })
               .eq("id", id)
               .eq("processing_token", claimToken);
+            if (tenantId) attemptUpdate.eq("tenant_id", tenantId);
+            await attemptUpdate;
           },
         );
 
-        const { error: sentError } = await supabase
+        const finalizeSent = supabase
           .from("email_queue")
           .update({
             status: "sent",
@@ -268,6 +263,8 @@ export default async function handler(req: any, res: any) {
           })
           .eq("id", id)
           .eq("processing_token", claimToken);
+        if (tenantId) finalizeSent.eq("tenant_id", tenantId);
+        const { error: sentError } = await finalizeSent;
 
         if (sentError) {
           throw new Error(`Failed to finalize sent email: ${sentError.message}`);
@@ -284,7 +281,7 @@ export default async function handler(req: any, res: any) {
         );
         const nextStatus = attempts >= MAX_RETRIES ? "failed" : "pending";
 
-        const { error: failError } = await supabase
+        const finalizeFailure = supabase
           .from("email_queue")
           .update({
             status: nextStatus,
@@ -296,6 +293,8 @@ export default async function handler(req: any, res: any) {
           })
           .eq("id", id)
           .eq("processing_token", claimToken);
+        if (tenantId) finalizeFailure.eq("tenant_id", tenantId);
+        const { error: failError } = await finalizeFailure;
 
         if (failError) {
           console.error(
