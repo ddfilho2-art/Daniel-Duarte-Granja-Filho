@@ -51,3 +51,18 @@ O painel Master precisa exibir o consumo de recursos por empresa sem inventar va
 - `src/lib/tenant-provisioning.ts`
 - `supabase/functions/tenant-provisioning/index.ts`
 - `docs/maintenance/2026-10-09-master-dashboard-sre-tenant-usage.md`
+
+
+## Correção — Paginação do armazenamento atribuível (2026-10-09)
+
+### Sintoma / risco
+A consulta de consumo usava `storage.from("tenant-branding").list(tenant.id, { limit: 1000, offset: 0 })`. Acima de 1.000 entradas, o painel deixaria de contabilizar arquivos adicionais sem avisar.
+
+### Alteração
+Em `supabase/functions/tenant-provisioning/index.ts`, a listagem agora percorre páginas de 1.000 entradas até receber uma página menor, acumulando quantidade de objetos e bytes a partir dos metadados. Placeholders de pasta continuam excluídos do total.
+
+### Validação / status
+- **Inspecionado:** o código anterior tinha limite fixo de 1.000 e offset zero.
+- **Implementado na main:** commit `d62f15ccf6a26b2e0fcf8ebca08460fbf9b1b5c6`.
+- **Não validado:** deploy da Edge Function, teste com mais de 1.000 objetos, build/type-check e regressão de autorização.
+- O indicador permanece parcial: somente objetos do bucket `tenant-branding` com caminho de tenant são somados junto dos anexos administrativos cujo tamanho está registrado. Isso não representa o armazenamento total de todos os dados do tenant.
