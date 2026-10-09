@@ -191,3 +191,20 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Regressão de login Master, admin tenant e isolamento | Aguardando validação | Garantir que as duas áreas continuam separadas |
 | Atualizar Base de Conhecimento | Concluído | docs/knowledge-base/tenant-admin-password-management.md |
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+
+## Manutenção — autorização presa em “Sincronizando acesso...” (2026-10-09)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Registrar sintoma | Concluído | Tela branca e spinner persistente ao navegar e retornar, conforme relato do usuário |
+| Diagnosticar dependência do efeito de autorização | Concluído — inspeção estática | `authorizationLoading` era ativado mesmo com o mesmo `authUserId`, mas o efeito dependia somente desse ID |
+| Corrigir reexecução da sincronização | Concluído — código na main | Commit `f0e9594624f47c3213c8330d1af71480880a3f9b`; contador `authorizationSyncVersion` dispara novamente o efeito |
+| Build / type-check | Aguardando validação | Ainda não executados |
+| Testar renovação de sessão e navegação repetida | Aguardando validação | Reproduzir no navegador após deploy |
+| Regressão de login/logout, Master/tenant e acesso negado | Aguardando validação | Confirmar que autorização continua fail-closed e não cruza tenants |
+| Atualizar Base de Conhecimento e plano por perfil | Concluído | Incidente e evidência estática documentados |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
+| Validação em produção | Aguardando validação | Só após deploy manual e testes funcionais |
+
+**Status atual:** correção implementada, mas manutenção ainda não validada funcionalmente. Não remover o bloqueio de autorização nem usar timeout para conceder acesso.
