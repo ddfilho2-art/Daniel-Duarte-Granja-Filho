@@ -31,6 +31,9 @@ type ProvisionAction =
       action: "list_tenants";
     }
   | {
+      action: "tenant_usage";
+    }
+  | {
       action: "get_tenant";
       tenantId?: string;
     }
@@ -152,6 +155,86 @@ Deno.serve(async (request) => {
 
       return jsonResponse(
         { success: true, tenants: tenants || [], requestId: currentRequestId },
+        200,
+        cors,
+      );
+    }
+
+    // ── TENANT RESOURCE USAGE ─────────────────────────────────────────────
+    if (body.action === "tenant_usage") {
+      const { data: tenants, error: tenantsError } = await admin
+        .from("tenants")
+        .select("id, display_name, status")
+        .order("display_name", { ascending: true });
+      if (tenantsError) throw tenantsError;
+
+      const tenantUsage = await Promise.all((tenants || []).map(async (tenant) => {
+        const countForTenant = async (table: string) => {
+          const { count, error } = await admin
+            .from(table)
+            .select("id", { count: "exact", head: true })
+            .eq("tenant_id", tenant.id);
+          if (error) throw error;
+          return count || 0;
+        };
+
+        const [memberships, vacancies, candidates, applications, aiRequests, auditEvents, brandingFiles] =
+          await Promise.all([
+            countForTenant("tenant_memberships"),
+            countForTenant("vagas"),
+            countForTenant("candidatos"),
+            countForTenant("candidaturas"),
+            countForTenant("ai_analysis_requests"),
+            countForTenant("tenant_audit_logs"),
+            admin.storage.from("tenant-branding").list(tenant.id, { limit: 1000, offset: 0 }),
+          ]);
+
+        if (brandingFiles.error) throw brandingFiles.error;
+        const brandingObjectList = (brandingFiles.data || []).filter((file) => file.id || file.metadata);
+        const brandingBytes = brandingObjectList.reduce((sum, file) => {
+          const size = Number(file.metadata?.size);
+          return sum + (Number.isFinite(size) && size > 0 ? size : 0);
+        }, 0);
+
+        const { data: operations, error: operationsError } = await admin
+          .from("tenant_admin_operations")
+          .select("id")
+          .eq("tenant_id", tenant.id);
+        if (operationsError) throw operationsError;
+
+        let adminAttachmentBytes = 0;
+        if ((operations || []).length > 0) {
+          const { data: attachments, error: attachmentsError } = await admin
+            .from("tenant_admin_operation_attachments")
+            .select("size_bytes")
+            .in("operation_id", operations!.map((operation) => operation.id));
+          if (attachmentsError) throw attachmentsError;
+          adminAttachmentBytes = (attachments || []).reduce((sum, attachment) => {
+            const size = Number(attachment.size_bytes);
+            return sum + (Number.isFinite(size) && size > 0 ? size : 0);
+          }, 0);
+        }
+
+        return {
+          tenant_id: tenant.id,
+          display_name: tenant.display_name,
+          status: tenant.status,
+          memberships,
+          vacancies,
+          candidates,
+          applications,
+          ai_requests: aiRequests,
+          audit_events: auditEvents,
+          branding_file_count: brandingObjectList.length,
+          branding_bytes: brandingBytes,
+          admin_attachment_bytes: adminAttachmentBytes,
+          attributed_storage_bytes: brandingBytes + adminAttachmentBytes,
+          storage_scope: "partial",
+        };
+      }));
+
+      return jsonResponse(
+        { success: true, code: "TENANT_USAGE_LISTED", tenantUsage, requestId: currentRequestId },
         200,
         cors,
       );
