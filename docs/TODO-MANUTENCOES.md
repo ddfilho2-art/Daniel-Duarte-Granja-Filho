@@ -77,3 +77,28 @@
 | Teste autenticado de upload → rascunho → publicação → portal | Aguardando validação | Confirmar logo associado ao tenant correto e sem vazamento entre tenants |
 | Implementar probes e medição real de SLO/latência | Não iniciado | Necessário para uptime, percentis de latência e error budget reais |
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+
+## Manutenção — 2026-10-09 — Correção da validação do caminho do logo
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Confirmar causa no banco de produção | Concluído | Teste SQL reproduziu que o padrão com barra duplicada não reconhecia caminho .png; padrão corrigido usa classe [.] sem ambiguidades de escape |
+| Corrigir função RPC create_tenant_branding_draft | Concluído no banco | Migration aplicada com sucesso ao Supabase; autorização, lock transacional e auditoria preservados |
+| Versionar migration na main | Concluído | supabase/migrations/20261009100000_fix_tenant_branding_logo_path_regex.sql |
+| Validar regex para PNG/WebP e rejeição de JPG | Concluído | Consulta SQL confirmou PNG e WebP válidos e JPG incompatível com a política |
+| Corrigir migration versionada para refletir exatamente o banco | Em tratamento | Substituir escape ambíguo por [.] e validar arquivo atualizado |
+| Testar upload → rascunho → publicação → portal autenticado | Aguardando validação | Exige sessão de platform master; logo só aparece após publicar o rascunho |
+| Build, type-check e regressão | Aguardando validação | Ainda não executados nesta sessão |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+## Manutenção — Consumo de recursos por empresa
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Inventariar tabelas e buckets atuais | Concluído | Catálogo de tabelas públicas e buckets consultado |
+| Identificar atribuição confiável dos dados a cada tenant | Em tratamento | Mapear colunas e relacionamentos antes de somar candidatos, vagas, usuários e anexos |
+| Definir métricas com origem verificável | Não iniciado | Separar bytes de armazenamento, contagens e consumo de infraestrutura não medido por tenant pelo Supabase |
+| Implementar painel Master com isolamento e dados reais | Não iniciado | Agregar métricas por tenant sem expor dados pessoais de candidatos |
+| Testes de precisão, isolamento e regressão | Não iniciado | Comparar totais com consultas de referência e impedir cruzamento entre tenants |
+| Documentar e atualizar TODO | Em tratamento | Registro inicial adicionado |
