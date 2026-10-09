@@ -35,6 +35,10 @@ type ProvisionAction =
       tenantId?: string;
     }
   | {
+      action: "list_branding_versions";
+      tenantId?: string;
+    }
+  | {
       action: "create_branding_draft";
       tenantId?: string;
       theme?: Record<string, unknown>;
@@ -193,6 +197,67 @@ Deno.serve(async (request) => {
           tenant: { ...tenant, memberCount: memberCount || 0 },
           requestId: currentRequestId,
         },
+        200,
+        cors,
+      );
+    }
+
+    // ── LIST BRANDING VERSIONS ────────────────────────────────────────────
+    if (body.action === "list_branding_versions") {
+      const tenantId = String(body.tenantId || "").trim();
+      if (!UUID_PATTERN.test(tenantId)) {
+        return jsonResponse(
+          { success: false, code: "INVALID_TENANT_ID", requestId: currentRequestId },
+          400,
+          cors,
+        );
+      }
+
+      const { data: versions, error } = await admin
+        .from("tenant_branding_versions")
+        .select("*")
+        .eq("tenant_id", tenantId)
+        .order("version", { ascending: false });
+
+      if (error) throw error;
+
+      // auth.users não é consultável diretamente pelo frontend. Resolver os autores
+      // no servidor evita expor UUIDs como se fossem nomes na tela de auditoria.
+      const userIds = [...new Set((versions || [])
+        .flatMap((version) => [version.created_by, version.published_by])
+        .filter((id): id is string => typeof id === "string" && UUID_PATTERN.test(id)))];
+
+      const identities = await Promise.all(userIds.map(async (userId) => {
+        const { data, error: userError } = await admin.auth.admin.getUserById(userId);
+        if (userError || !data.user) return [userId, { name: null, email: null }] as const;
+        const metadata = data.user.user_metadata || {};
+        const name = [metadata.full_name, metadata.name, metadata.display_name, metadata.nome]
+          .find((value) => typeof value === "string" && value.trim().length > 0);
+        return [userId, {
+          name: typeof name === "string" ? name.trim() : null,
+          email: data.user.email || null,
+        }] as const;
+      }));
+      const identityById = new Map(identities);
+
+      const enrichedVersions = (versions || []).map((version) => {
+        const creator = typeof version.created_by === "string"
+          ? identityById.get(version.created_by)
+          : undefined;
+        const publisher = typeof version.published_by === "string"
+          ? identityById.get(version.published_by)
+          : undefined;
+        return {
+          ...version,
+          created_by_name: creator?.name || null,
+          created_by_email: creator?.email || null,
+          published_by_name: publisher?.name || null,
+          published_by_email: publisher?.email || null,
+        };
+      });
+
+      return jsonResponse(
+        { success: true, code: "BRANDING_VERSIONS_LISTED", versions: enrichedVersions, requestId: currentRequestId },
         200,
         cors,
       );
