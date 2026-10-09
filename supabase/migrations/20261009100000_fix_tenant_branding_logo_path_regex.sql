@@ -1,5 +1,4 @@
--- Fix tenant branding logo path validation: PostgreSQL regex must escape the
--- extension dot once so generated UUID.png / UUID.webp paths are accepted.
+-- Fix tenant branding logo path validation: PostgreSQL regex must use a literal-dot character class so generated UUID.png / UUID.webp paths are accepted.
 CREATE OR REPLACE FUNCTION public.create_tenant_branding_draft(p_actor_id uuid, p_tenant_id uuid, p_theme jsonb, p_reason text)
  RETURNS jsonb
  LANGUAGE plpgsql
