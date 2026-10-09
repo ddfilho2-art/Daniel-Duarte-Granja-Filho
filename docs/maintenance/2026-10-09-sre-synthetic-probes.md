@@ -73,3 +73,10 @@ O sintoma era correto. A causa era ausência de coleta e armazenamento de mediç
 - **Implementado na UI:** Overview reflete estados `measured`, `degraded`, `stale` e `not_measured`; o rótulo do gráfico só indica série instrumentada quando há pontos.
 - **Não validado:** não há amostras reais ainda; não foram executados build/type-check, testes de sessão autenticada ou validação visual. A consulta SQL de health é uma verificação de conectividade, não uma prova de funcionamento de todos os fluxos de negócio.
 - **Atenção do advisor:** o Supabase reporta RLS habilitada sem policy para a tabela de probes. Isso é intencional: nenhuma role de cliente recebe acesso direto; a ingestão usa service-role no servidor e a leitura passa pela RPC com guard Master. O advisor também lista alertas preexistentes sobre outras funções SECURITY DEFINER; não foram alterados neste escopo.
+
+
+## Tentativa de validação de build
+
+- **Verificação estática de fonte:** 10/10 checagens passaram para endpoints, autenticação Master, segredo de ingestão, workflow, UI, migrations e documentação.
+- **Build/type-check:** não executados. A tentativa de provisionar um sandbox de validação falhou porque o clone do GitHub falhou no ambiente de sandbox. Isso não comprova erro de compilação nem sucesso de build.
+- **Próxima validação:** executar `npm run lint` e `npm run build` em ambiente que consiga clonar o repositório; em seguida configurar os segredos, executar o workflow manual e confirmar a persistência de duas amostras por execução.
