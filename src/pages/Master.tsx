@@ -693,15 +693,21 @@ export function MasterBrandingEditor() {
     }
   };
 
-  const handlePublish = async (brandingId: string) => {
+  const handlePublish = async (brandingId: string, savedReason?: string) => {
     if (loading) return;
     if (!selectedTenant) { setError("Selecione uma empresa antes de publicar."); return; }
-    if (reason.trim().length < 3) { setError("Informe uma justificativa com pelo menos 3 caracteres para publicar."); return; }
+    // A justificativa já registrada no rascunho é a justificativa da publicação.
+    // Só usa o texto atual do formulário como fallback para rascunhos antigos sem motivo salvo.
+    const publishReason = String(savedReason || reason || "").trim();
+    if (publishReason.length < 3) {
+      setError("Esta versão não possui justificativa válida. Informe uma justificativa no campo acima e salve um novo rascunho.");
+      return;
+    }
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      await publishBranding(selectedTenant, brandingId, reason.trim());
+      await publishBranding(selectedTenant, brandingId, publishReason);
       setSuccess("Identidade visual publicada com sucesso.");
       await loadBranding(selectedTenant);
       setReason("");
@@ -845,7 +851,7 @@ export function MasterBrandingEditor() {
                     <td className="px-4 py-2 text-xs text-slate-500">{new Date(v.created_at as string).toLocaleString("pt-BR")}</td>
                     <td className="px-4 py-2 text-xs">{String(v.created_by_name || v.created_by_email || v.created_by || "-")}</td>
                     <td className="px-4 py-2 text-xs max-w-sm">{String(v.change_reason || "-")}</td>
-                    <td className="px-4 py-2">{v.status === "draft" && <button type="button" onClick={() => handlePublish(v.id as string)} disabled={loading} className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">Publicar</button>}</td>
+                    <td className="px-4 py-2">{v.status === "draft" && <button type="button" onClick={() => handlePublish(v.id as string, String(v.change_reason || ""))} disabled={loading} className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">Publicar</button>}</td>
                   </tr>)}
                 </tbody>
               </table>
