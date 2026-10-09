@@ -1106,7 +1106,7 @@ export function MasterTenantAdminManagement() {
   const submitPasswordReset = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedTenant || !resetPasswordAdmin) return;
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,128}$/.test(resetPassword)) {
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,128}$/.test(resetPassword)) {
       setError("A senha deve ter de 8 a 128 caracteres, com letra maiúscula, minúscula e número.");
       return;
     }
