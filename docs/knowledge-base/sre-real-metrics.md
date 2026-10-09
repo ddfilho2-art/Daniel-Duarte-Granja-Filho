@@ -82,3 +82,16 @@ Os valores variam com o uso e não devem ser codificados como constantes.
 - A consulta equivalente foi executada via fonte gerenciada e retornou 10 fontes de serviço. A classificação de suspeitas de erro é heurística por texto, não uma confirmação de incidente.
 - **Não validado:** chamada do endpoint a partir de uma sessão Master real, presença da variável de ambiente no ambiente de produção, build/type-check e teste visual.
 - Uptime e latência continuam sem probes e histórico persistido; não exibir como zero ou como saudável sem medição.
+
+
+## Probes sintéticos e disponibilidade/latência — 2026-10-09
+
+- Causa de `not_measured`: a RPC `get_sre_dashboard_metrics()` mantinha `uptime_real = null`, gráfico de latência vazio e `data_quality.*_instrumented = false`; não havia histórico de sondagens.
+- Migration `supabase/migrations/20261009160000_sre_synthetic_probes.sql` cria `public.sre_probe_results` com RLS habilitada e sem acesso direto de `anon`/ `authenticated`, e RPC `get_sre_slo_metrics()` com guard de administrador global.
+- Probes são executados pelo GitHub Actions a cada cinco minutos para a homepage publicada e `/api/sre-health`, que verifica a conectividade da aplicação com o Data API/PostgreSQL.
+- `supabase/functions/sre-probe-ingest/index.ts` valida um segredo compartilhado, payload, endpoints permitidos, status, latência e timestamp antes de inserir usando service-role somente no servidor.
+- A API `/api/sre-slo-metrics` valida sessão e autorização Master antes de consultar o histórico; a UI exibe disponibilidade observada em 24h e 30 dias, p50/p95/p99, falhas e atraso de sondagem.
+- Configuração pendente: adicionar `SRE_PROBE_SECRET` como segredo da Edge Function e como GitHub Actions Secret; adicionar `SUPABASE_ANON_KEY` como GitHub Actions Secret. O mesmo segredo compartilhado deve ser forte, gerado aleatoriamente e nunca commitado.
+- **Testado:** migration aplicada; Edge Function publicada versão 1.
+- **Não validado:** probes reais, ingestão autenticada, workflow agendado, build/type-check, sessão Master real, negação a usuário de tenant e deploy manual da Vercel.
+- Não formalizar metas de SLO antes de observar uma linha de base real. O indicador é disponibilidade observada, não garantia contratual de SLA.
