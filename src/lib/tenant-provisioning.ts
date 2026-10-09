@@ -22,6 +22,23 @@ export interface TenantDetail extends TenantListItem {
   memberCount: number;
 }
 
+export interface TenantUsageItem {
+  tenant_id: string;
+  display_name: string;
+  status: string;
+  memberships: number;
+  vacancies: number;
+  candidates: number;
+  applications: number;
+  ai_requests: number;
+  audit_events: number;
+  branding_file_count: number;
+  branding_bytes: number;
+  admin_attachment_bytes: number;
+  attributed_storage_bytes: number;
+  storage_scope: "partial";
+}
+
 export interface ProvisionPayload {
   kind?: "employer" | "occupational_health_provider";
   cnpj: string;
@@ -57,6 +74,7 @@ interface EdgeResponse {
   tenants?: TenantListItem[];
   tenant?: TenantDetail;
   versions?: Record<string, unknown>[];
+  tenantUsage?: TenantUsageItem[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -99,6 +117,11 @@ async function callEdge(
 export async function listTenants(): Promise<TenantListItem[]> {
   const data = await callEdge("list_tenants", {});
   return data.tenants || [];
+}
+
+export async function getTenantUsage(): Promise<TenantUsageItem[]> {
+  const data = await callEdge("tenant_usage", {});
+  return (data.tenantUsage || []) as TenantUsageItem[];
 }
 
 export async function getTenant(tenantId: string): Promise<TenantDetail> {
