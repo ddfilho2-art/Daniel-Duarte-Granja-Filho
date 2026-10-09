@@ -134,3 +134,29 @@ O membership de um administrador revogado que não possui outros papéis não po
 
 ### Aprendizado
 Arquivos de produção dentro de `dist` não devem ser tratados como fonte estática. Assets que precisam sobreviver a `vite build` devem estar em `public` ou em `src/assets`. Para personalização multi-tenant, o upload precisa ser associado ao tenant e o caminho deve fazer parte do tema publicado; salvar somente o arquivo não altera a identidade exibida.
+
+
+## 2026-10-09 — Persistência de logo por tenant e SRE com dados honestos
+
+### Problema
+O logo selecionado na identidade visual não aparecia no portal da empresa. O Dashboard Master tinha apenas KPIs básicos. A tela SRE apresentava valores de disponibilidade, cache, conexões e saúde sem instrumentação real.
+
+### Evidências e causa-raiz
+- `MasterBrandingEditor` gerava caminho como `<tenant-id>/logo-primary-<timestamp>.png`, enquanto `create_tenant_branding_draft` valida `<tenant-id>/<uuid>.(png|webp)`. A função rejeitava o caminho; o upload ainda permitia JPG, embora o bucket/validação não o aceitassem.
+- `get_public_tenant_context` lê o caminho do logo da versão publicada; criar um rascunho não publica automaticamente a identidade.
+- As RPCs SRE retornavam valores fixos (`uptime_real=100`, score de saúde 100, cache/conexões artificiais), sem medição que sustentasse esses números.
+- Consulta ao catálogo do Supabase confirmou que as funções e tabelas de branding existem. A telemetria de logs da aplicação disponível no banco é limitada e não é um monitor de disponibilidade/latência.
+
+### O que mudou
+- Upload de logo agora aceita PNG/WebP e gera nome UUID dentro da pasta do tenant, compatível com a validação existente.
+- Dashboard Master passou a exibir crescimento mensal de empresas, situação contratual, distribuição por tipo e contratos encerrados, usando a lista real de tenants.
+- Área SRE adicionada ao menu Master. O acesso global é limitado ao platform master; o acesso SRE na rota administrativa de empresa exibe bloqueio para não-master.
+- RPCs SRE substituídas por métricas de tabelas reais (logs de aplicação e fila de e-mails), disponibilidade/latência/cache/conexões não instrumentadas retornam N/D/null em vez de valores inventados.
+- Migração versionada em `supabase/migrations/20261009070000_platform_sre_real_metrics_and_truthful_unknowns.sql` e aplicada ao Supabase.
+
+### Validação e limitações
+- Validado por inspeção: incompatibilidade do caminho do logo; definição atual das RPCs e existência das tabelas; execução bem-sucedida da migration no Supabase.
+- Ainda não validado por build/type-check nem teste autenticado ponta a ponta.
+- O logo deve ser publicado depois de criado o rascunho para aparecer no portal.
+- A área SRE ainda não pode declarar SLO de uptime/latência. Próxima etapa técnica: instrumentar probes sintéticos e latência de requisições, persistir resultados com timestamp e calcular disponibilidade/error budget sobre uma janela definida. O painel atual identifica explicitamente essa lacuna.
+- Nenhum deploy Vercel foi feito por esta manutenção.
