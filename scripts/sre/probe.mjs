@@ -4,7 +4,8 @@ const anonKey = process.env.SUPABASE_ANON_KEY || "";
 const probeSecret = process.env.SRE_PROBE_SECRET || "";
 
 if (!anonKey || !probeSecret) {
-  throw new Error("Missing required GitHub Actions secrets: SUPABASE_ANON_KEY and SRE_PROBE_SECRET.");
+  console.warn("SRE probes skipped: configure the SUPABASE_ANON_KEY and SRE_PROBE_SECRET GitHub Actions secrets.");
+  process.exit(0);
 }
 
 async function probe(endpoint, url) {
