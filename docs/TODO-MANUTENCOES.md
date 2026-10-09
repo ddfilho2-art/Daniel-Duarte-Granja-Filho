@@ -59,3 +59,21 @@
 | Teste visual integrado no perfil Master e portal de empresa | Aguardando validação | Uma rodada após build: navegação, editor, upload, rascunho, publicação e logo público |
 | Atualizar Base de Conhecimento | Concluído | Causa, alterações, riscos e limitações registrados |
 | Deploy Vercel | Não iniciado | Deploy continua sob controle manual do usuário |
+
+
+## Manutenção atual — 2026-10-09 — Logo tenant, Dashboard e SRE
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Consultar Base de Conhecimento e estado atual | Concluído | Código atual, RPCs e políticas de Storage inspecionados |
+| Diagnosticar associação/persistência do logo | Concluído | Caminho enviado não correspondia ao regex da RPC; JPG também era incompatível |
+| Corrigir caminho e formatos de upload | Concluído (código) | PNG/WebP + UUID no diretório do tenant; teste ponta a ponta pendente |
+| Expandir Dashboard Master | Concluído (código) | Tendência mensal de cadastros, status contratual e tipo com dados reais |
+| Adicionar acesso SRE exclusivo do platform master | Concluído (código) | Menu e rota Master adicionados; rota Admin protegida por verificação de papel global |
+| Remover números SRE fictícios das RPCs | Concluído | Migration aplicada; uptime/latência/uso de infraestrutura não medidos aparecem como N/D |
+| Versionar migration SRE no repositório | Concluído | `20261009070000_platform_sre_real_metrics_and_truthful_unknowns.sql` |
+| Atualizar Base de Conhecimento | Concluído | Causa, solução, evidência e lacunas documentadas |
+| Build, lint/type-check e regressão | Aguardando validação | Ainda não executados neste ambiente |
+| Teste autenticado de upload → rascunho → publicação → portal | Aguardando validação | Confirmar logo associado ao tenant correto e sem vazamento entre tenants |
+| Implementar probes e medição real de SLO/latência | Não iniciado | Necessário para uptime, percentis de latência e error budget reais |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
