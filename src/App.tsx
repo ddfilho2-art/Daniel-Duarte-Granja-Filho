@@ -309,6 +309,7 @@ const App = () => {
               <Route path="tenants" element={<MasterTenantList />} />
               <Route path="administradores" element={<MasterTenantAdminManagement />} />
               <Route path="branding" element={<MasterBrandingEditor />} />
+              <Route path="sre" element={<AdminPerformance />} />
               <Route path="perfil" element={<MasterProfile />} />
             </Route>
 
