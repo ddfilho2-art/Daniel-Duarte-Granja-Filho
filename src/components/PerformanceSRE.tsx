@@ -170,7 +170,9 @@ const OverviewTab = ({
                 className={`text-[9px] font-bold px-2.5 py-1 rounded-full uppercase tracking-tighter border ${
                   s.isAlert
                     ? "bg-red-50 text-[#ED1C24] border-red-200"
-                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : s.status === "SEM DADO" || s.status === "SEM MEDIÇÃO"
+                      ? "bg-slate-50 text-slate-600 border-slate-200"
+                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}
               >
                 {s.status || (s.isAlert ? "VERIFICAR" : "DADO REAL")}
@@ -420,19 +422,25 @@ const DatabaseTab = ({
 
   const fetchInfra = useCallback(async () => {
     setInfraLoading(true);
-    const { data: rpcData, error } = await supabase.rpc("get_infra_usage");
-    if (error) {
-      console.error("Erro ao buscar get_infra_usage", error);
-      setInfraError(error.message);
+    try {
+      const { data: rpcData, error } = await supabase.rpc("get_infra_usage");
+      if (error) {
+        console.error("Erro ao buscar get_infra_usage", error);
+        setInfraError(error.message);
+        setInfraData(null);
+      } else if (rpcData) {
+        setInfraData(Array.isArray(rpcData) ? rpcData[0] : rpcData);
+        setInfraError(null);
+      } else {
+        setInfraError("A consulta não retornou dados.");
+        setInfraData(null);
+      }
+    } catch (error: unknown) {
+      setInfraError(error instanceof Error ? error.message : "Falha de rede ao consultar infraestrutura.");
       setInfraData(null);
-    } else if (rpcData) {
-      setInfraData(Array.isArray(rpcData) ? rpcData[0] : rpcData);
-      setInfraError(null);
-    } else {
-      setInfraError("A consulta não retornou dados.");
-      setInfraData(null);
+    } finally {
+      setInfraLoading(false);
     }
-    setInfraLoading(false);
   }, []);
 
   useEffect(() => {
@@ -542,19 +550,25 @@ const ObservabilityTab = ({
 
   const fetchObservability = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc("get_observability_telemetry");
-    if (error) {
-      console.error("Erro ao buscar get_observability_telemetry", error);
-      setObsError(error.message);
+    try {
+      const { data, error } = await supabase.rpc("get_observability_telemetry");
+      if (error) {
+        console.error("Erro ao buscar get_observability_telemetry", error);
+        setObsError(error.message);
+        setObsData(null);
+      } else if (data) {
+        setObsData(Array.isArray(data) ? data[0] : data);
+        setObsError(null);
+      } else {
+        setObsError("A consulta não retornou dados.");
+        setObsData(null);
+      }
+    } catch (error: unknown) {
+      setObsError(error instanceof Error ? error.message : "Falha de rede ao consultar observabilidade.");
       setObsData(null);
-    } else if (data) {
-      setObsData(Array.isArray(data) ? data[0] : data);
-      setObsError(null);
-    } else {
-      setObsError("A consulta não retornou dados.");
-      setObsData(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -652,7 +666,14 @@ const SlosTab = ({
         <KPISkeleton />
       </div>
     );
-  const alertas = data?.alertas_slos?.lista_alertas || [];
+  if (!data) {
+    return (
+      <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+        Os alertas e SLOs estão indisponíveis porque a consulta principal do SRE não retornou dados. Isso não deve ser interpretado como ausência de alertas.
+      </div>
+    );
+  }
+  const alertas = data.alertas_slos?.lista_alertas || [];
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-400">
