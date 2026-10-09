@@ -62,3 +62,14 @@ Os valores variam com o uso e não devem ser codificados como constantes.
 - `src/pages/AdminPerformance.tsx`
 - `supabase/migrations/20261009133000_sre_live_infrastructure_metrics.sql`
 - `docs/maintenance/2026-10-09-sre-real-metrics.md`
+
+
+## Separação SRE global e operação local de e-mails — 2026-10-09
+
+- `/master/sre` é reservado ao administrador global e não deve apresentar fila ou contadores de e-mail.
+- `/admin/performance` passa a ser a operação de e-mails do administrador/substituto do tenant ativo.
+- `email_queue.tenant_id` foi adicionado por migration e a policy de leitura exige Master global ou membership administrativa ativa do mesmo tenant.
+- `api/email-monitor.ts` filtra a fila por tenant e valida a membership no backend; `api/retry-emails.ts` limita chamadas interativas ao tenant e preserva o processamento global somente para o segredo de cron; `api/send-email.ts` grava o tenant associado ao envio.
+- A primeira tentativa de migration falhou porque o array `roles` usa o enum `tenant_role[]`; a policy foi corrigida para usar esse tipo e a migration aplicada. A coluna, policy e RPC SRE foram verificadas por consultas read-only.
+- Build/type-check e testes autenticados de isolamento ainda não foram executados. Não declarar a manutenção concluída até que esses testes passem.
+- Logs gerenciados Supabase, uptime e latência continuam pendentes de integração server-side autorizada e telemetria persistida.
