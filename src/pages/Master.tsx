@@ -582,8 +582,8 @@ export function MasterBrandingEditor() {
       setError("Selecione uma empresa e informe o motivo da alteração.");
       return;
     }
-    if (logoFile && (!["image/png", "image/jpeg", "image/webp"].includes(logoFile.type) || logoFile.size > 2 * 1024 * 1024)) {
-      setError("Use um logo PNG, JPG ou WebP de até 2 MB.");
+    if (logoFile && (!["image/png", "image/webp"].includes(logoFile.type) || logoFile.size > 2 * 1024 * 1024)) {
+      setError("Use um logo PNG ou WebP de até 2 MB.");
       return;
     }
 
@@ -593,8 +593,9 @@ export function MasterBrandingEditor() {
     try {
       let draftTheme: BrandingDraftPayload = { ...theme };
       if (logoFile) {
-        const extension = logoFile.type === "image/png" ? "png" : logoFile.type === "image/webp" ? "webp" : "jpg";
-        const storagePath = `${selectedTenant}/logo-primary-${Date.now()}.${extension}`;
+        const extension = logoFile.type === "image/png" ? "png" : "webp";
+        // A RPC valida tenant UUID + arquivo UUID + extensão; mantenha o caminho compatível.
+        const storagePath = `${selectedTenant}/${crypto.randomUUID()}.${extension}`;
         const { error: uploadError } = await supabase.storage
           .from("tenant-branding")
           .upload(storagePath, logoFile, { upsert: true, contentType: logoFile.type });
@@ -664,7 +665,7 @@ export function MasterBrandingEditor() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
               <div className="space-y-3">
                 <label className="block text-sm font-medium text-slate-700">Escolha o arquivo do logo</label>
-                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
+                <input type="file" accept="image/png,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
                   className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2" />
                 <p className="text-xs text-slate-500">PNG, JPG ou WebP; até 2 MB. O envio cria um rascunho, não publica automaticamente.</p>
                 {logoFile && <button type="button" onClick={() => setLogoFile(null)} className="text-sm text-red-700 underline">Remover arquivo selecionado</button>}
