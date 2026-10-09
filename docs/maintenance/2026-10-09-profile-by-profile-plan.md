@@ -137,3 +137,23 @@ Implementada a redefinição de senha pelo Master e a alteração da própria se
 | Build/type-check | Aguardando validação | Ainda não executados |
 | Testes funcionais e negativos | Aguardando validação | Não houve reset real nem login com senha alterada |
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+
+## Incidente adicional — carregamento de autorização preso (2026-10-09)
+
+**Sintoma:** após sair de uma página protegida e retornar, tela branca com “Sincronizando acesso...” sem concluir.
+
+**Causa identificada por inspeção estática:** o fluxo de sincronização marcava `authorizationLoading=true` mesmo quando `authUserId` permanecia igual. Como o efeito de autorização dependia somente de `authUserId`, não era reexecutado em eventos como renovação de token; assim, o loading podia permanecer ativo.
+
+**Correção em `main`:** commit `f0e9594624f47c3213c8330d1af71480880a3f9b`, arquivo `src/contexts/AuthContext.tsx`. Foi adicionado `authorizationSyncVersion` como gatilho explícito para reexecutar o efeito a cada sincronização válida do perfil, inclusive para o mesmo ID.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Registrar e reproduzir | Em tratamento | Sintoma relatado pelo usuário; reprodução local ainda não executada |
+| Identificar causa | Concluído — inspeção estática | Dependência somente de `authUserId` não reagia a nova sincronização com o mesmo ID |
+| Corrigir gatilho de sincronização | Concluído — código commitado | Commit `f0e9594624f47c3213c8330d1af71480880a3f9b` |
+| Build e type-check | Aguardando validação | Não executados nesta sessão |
+| Testar renovação de sessão e navegação repetida | Aguardando validação | Reproduzir em navegador autenticado |
+| Regressão de login/logout, Master/tenant e acesso negado | Aguardando validação | Garantir que o isolamento e redirecionamentos permanecem corretos |
+| Atualizar Base de Conhecimento e TODO | Concluído — documentação | Registro deste incidente adicionado |
+| Deploy Vercel | Não iniciado | Continua manual e sob controle do usuário |
