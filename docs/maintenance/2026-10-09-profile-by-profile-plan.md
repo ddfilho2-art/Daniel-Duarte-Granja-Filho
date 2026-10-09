@@ -91,3 +91,27 @@ Na inspeção estática de `src/components/layouts/DashboardLayouts.tsx`, o carr
 - Registrar separadamente: testado agora, testado pelo usuário, inspecionado, não validado e bloqueado.
 - Preservar isolamento multi-tenant e regras de autorização.
 - O deploy da Vercel permanece manual e sob controle do usuário.
+
+
+## Correção adicional — bloqueio de login Master no portal tenant (2026-10-09)
+
+O usuário confirmou que a conta Master ainda conseguia autenticar no portal de outro tenant, mesmo após a guarda de criação de administradores.
+
+**Causa-raiz confirmada no banco:** get_current_tenant_access(uuid) tratava is_platform_master_admin() como condição suficiente para hasAccess=true. Assim, o portal aceitava o Master sem membership.
+
+**Solução implementada e aplicada:** migration supabase/migrations/20261009190000_block_platform_master_tenant_access.sql faz a RPC retornar sem acesso de tenant para qualquer Master, mesmo se houver vínculo residual. A separação de acesso global permanece nas rotas/funções específicas do Master.
+
+**Validação SQL executada agora:**
+- Master em exemplostore: hasAccess=false, roles vazias, canAdministerTenant=false.
+- Administrador ativo legítimo do mesmo tenant: hasAccess=true, role tenant_admin, canAdministerTenant=true.
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Confirmar causa-raiz no banco | Concluído | Definição da RPC demonstrava autorização explícita ao Master |
+| Versionar e aplicar migration | Concluído | Arquivo na main e migration aplicada ao Supabase |
+| Teste SQL negativo Master | Concluído | RPC nega acesso ao portal tenant |
+| Teste SQL positivo tenant admin | Concluído | RPC preserva acesso legítimo do administrador |
+| Teste manual do login Master no tenant | Aguardando validação | Portal deve recusar login e encerrar sessão |
+| Revalidar login/rota Master global | Aguardando validação | /master deve continuar funcionando |
+| Build/type-check e regressão | Aguardando validação | Pipeline ainda não executado nesta sessão |
+| Deploy Vercel | Não iniciado | Continua manual, sob controle do usuário |
