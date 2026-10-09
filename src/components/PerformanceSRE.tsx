@@ -200,7 +200,7 @@ const OverviewTab = ({
               <Activity className="w-4 h-4 text-[#0054A6]" />
               Histórico de latência instrumentada (ms)
             </div>
-            <span className="text-[9px] text-[#00A859] animate-pulse">
+            <span className="text-[9px] text-slate-500">
               ● SEM SÉRIE INSTRUMENTADA
             </span>
           </h3>
@@ -498,38 +498,38 @@ const DatabaseTab = ({
         </div>
         <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
           <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#0054A6]" /> Ocupação do Banco
+            <Database className="w-4 h-4 text-[#0054A6]" /> Percentual de Ocupação do Banco
           </h4>
-          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
-            {infraData?.db_used_str || "N/D"}
-          </h3>
           {dbPercent === null ? (
-            <p className="text-xs text-slate-500">O limite do plano não está disponível nesta fonte; percentual não calculado.</p>
+            <>
+              <h3 className="text-4xl font-bold tracking-tighter italic text-slate-500 mb-4">N/D</h3>
+              <p className="text-xs text-slate-500">O limite do plano não está disponível nesta fonte; percentual não calculado.</p>
+            </>
           ) : (
             <>
+              <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">{dbPercent}%</h3>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className={\`h-full \${getBarColor(dbPercent)} transition-all duration-1000\`} style={{ width: \`\${dbPercent}%\` }} />
+                <div className={`h-full ${getBarColor(dbPercent)} transition-all duration-1000`} style={{ width: `${dbPercent}%` }} />
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{dbPercent}% utilizado</p>
             </>
           )}
         </div>
         <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
           <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#0054A6]" /> Armazenamento Global (Storage)
+            <Layers className="w-4 h-4 text-[#0054A6]" /> Percentual de Ocupação do Storage
           </h4>
-          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
-            {infraData?.st_used_str || "N/D"}
-          </h3>
-          <p className="mb-3 text-xs text-slate-500">{infraData?.st_objects_count ?? "N/D"} objetos no Storage.</p>
           {stPercent === null ? (
-            <p className="text-xs text-slate-500">O limite do plano não está disponível nesta fonte; percentual não calculado.</p>
+            <>
+              <h3 className="text-4xl font-bold tracking-tighter italic text-slate-500 mb-4">N/D</h3>
+              <p className="text-xs text-slate-500">O limite do plano não está disponível nesta fonte; percentual não calculado.</p>
+            </>
           ) : (
             <>
+              <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">{stPercent}%</h3>
+              <p className="mb-3 text-xs text-slate-500">{infraData?.st_objects_count ?? "N/D"} objetos no Storage.</p>
               <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className={\`h-full \${getBarColor(stPercent)} transition-all duration-1000\`} style={{ width: \`\${stPercent}%\` }} />
+                <div className={`h-full ${getBarColor(stPercent)} transition-all duration-1000`} style={{ width: `${stPercent}%` }} />
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{stPercent}% utilizado</p>
             </>
           )}
         </div>
@@ -606,8 +606,8 @@ const ObservabilityTab = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center gap-6">
-          <div className={\`p-6 rounded-full border-4 flex items-center justify-center w-24 h-24 \${healthScore === null ? "border-slate-300 text-slate-500" : healthScore > 80 ? "border-[#00A859] text-[#00A859]" : healthScore > 50 ? "border-[#F8971D] text-[#F8971D]" : "border-[#ED1C24] text-[#ED1C24]"}\`}>
-            <span className="text-3xl font-bold tracking-tighter">{healthScore === null ? "N/D" : \`\${healthScore}%\`}</span>
+          <div className={`p-6 rounded-full border-4 flex items-center justify-center w-24 h-24 ${healthScore === null ? "border-slate-300 text-slate-500" : healthScore > 80 ? "border-[#00A859] text-[#00A859]" : healthScore > 50 ? "border-[#F8971D] text-[#F8971D]" : "border-[#ED1C24] text-[#ED1C24]"}`}>
+            <span className="text-3xl font-bold tracking-tighter">{healthScore === null ? "N/D" : `${healthScore}%`}</span>
           </div>
           <div>
             <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">Score de saúde instrumentado</h4>
@@ -619,7 +619,7 @@ const ObservabilityTab = ({
           <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-[#ED1C24]" /> Incidentes Críticos (24h)
           </h4>
-          <span className={\`text-5xl font-bold tracking-tighter italic \${criticalCount === null ? "text-slate-500" : criticalCount > 0 ? "text-[#ED1C24]" : "text-[#00A859]"}\`}>
+          <span className={`text-5xl font-bold tracking-tighter italic ${criticalCount === null ? "text-slate-500" : criticalCount > 0 ? "text-[#ED1C24]" : "text-[#00A859]"}`}>
             {criticalCount === null ? "N/D" : criticalCount}
           </span>
         </div>
@@ -634,7 +634,7 @@ const ObservabilityTab = ({
             {incidents.map((inc: any, idx: number) => (
               <li key={idx} className="py-3 flex items-start gap-4 text-sm">
                 <span className="font-mono text-xs text-slate-400 shrink-0 whitespace-nowrap">[{inc.hora || inc.created_at || "Horário não informado"}]</span>
-                <span className={\`font-bold shrink-0 \${inc.tipo?.toLowerCase().includes("error") || inc.tipo?.toLowerCase().includes("crítico") ? "text-[#ED1C24]" : "text-slate-600"}\`}>- [{inc.tipo || "LOG"}]:</span>
+                <span className={`font-bold shrink-0 ${inc.tipo?.toLowerCase().includes("error") || inc.tipo?.toLowerCase().includes("crítico") ? "text-[#ED1C24]" : "text-slate-600"}`}>- [{inc.tipo || "LOG"}]:</span>
                 <span className="text-slate-700">{inc.mensagem || inc.message}</span>
               </li>
             ))}
@@ -1092,9 +1092,9 @@ export function PerformanceSRE() {
             <RefreshCw className={`w-5 h-5 ${loading ? "animate-spin" : ""}`} />
           </button>
           <div className="flex items-center gap-3 py-2 px-6 bg-[#F1F5F9] border border-[#E2E8F0] rounded-full shadow-inner">
-            <div className="w-2.5 h-2.5 bg-[#00A859] rounded-full shadow-[0_0_8px_#00A859]" />
+            <div className={`w-2.5 h-2.5 rounded-full ${metricsError ? "bg-red-500" : "bg-[#00A859]"}`} />
             <span className="text-[10px] font-bold text-[#1A1A1A] uppercase tracking-widest">
-              Métricas da aplicação · atualização a cada 30s
+              {metricsError ? "Falha na consulta principal do SRE" : "Métricas da aplicação · atualização a cada 30s"}
             </span>
           </div>
         </div>
