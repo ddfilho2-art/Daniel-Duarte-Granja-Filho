@@ -37,7 +37,8 @@ O SRE global continha uma aba de e-mails, embora a fila e o reprocessamento seja
 - [x] Atualização da Base de Conhecimento.
 - [ ] Executar type-check e build.
 - [ ] Testar leitura e reprocessamento do próprio tenant e negar acesso cruzado/sem membership.
-- [ ] Atualizar documentação com os resultados finais de build e testes.
+- [x] Atualizar documentação com os resultados de migration e integração de logs.
+- [ ] Atualizar documentação novamente após build e testes finais.
 - [ ] Deploy manual e smoke test em produção.
 
 ## Estado da validação
@@ -45,4 +46,13 @@ O SRE global continha uma aba de e-mails, embora a fila e o reprocessamento seja
 - **Testado agora:** migration aplicada; consulta read-only confirmou a coluna UUID, policy instalada e RPC SRE sem referências à fila de e-mails.
 - **Verificação estática:** `PerformanceSRE.tsx` não contém aba nem referências a e-mail; os endpoints têm checagem de membership e filtros por tenant.
 - **Não validado:** build/type-check, autorização por sessão real, isolamento entre dois tenants, envio/reprocessamento real, interface em navegador e produção.
-- **Pendente:** ingestão dos logs gerenciados Supabase e instrumentação de uptime/latência; exigem fonte server-side autorizada e histórico real.
+- **Parcialmente implementado:** aba `Logs dos Serviços` e endpoint server-side de consulta dos logs gerenciados Supabase; a chamada de produção depende de `SUPABASE_ACCESS_TOKEN` com permissão Logs — Read configurado como variável server-side da Vercel.
+- **Pendente:** instrumentação persistida de uptime/latência e testes end-to-end com sessão Master.
+
+
+## Extensão da visão de infraestrutura
+- Adicionada a aba **Logs dos Serviços** em `src/components/PerformanceSRE.tsx`.
+- Criado `api/sre-infrastructure-logs.ts`, que exige sessão válida e confirmação da RPC `is_platform_master_admin()`, consulta a Management API do Supabase no servidor e nunca envia o token ao browser.
+- A consulta ClickHouse foi validada via fonte de logs gerenciados do projeto: retornou 10 fontes de serviço na janela de 24 horas. Os eventos suspeitos são heurísticos por texto e não equivalem a incidentes confirmados.
+- A integração da aplicação ainda precisa da variável server-side `SUPABASE_ACCESS_TOKEN`, com escopo restrito ao projeto e permissão **Logs — Read**. A variável `SUPABASE_PROJECT_REF` é opcional; o código usa o ref atual como fallback.
+- O endpoint foi inspecionado, mas ainda não foi testado em runtime pela sessão Master nem validado em build.
