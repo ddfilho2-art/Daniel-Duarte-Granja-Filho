@@ -67,7 +67,7 @@ A causa foi uma combinação de métricas de infraestrutura não implementadas e
 - Migration aplicada no Supabase com retorno de sucesso.
 - Definição ativa da RPC relida no banco e confirmada com a validação Master preservada.
 - Consulta SQL somente leitura confirmou os dados de infraestrutura e os valores operacionais listados acima.
-- Código frontend atualizado em `main`; verificações textuais confirmaram que os fallbacks de zero foram removidos dos indicadores tratados e que estados de erro estão presentes.
+- Código frontend atualizado em `main`; verificações textuais confirmaram que os fallbacks de zero foram removidos dos indicadores tratados, que erros são visíveis, que os percentuais desconhecidos aparecem como `N/D` e que o status do painel reflete falha na RPC.
 
 ### Não validado
 - `npm run lint` / TypeScript, `npm run build` e testes automatizados.
@@ -96,5 +96,6 @@ A causa foi uma combinação de métricas de infraestrutura não implementadas e
 - `33f1ced52e15992cf36d68e806dfc2c2a107c12a` — migration versionada.
 - `5fa3b2806fc4001dabc912bcdfff43e8624ae6c0` — métricas reais e tratamento de falhas na aba SRE.
 - `8a4b315bfc80ff81725f718a592d8bca956e41ce` — tratamento de falhas de rede e ausência de dados sem falsos zeros.
+- `1332e2047d96cfefc2122efa61488d19be3874d6` — clarifica cards de ocupação sem repetir tamanho e reflete falha no status do painel.
 
 **Conclusão:** a causa identificada foi tratada no banco e no código. A manutenção permanece em tratamento até passar build/type-check, teste autenticado e validação visual após o deploy manual. Uptime, latência e logs internos do Supabase ainda exigem instrumentação/integração própria.
