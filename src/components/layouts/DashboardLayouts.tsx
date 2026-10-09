@@ -451,7 +451,7 @@ export function AdminLayout() {
     { to: "/admin/users", icon: Users, label: "Gestão de Usuários" },
     { to: "/admin/transferencias", icon: Repeat, label: "Transferências" },
     { to: "/admin/auditoria", icon: Shield, label: "Auditoria" },
-    { to: "/admin/performance", icon: Activity, label: "SRE" },
+    { to: "/admin/performance", icon: Activity, label: "Operação de E-mails" },
     { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
   ];
 
