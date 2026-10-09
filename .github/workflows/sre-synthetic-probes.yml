@@ -1,0 +1,32 @@
+name: SRE synthetic probes
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sre-synthetic-probes
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Probe production and persist measurements
+        env:
+          PROBE_BASE_URL: https://daniel-duarte-granja-filho.vercel.app
+          SUPABASE_URL: https://dmzagrakkduddofkqjhg.supabase.co
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SRE_PROBE_SECRET: ${{ secrets.SRE_PROBE_SECRET }}
+        run: node scripts/sre/probe.mjs
