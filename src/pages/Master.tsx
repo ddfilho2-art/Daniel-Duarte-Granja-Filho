@@ -620,6 +620,7 @@ export function MasterBrandingEditor() {
       setVersions(loaded);
       const current = loaded.find((v) => v.status === "draft") ?? loaded.find((v) => v.status === "published") ?? loaded[0];
       if (!current) { setTheme({}); setLogoPreview(""); return; }
+      const published = loaded.find((v) => v.status === "published");
       const keys = ["display_name", "sidebar_background", "sidebar_text", "sidebar_active", "sidebar_hover", "home_background", "hero_background", "hero_text", "primary_action", "accent", "primary_color", "secondary_color", "link_color", "focus_ring_color", "logo_primary_path"];
       const next: BrandingDraftPayload = {};
       for (const key of keys) {
@@ -627,7 +628,11 @@ export function MasterBrandingEditor() {
         if (typeof value === "string") (next as Record<string, unknown>)[key] = value;
       }
       setTheme(next);
-      const path = typeof current.logo_primary_path === "string" ? current.logo_primary_path : "";
+      // Um rascunho pode não ter logo próprio (ex.: rascunho de cores).
+      // Nesse caso, preserve a prévia do logo já publicado para não parecer que foi perdido.
+      const draftLogoPath = typeof current.logo_primary_path === "string" ? current.logo_primary_path : "";
+      const publishedLogoPath = typeof published?.logo_primary_path === "string" ? published.logo_primary_path : "";
+      const path = draftLogoPath || publishedLogoPath;
       setLogoPreview(path ? supabase.storage.from("tenant-branding").getPublicUrl(path).data.publicUrl : "");
     } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar o histórico."); }
   }, []);
@@ -731,7 +736,16 @@ export function MasterBrandingEditor() {
 
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <label className="block text-sm font-medium text-slate-700 mb-1">Empresa</label>
-        <select value={selectedTenant} onChange={(e) => { setSelectedTenant(e.target.value); setTheme({}); setLogoFile(null); }}
+        <select value={selectedTenant} onChange={(e) => {
+          setSelectedTenant(e.target.value);
+          setTheme({});
+          setVersions([]);
+          setLogoFile(null);
+          setLogoPreview("");
+          setReason("");
+          setError("");
+          setSuccess("");
+        }}
           className="w-full max-w-2xl rounded-lg border border-slate-200 px-3 py-2 text-sm">
           <option value="">Selecione uma empresa...</option>
           {tenants.map((t) => <option key={t.id} value={t.id}>{t.display_name} ({t.slug})</option>)}
@@ -752,12 +766,17 @@ export function MasterBrandingEditor() {
                 <label className="block text-sm font-medium text-slate-700">Escolha o arquivo do logo</label>
                 <input type="file" accept="image/png,image/webp" onChange={(e) => setLogoFile(e.target.files?.[0] || null)}
                   className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2" />
-                <p className="text-xs text-slate-500">PNG, JPG ou WebP; até 2 MB. O envio cria um rascunho, não publica automaticamente.</p>
+                <p className="text-xs text-slate-500">PNG ou WebP; até 2 MB. O envio cria um rascunho, não publica automaticamente.</p>
                 {logoFile && <button type="button" onClick={() => setLogoFile(null)} className="text-sm text-red-700 underline">Remover arquivo selecionado</button>}
               </div>
               <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-3">Prévia da marca</p>
                 {logoPreview ? <img src={logoPreview} alt="Prévia do logo da empresa" className="mx-auto max-h-20 max-w-full object-contain" /> : <div className="py-5 text-sm text-slate-400">O logo escolhido aparecerá aqui.</div>}
+                {versions.some((v) => v.status === "draft") && (
+                  <p className="mt-3 text-xs text-amber-700">
+                    O editor carrega o rascunho mais recente. O portal da empresa continua usando a versão publicada até você publicar este rascunho.
+                  </p>
+                )}
                 <div className="mt-3 border-t border-slate-200 pt-3">
                   <img src={DFLlogo} alt="Recruta AÍ" className="mx-auto h-7 max-w-36 object-contain" />
                   <p className="mt-1 text-xs text-slate-500">Recruta AÍ — plataforma de recrutamento</p>
