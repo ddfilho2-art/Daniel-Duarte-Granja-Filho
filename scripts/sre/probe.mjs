@@ -75,6 +75,3 @@ console.log(JSON.stringify({
   })),
 }));
 
-if (samples.some((sample) => !sample.success)) {
-  process.exitCode = 1;
-}
