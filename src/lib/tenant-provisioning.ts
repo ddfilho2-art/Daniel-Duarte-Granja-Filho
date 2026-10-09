@@ -156,12 +156,6 @@ export async function publishBranding(
 export async function getBrandingVersions(
   tenantId: string,
 ): Promise<Record<string, unknown>[]> {
-  const { data, error } = await supabase
-    .from("tenant_branding_versions")
-    .select("*")
-    .eq("tenant_id", tenantId)
-    .order("version", { ascending: false });
-
-  if (error) throw new Error(error.message);
-  return data || [];
+  const data = await callEdge("list_branding_versions", { tenantId });
+  return (data.versions || []) as Record<string, unknown>[];
 }
