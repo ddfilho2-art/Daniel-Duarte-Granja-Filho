@@ -150,7 +150,7 @@ const ProtectedRoute = ({
 
   // CORREÇÃO 1: Enquanto qualquer dado de autenticação estiver carregando,
   // mantemos o Loading para evitar redirecionamentos precipitados.
-  if (authLoading || profileLoading || tenantMembershipLoading) {
+  if (authLoading || profileLoading || tenantMembershipLoading || authorizationLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-4">
