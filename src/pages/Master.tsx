@@ -227,7 +227,7 @@ export function MasterDashboard() {
               <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
                 <tr>
                   <th className="px-4 py-3">Empresa</th>
-                  <th className="px-4 py-3 text-right">Usuários vinculados</th>
+                  <th className="px-4 py-3 text-right">Vínculos de usuários</th>
                   <th className="px-4 py-3 text-right">Vagas</th>
                   <th className="px-4 py-3 text-right">Candidatos</th>
                   <th className="px-4 py-3 text-right">Candidaturas</th>
