@@ -16,13 +16,14 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 ## Solução aplicada
 
 - `src/App.tsx`: aguardar `authorizationLoading` junto dos demais estados de autenticação antes de avaliar rotas protegidas.
+- `src/contexts/AuthContext.tsx`: marcar a autorização como pendente antes de definir o perfil autenticado, eliminando a janela em que a rota poderia avaliar a autorização antiga.
 - `src/pages/Master.tsx`: usar `Link` do React Router para navegar à gestão de administradores sem reload completo.
 - `supabase/functions/tenant-admin-management/index.ts`: validar `platform_user_roles` e bloquear conta Master ativa com erro 403 antes de criar vínculo de administrador de tenant.
 - Edge Function publicada como versão 4 ACTIVE; a leitura do runtime confirmou a guarda.
 
 ## Evidência e limites
 
-- Consulta SQL somente leitura confirmou que a conta Master ativa consultada não possui memberships em `tenant_memberships`, incluindo vínculos revogados.
+- Consulta SQL somente leitura confirmou que a conta Master ativa consultada não possui memberships em `tenant_memberships`, incluindo vínculos revogados. A consulta agregada também mostrou que os dois tenants existentes têm um administrador ativo cada, sem associação à conta Master consultada.
 - Portanto, não foi identificada associação indevida existente para essa conta na consulta realizada.
 - Isso não confirma que cada tenant tenha um administrador próprio, nem que o fluxo corrigido já foi testado pelo navegador.
 - Build, type-check, testes automatizados, teste funcional da ação e teste negativo da guarda ainda aguardam validação.
