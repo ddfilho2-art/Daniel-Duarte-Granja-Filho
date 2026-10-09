@@ -160,3 +160,22 @@ O logo selecionado na identidade visual não aparecia no portal da empresa. O Da
 - O logo deve ser publicado depois de criado o rascunho para aparecer no portal.
 - A área SRE ainda não pode declarar SLO de uptime/latência. Próxima etapa técnica: instrumentar probes sintéticos e latência de requisições, persistir resultados com timestamp e calcular disponibilidade/error budget sobre uma janela definida. O painel atual identifica explicitamente essa lacuna.
 - Nenhum deploy Vercel foi feito por esta manutenção.
+
+
+## 2026-10-09 — Causa-raiz confirmada: regex do caminho do logo
+
+### Evidência conclusiva
+Uma consulta SQL comparando padrões mostrou que a expressão com duas barras invertidas antes do ponto não reconhecia um caminho terminado em .png, enquanto o padrão corrigido reconhece. Para evitar diferenças de escaping entre SQL, PL/pgSQL e regex, a correção definitiva usa a classe de caractere [.] para representar o ponto literal.
+
+### Correção aplicada
+A função public.create_tenant_branding_draft(uuid, uuid, jsonb, text) foi recriada no Supabase com padrões:
+- Logo principal/secundário: <tenant UUID>/<file UUID>[.](png|webp)
+- Favicon: <tenant UUID>/<file UUID>[.](png|webp|ico)
+
+Foram preservados os controles existentes: identidade do ator igual a auth.uid(), papel global ativo platform_master_admin, validação do tema e justificativa, lock por tenant, vínculo ao branding publicado atual, versão incremental e trilha de auditoria.
+
+### Validação e status
+- Migration aplicada ao banco com sucesso.
+- Consulta SQL confirmou que PNG e WebP são aceitos pelo padrão e JPG continua rejeitado.
+- O arquivo de migration versionado inicialmente precisa ser alinhado ao padrão final [.] antes de ser aplicado em outro ambiente.
+- Ainda não validado: sessão autenticada de upload, criação do rascunho, publicação e leitura no portal. Não declarar funcionalidade concluída ponta a ponta até esse teste.
