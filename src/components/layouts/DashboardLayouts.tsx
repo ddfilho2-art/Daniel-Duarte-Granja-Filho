@@ -464,6 +464,7 @@ export function MasterLayout() {
     { to: "/master/tenants", icon: Building2, label: "Empresas" },
     { to: "/master/administradores", icon: Users, label: "Administradores das Empresas" },
     { to: "/master/branding", icon: Palette, label: "Identidade Visual" },
+    { to: "/master/sre", icon: Activity, label: "SRE da Plataforma" },
   ];
 
   return <DashboardLayout menuItems={menuItems} />;
