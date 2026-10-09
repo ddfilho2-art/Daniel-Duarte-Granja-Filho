@@ -66,3 +66,7 @@ Em `supabase/functions/tenant-provisioning/index.ts`, a listagem agora percorre 
 - **Implementado na main:** commit `d62f15ccf6a26b2e0fcf8ebca08460fbf9b1b5c6`.
 - **Não validado:** deploy da Edge Function, teste com mais de 1.000 objetos, build/type-check e regressão de autorização.
 - O indicador permanece parcial: somente objetos do bucket `tenant-branding` com caminho de tenant são somados junto dos anexos administrativos cujo tamanho está registrado. Isso não representa o armazenamento total de todos os dados do tenant.
+
+  
+### Limitação operacional — publicação (2026-10-09)
+Duas tentativas de publicar a alteração via ferramenta de deploy falharam com erro `import map path does not exist` apontando para `deno.json`. A leitura da Edge Function ativa confirmou que a versão publicada ainda não contém a paginação. O código corrigido permanece na `main`; não considerar ativo em produção até resolver o deploy e reler a versão publicada.
