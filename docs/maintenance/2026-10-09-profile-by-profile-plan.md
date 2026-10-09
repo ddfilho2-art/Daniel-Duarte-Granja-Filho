@@ -115,3 +115,25 @@ O usuário confirmou que a conta Master ainda conseguia autenticar no portal de 
 | Revalidar login/rota Master global | Aguardando validação | /master deve continuar funcionando |
 | Build/type-check e regressão | Aguardando validação | Pipeline ainda não executado nesta sessão |
 | Deploy Vercel | Não iniciado | Continua manual, sob controle do usuário |
+
+
+## Manutenção adicional — senhas dos administradores (2026-10-09)
+
+Implementada a redefinição de senha pelo Master e a alteração da própria senha pelo administrador autenticado.
+
+- Backend: ação reset_admin_password em tenant-admin-management, publicada como versão 5 ACTIVE. A autorização exige Master global ativo, administrador-alvo com membership ativa e papel tenant_admin no tenant informado, e rejeita conta Master como alvo.
+- Auditoria: migration supabase/migrations/20261009193000_tenant_admin_password_reset_audit.sql, aplicada ao Supabase. A tabela não expõe leitura/escrita direta a anon/authenticated.
+- Frontend Master: botão “Redefinir senha” na linha de administrador ativo, com senha temporária, confirmação e justificativa.
+- Autoatendimento: modal “Trocar Senha” agora exige senha atual, valida-a por autenticação e só permite atualizar a senha da mesma conta; política mínima 8 caracteres, maiúscula, minúscula e número.
+- Não foi feita alteração de senha de usuário real durante os testes técnicos.
+- Não houve build/type-check nem deploy Vercel; ambos ficam pendentes.
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Migration de auditoria aplicada | Concluído | SQL confirmou tabela, RLS e privilégios |
+| Edge Function publicada | Concluído | Versão 5 ACTIVE e runtime relido |
+| UI de reset Master | Concluído — código | Modal e validações presentes |
+| Autoatendimento de senha | Concluído — código | Reautenticação da senha atual antes do update |
+| Build/type-check | Aguardando validação | Ainda não executados |
+| Testes funcionais e negativos | Aguardando validação | Não houve reset real nem login com senha alterada |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
