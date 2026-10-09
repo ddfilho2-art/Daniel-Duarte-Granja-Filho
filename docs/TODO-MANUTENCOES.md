@@ -126,3 +126,20 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 - **Status:** Edge Function `tenant-provisioning` versão 12, `ACTIVE`.
 - **Validação pós-deploy:** releitura da função ativa confirmou a presença de `storagePageSize` e ausência do antigo `offset: 0` fixo.
 - **Ainda pendente:** teste funcional com mais de 1.000 objetos, build/type-check da aplicação e teste formal de autorização Master/tenant comum.
+
+
+## Manutenção — Master: navegação de administradores e separação de contas (2026-10-09)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Registrar os dois sintomas | Concluído | Ação Administradores redirecionava à home; comportamento sugeria reutilização da conta Master |
+| Diagnosticar guarda de rota | Concluído — inspeção estática | `ProtectedRoute` não aguardava `authorizationLoading`; link usava navegação completa |
+| Corrigir ação Administradores | Concluído — código | `Link` SPA no arquivo `src/pages/Master.tsx`; guarda aguarda autorização em `src/App.tsx` |
+| Bloquear conta global Master na associação como tenant admin | Concluído — código e deploy Supabase | `tenant-admin-management` versão 4 ACTIVE; runtime contém verificação explícita e 403 |
+| Consultar memberships atuais da conta Master | Concluído — leitura somente | Nenhum vínculo de tenant encontrado para a conta Master consultada |
+| Confirmar build/type-check/testes automatizados | Aguardando validação | Ainda não executados nesta sessão |
+| Testar ação Administradores no navegador | Aguardando validação | Deve abrir gestão do tenant correto e manter sessão Master |
+| Testar tentativa de associar Master a tenant | Aguardando validação | Backend retorna 403 e não grava vínculo |
+| Auditar administradores próprios de todos os tenants | Aguardando validação | Confirmar que cada empresa/clínica tem usuário próprio; não corrigir dados sem identificar vínculos exatos |
+| Atualizar Base de Conhecimento com resultados funcionais | Em tratamento | Finalizar após evidência de testes |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
