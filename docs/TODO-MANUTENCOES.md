@@ -208,3 +208,18 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Validação em produção | Aguardando validação | Só após deploy manual e testes funcionais |
 
 **Status atual:** correção implementada, mas manutenção ainda não validada funcionalmente. Não remover o bloqueio de autorização nem usar timeout para conceder acesso.
+
+
+### Reavaliação — lentidão no primeiro login Master (2026-10-09)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Registrar regressão reportada | Concluído | Usuário informou piora e lentidão no primeiro login Master após a alteração anterior |
+| Remover gatilho que repetia autorização | Concluído — código na main | Commit `29dff80d19a0b3a246ffbda37315c0f646ea43e5`; removido `authorizationSyncVersion` |
+| Evitar recarga redundante do perfil para o mesmo usuário | Concluído — código na main | `lastProfileSyncUserIdRef` ignora eventos repetidos do usuário já sincronizado |
+| Build / type-check | Aguardando validação | Não executados nesta sessão |
+| Teste de primeiro login Master e navegação repetida | Aguardando validação | Requer deploy manual e teste em navegador |
+| Regressão de logout, tenant e acesso negado | Aguardando validação | Confirmar isolamento multi-tenant |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+**Status:** correção anterior substituída por ajuste para evitar sincronizações duplicadas. Não declarar resolvido até teste funcional.
