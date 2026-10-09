@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Activity,
-  Clock,
   AlertTriangle,
   Zap,
   Database,
@@ -16,7 +15,6 @@ import {
   Users,
   Briefcase,
   AlertCircle,
-  Mail,
 } from "lucide-react";
 import {
   XAxis,
@@ -28,7 +26,6 @@ import {
   Area,
 } from "recharts";
 import { supabase } from "../lib/supabase";
-import { safeFetch } from "../lib/api";
 
 // --- DATA STRUCTURES ---
 interface SREMetrics {
@@ -62,7 +59,6 @@ const TABS = [
   { id: "database", label: "Banco de Dados", icon: Database },
   { id: "observability", label: "Observabilidade", icon: Layers },
   { id: "slos", label: "Alertas & SLOs", icon: Bell },
-  { id: "emails", label: "E-mails", icon: Mail },
 ];
 
 // --- SKELETON (DFL STYLE) ---
@@ -721,290 +717,6 @@ const SlosTab = ({
   );
 };
 
-function EmailMonitor() {
-  const [emailQueue, setEmailQueue] = useState<any[]>([]);
-  const [loadingEmails, setLoadingEmails] = useState(false);
-  const [emailLogs, setEmailLogs] = useState<any[]>([]);
-  const [activeSubTab, setActiveSubTab] = useState<"queue" | "history">(
-    "queue",
-  );
-
-  async function fetchEmailQueue() {
-    try {
-      setLoadingEmails(true);
-
-      const queueResponse = await safeFetch("/api/email-monitor");
-      if (!queueResponse.ok) {
-        throw new Error(
-          queueResponse.data?.message ||
-            queueResponse.data?.code ||
-            "Não foi possível carregar a fila de e-mails.",
-        );
-      }
-      setEmailQueue(queueResponse.data?.queue || []);
-
-      const { data: logData, error: logError } = await supabase
-        .from("logs")
-        .select("*")
-        .or("acao.eq.Enviou Convite,acao.eq.Enviou Mensagem Talentos")
-        .order("data", { ascending: false })
-        .limit(20);
-
-      if (logError) throw logError;
-      setEmailLogs(logData || []);
-    } catch (err) {
-      console.error("Erro ao buscar dados:", err);
-    } finally {
-      setLoadingEmails(false);
-    }
-  }
-
-  useEffect(() => {
-    fetchEmailQueue();
-    const interval = setInterval(fetchEmailQueue, 15000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function handleRetry() {
-    try {
-      setLoadingEmails(true);
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
-        throw new Error("Sessão expirada. Faça login novamente.");
-      }
-
-      const response = await safeFetch("/api/retry-emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (!response.ok) {
-        throw new Error(
-          response.data?.message ||
-            response.data?.code ||
-            "Não foi possível reprocessar os e-mails.",
-        );
-      }
-
-      const result = response.data;
-      alert(
-        `✅ ${result?.processed || 0} e-mails processados. Sucesso: ${result?.successCount || 0}, Falhas: ${result?.failCount || 0}`,
-      );
-      await fetchEmailQueue();
-    } catch (e: any) {
-      console.error("Erro ao reprocessar:", e);
-      alert("❌ Erro ao reprocessar e-mails: " + e.message);
-    } finally {
-      setLoadingEmails(false);
-    }
-  }
-
-  const pendingCount = emailQueue.filter(
-    (e: any) => e.status === "pending",
-  ).length;
-  const sentCount = emailQueue.filter((e: any) => e.status === "sent").length;
-  const failedCount = emailQueue.filter(
-    (e: any) => e.status === "failed",
-  ).length;
-
-  return (
-    <div className="space-y-6 animate-in slide-in-from-right-4 duration-400">
-      <div className="p-6 border-b border-slate-200 bg-slate-50 rounded-t-xl">
-        <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-          <Mail className="w-5 h-5 text-primary" />
-          Monitoramento de E-mails
-        </h2>
-        <p className="text-sm text-slate-500 mt-1">
-          Acompanhe e reprocesse e-mails parados ou falhos na fila.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <Clock className="w-8 h-8 text-amber-600" />
-            <div>
-              <p className="text-sm font-medium text-amber-800">Pendentes</p>
-              <p className="text-3xl font-bold text-amber-600">
-                {pendingCount}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-8 h-8 text-emerald-600" />
-            <div>
-              <p className="text-sm font-medium text-emerald-800">Enviados</p>
-              <p className="text-3xl font-bold text-emerald-600">{sentCount}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-red-50 border border-red-200 rounded-xl p-6">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="w-8 h-8 text-red-600" />
-            <div>
-              <p className="text-sm font-medium text-red-800">Falhas</p>
-              <p className="text-3xl font-bold text-red-600">{failedCount}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-3">
-        <button
-          onClick={handleRetry}
-          disabled={loadingEmails}
-          className="flex items-center gap-2 bg-[#0054A6] text-white px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#004080] transition-all disabled:opacity-50"
-        >
-          <RefreshCw
-            className={`w-5 h-5 ${loadingEmails ? "animate-spin" : ""}`}
-          />
-          Reprocessar E-mails com Falha
-        </button>
-
-        <button
-          onClick={fetchEmailQueue}
-          disabled={loadingEmails}
-          className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all"
-        >
-          <RefreshCw
-            className={`w-5 h-5 ${loadingEmails ? "animate-spin" : ""}`}
-          />
-          Atualizar
-        </button>
-      </div>
-
-      <div className="flex gap-2 p-1 bg-slate-100 rounded-xl w-fit">
-        <button
-          onClick={() => setActiveSubTab("queue")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
-            activeSubTab === "queue"
-              ? "bg-white text-[#0054A6] shadow-sm"
-              : "text-slate-500"
-          }`}
-        >
-          Fila ({emailQueue.length})
-        </button>
-        <button
-          onClick={() => setActiveSubTab("history")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
-            activeSubTab === "history"
-              ? "bg-white text-[#0054A6] shadow-sm"
-              : "text-slate-500"
-          }`}
-        >
-          Histórico ({emailLogs.length})
-        </button>
-      </div>
-
-      {activeSubTab === "queue" ? (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {loadingEmails ? (
-            <div className="p-12 text-center">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
-              <p className="text-sm text-slate-500">Carregando...</p>
-            </div>
-          ) : emailQueue.length === 0 ? (
-            <div className="p-12 text-center">
-              <Mail className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500 font-medium">Fila vazia</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Nenhum e-mail pendente
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 font-bold uppercase text-xs">
-                  <tr>
-                    <th className="px-6 py-3">Destinatário</th>
-                    <th className="px-6 py-3">Status</th>
-                    <th className="px-6 py-3 text-center">Tentativas</th>
-                    <th className="px-6 py-3">Data</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {emailQueue.map((item: any) => (
-                    <tr key={item.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-3">{item.payload?.to || "N/A"}</td>
-                      <td className="px-6 py-3">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-bold ${
-                            item.status === "sent"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : item.status === "failed"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-3 text-center">{item.attempts}</td>
-                      <td className="px-6 py-3 text-xs text-slate-500">
-                        {new Date(item.created_at).toLocaleString("pt-BR")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          {loadingEmails ? (
-            <div className="p-12 text-center">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
-              <p className="text-sm text-slate-500">Carregando histórico...</p>
-            </div>
-          ) : emailLogs.length === 0 ? (
-            <div className="p-12 text-center">
-              <Mail className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500 font-medium">
-                Nenhum histórico ainda
-              </p>
-              <p className="text-xs text-slate-400 mt-1">
-                Os logs de e-mails aparecerão aqui
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 font-bold uppercase text-xs">
-                  <tr>
-                    <th className="px-6 py-3">Ação</th>
-                    <th className="px-6 py-3">Detalhes</th>
-                    <th className="px-6 py-3">Data</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {emailLogs.map((log: any) => (
-                    <tr key={log.id} className="hover:bg-slate-50">
-                      <td className="px-6 py-3 font-medium">{log.acao}</td>
-                      <td className="px-6 py-3 text-xs text-slate-500">
-                        {typeof log.detalhes === "string"
-                          ? log.detalhes.slice(0, 80)
-                          : JSON.stringify(log.detalhes).slice(0, 80)}
-                      </td>
-                      <td className="px-6 py-3 text-xs text-slate-500">
-                        {new Date(log.data).toLocaleString("pt-BR")}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // --- COMPONENTE PRINCIPAL ---
 
 export function PerformanceSRE() {
@@ -1140,9 +852,7 @@ export function PerformanceSRE() {
         {activeTab === "observability" && (
           <ObservabilityTab data={metrics} loading={loading} />
         )}
-        {activeTab === "slos" && <SlosTab data={metrics} loading={loading} />}
-        {activeTab === "emails" && <EmailMonitor />}
-      </div>
+        {activeTab === "slos" && <SlosTab data={metrics} loading={loading} />}      </div>
 
       {/* FOOTER DFL STRUCTURAL */}
       <div className="pt-24 border-t border-[#E2E8F0]">
