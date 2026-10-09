@@ -95,3 +95,10 @@ Os valores variam com o uso e não devem ser codificados como constantes.
 - **Testado:** migration aplicada; Edge Function publicada versão 1.
 - **Não validado:** probes reais, ingestão autenticada, workflow agendado, build/type-check, sessão Master real, negação a usuário de tenant e deploy manual da Vercel.
 - Não formalizar metas de SLO antes de observar uma linha de base real. O indicador é disponibilidade observada, não garantia contratual de SLA.
+
+
+### Integração do uptime no Overview — 2026-10-09
+- Migration `20261009161000_sre_overview_uptime_metrics.sql` conecta `get_sre_dashboard_metrics()` à tabela `sre_probe_results`: o card Uptime Global usa disponibilidade observada nas últimas 24h e o gráfico usa latência média horária das sondagens bem-sucedidas.
+- O Overview diferencia `measured`, `degraded`, `stale` e `not_measured`; ausência ou atraso de sondagens não deve ser mostrada como saúde garantida.
+- Verificação SQL confirmou que `sre_probe_health()` retorna status `ok`, a tabela mantém RLS e não tem SELECT direto para `anon`/`authenticated`, e a função SLO não é executável por `anon`.
+- Ainda não há amostras reais: os segredos GitHub Actions/Supabase e o deploy manual da Vercel são pré-requisitos para validar o fluxo de ponta a ponta.
