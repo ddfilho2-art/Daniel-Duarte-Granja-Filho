@@ -101,7 +101,7 @@ export default async function handler(req: any, res: any) {
 
     const sources = rows.map((row: any) => {
       const rawLastEvent = typeof row.last_event === "string" ? row.last_event : "";
-      const normalizedTimestamp = rawLastEvent && !/(Z|[+-]\\d{2}:\\d{2})$/i.test(rawLastEvent)
+      const normalizedTimestamp = rawLastEvent && !/(Z|[+-]\d{2}:\d{2})$/i.test(rawLastEvent)
         ? `${rawLastEvent}Z`
         : rawLastEvent;
       const parsedTimestamp = normalizedTimestamp ? new Date(normalizedTimestamp) : null;
