@@ -55,3 +55,16 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - **Validação SQL executada:** conta Master consultada recebeu hasAccess=false, roles=[] e isPlatformMasterAdmin=true no tenant ativo exemplostore. Um administrador real desse tenant continuou recebendo hasAccess=true, role tenant_admin e canAdministerTenant=true.
 - **Pendente:** teste manual pelo navegador no portal do tenant, build/type-check e regressão de login Master; deploy Vercel segue manual e não foi realizado nesta manutenção.
 - **Lição reutilizável:** impedir que o Master seja cadastrado como administrador não basta. A RPC central de autorização de tenant também precisa negar acesso ao portal, sem afetar operações globais específicas do Master.
+
+
+## Incidente — indicador “Sincronizando acesso...” permanece indefinidamente (2026-10-09)
+
+**Sintoma:** ao navegar para fora de páginas protegidas e voltar, a aplicação podia permanecer com tela branca e o indicador “Sincronizando acesso...”.
+
+**Causa identificada por inspeção estática:** `synchronizeProfile` marcava `authorizationLoading=true` após cada sincronização de sessão, inclusive quando o ID do usuário permanecia igual (por exemplo, em uma renovação de token). A consulta de autorização dependia apenas de `authUserId`; como React não dispara o efeito quando o estado recebe o mesmo ID, a autorização não era consultada novamente e o indicador podia ficar preso em `true`.
+
+**Correção aplicada:** commit `f0e9594624f47c3213c8330d1af71480880a3f9b` adiciona `authorizationSyncVersion`, incrementada após a sincronização do perfil, e usa esse contador como gatilho adicional do efeito de autorização. Assim, uma nova sincronização do mesmo usuário reexecuta a verificação e permite que o `finally` encerre o loading.
+
+**Validação:** inspeção do código e commit confirmados. Build, type-check, testes automatizados e reprodução no navegador ainda não foram executados. Deploy Vercel não realizado; permanece manual.
+
+**Riscos/regressão a testar:** login/logout, renovação de token, navegação repetida entre páginas protegidas, mudança entre portal Master e tenant, usuário sem membership e RPC de autorização com erro. Não remover a espera de autorização nem permitir acesso por timeout; erros devem terminar em estado seguro.
