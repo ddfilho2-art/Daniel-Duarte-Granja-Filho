@@ -73,3 +73,12 @@ Os valores variam com o uso e não devem ser codificados como constantes.
 - A primeira tentativa de migration falhou porque o array `roles` usa o enum `tenant_role[]`; a policy foi corrigida para usar esse tipo e a migration aplicada. A coluna, policy e RPC SRE foram verificadas por consultas read-only.
 - Build/type-check e testes autenticados de isolamento ainda não foram executados. Não declarar a manutenção concluída até que esses testes passem.
 - Logs gerenciados Supabase, uptime e latência continuam pendentes de integração server-side autorizada e telemetria persistida.
+
+
+## Logs gerenciados dos serviços — 2026-10-09
+- A aba `Logs dos Serviços` usa o endpoint server-side `api/sre-infrastructure-logs.ts`; a autorização é verificada com sessão Supabase e RPC Master.
+- O endpoint consulta `/v1/projects/{ref}/analytics/endpoints/logs` com janela de até 24 horas e uma consulta ClickHouse fixa. O token nunca deve ser enviado ao frontend.
+- Configuração necessária na Vercel: `SUPABASE_ACCESS_TOKEN` com escopo somente do projeto e permissão **Logs — Read**. `SUPABASE_PROJECT_REF` é opcional porque há fallback para o ref atual.
+- A consulta equivalente foi executada via fonte gerenciada e retornou 10 fontes de serviço. A classificação de suspeitas de erro é heurística por texto, não uma confirmação de incidente.
+- **Não validado:** chamada do endpoint a partir de uma sessão Master real, presença da variável de ambiente no ambiente de produção, build/type-check e teste visual.
+- Uptime e latência continuam sem probes e histórico persistido; não exibir como zero ou como saudável sem medição.
