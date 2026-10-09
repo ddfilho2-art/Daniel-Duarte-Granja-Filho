@@ -41,3 +41,14 @@ O salvamento falhava com 403 porque o papel autenticado não tinha EXECUTE nas R
 - Correção no commit `0f389b233b950c06ad360160cca5cda29f9368fd`: o botão passa também `change_reason` persistido da versão; o handler usa essa justificativa para publicar. Para rascunhos antigos sem justificativa válida, a tela informa que é necessário salvar uma nova versão com justificativa.
 - Auditoria preservada: a RPC recebe a justificativa registrada e continua registrando autor/data da publicação e motivo no evento de auditoria.
 - Validação: confirmação estática do código alterado e commit registrado. Ainda não executados build, testes automatizados ou validação no navegador; status permanece `AGUARDANDO VALIDAÇÃO`.
+
+
+## Diagnóstico adicional — prévia do logo, cores e autoria do histórico
+- Sintomas relatados em 2026-10-09: ao selecionar um tenant no editor, o logo não aparecia; o usuário não conseguia distinguir alterações salvas de alterações já publicadas; o histórico mostrava o UUID do responsável.
+- Consulta direta ao banco confirmou para Exemplo Store que a versão publicada v3 possui `logo_primary_path` preenchido, enquanto o rascunho v2 tem esse campo nulo. A tela escolhia o rascunho e usava exclusivamente o caminho de logo dele, portanto a prévia ficava vazia mesmo havendo um logo publicado.
+- A tela agora usa o logo do rascunho quando ele existe e, quando o rascunho não possui logo próprio, usa o logo da versão publicada como fallback. Ao trocar de empresa, limpa imediatamente os estados visuais e mensagens da empresa anterior.
+- O editor exibe aviso explícito: o portal público continua usando a versão publicada até que o rascunho seja publicado. O histórico segue mostrando a versão salva; rascunho não altera o portal por si só.
+- Para o responsável, a causa foi confirmada: a consulta direta a `tenant_branding_versions` só retornava o UUID `created_by`, e os campos `created_by_name`/`created_by_email` não existem na tabela. O UUID consultado pertence a usuário com e-mail `teste.platform@recrutaai.local`, sem nome nos metadados nem perfil associado.
+- A listagem do histórico passou para a Edge Function autenticada `tenant-provisioning`, que valida o usuário como platform master admin e enriquece a resposta com nome disponível nos metadados e e-mail do usuário, sem expor `auth.users` ao frontend. Edge Function implantada como versão 8.
+- Commits do código: UI `ad079ca254e0e9e6e15aa3a31b7a954875b34a32`; cliente de branding `de9a8415629469b4e8eb5da69cf0ae555e838b51`; Edge Function `ebb01016b3f69d9fc8402eded7832df49d538733`.
+- Limitações de validação: a Edge Function foi implantada com sucesso na versão 8; ainda não foi executado build/CI nem o teste completo no navegador. O portal e a tela Master precisam ser testados após o próximo deploy manual da aplicação web. O nome civil continuará ausente se não estiver cadastrado em metadados; nesse caso, a interface deve exibir o e-mail como identificação legível.
