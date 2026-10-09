@@ -390,7 +390,7 @@ Deno.serve(async (request) => {
           cors,
         );
       }
-      const { data, error } = await admin.rpc("create_tenant_branding_draft", {
+      const { data, error } = await userClient.rpc("create_tenant_branding_draft", {
         p_actor_id: authData.user.id,
         p_tenant_id: tenantId,
         p_theme: body.theme || {},
@@ -416,7 +416,7 @@ Deno.serve(async (request) => {
           cors,
         );
       }
-      const { data, error } = await admin.rpc("publish_tenant_branding", {
+      const { data, error } = await userClient.rpc("publish_tenant_branding", {
         p_actor_id: authData.user.id,
         p_tenant_id: tenantId,
         p_branding_id: brandingId,
@@ -481,21 +481,28 @@ Deno.serve(async (request) => {
       cors,
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error(
-      JSON.stringify({
-        event: "tenant_provisioning_failed",
-        requestId: currentRequestId,
-        error: message.split(":")[0],
-      }),
-    );
+    const errorRecord = error && typeof error === "object"
+      ? error as Record<string, unknown>
+      : null;
+    const message = error instanceof Error
+      ? error.message
+      : String(errorRecord?.message || errorRecord?.details || errorRecord?.hint || error);
+    const code = typeof errorRecord?.code === "string" ? errorRecord.code : undefined;
+    console.error(JSON.stringify({
+      event: "tenant_provisioning_failed",
+      requestId: currentRequestId,
+      code,
+      error: message.slice(0, 300),
+    }));
+    const expectedClientError = code === "22023" || code === "P0002" || code === "42501";
     return jsonResponse(
       {
         success: false,
-        code: "INTERNAL_ERROR",
+        code: expectedClientError ? "BRANDING_OPERATION_REJECTED" : "INTERNAL_ERROR",
+        message: expectedClientError ? message : "A operação falhou no servidor. Informe o código de atendimento.",
         requestId: currentRequestId,
       },
-      500,
+      expectedClientError ? (code === "42501" ? 403 : 400) : 500,
       cors,
     );
   }
