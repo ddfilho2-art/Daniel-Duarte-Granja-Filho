@@ -43,11 +43,13 @@ O SRE global continha uma aba de e-mails, embora a fila e o reprocessamento seja
 
 ## Estado da validação
 - **Inspecionado:** estado atual dos arquivos no `main`, endpoints e política da fila.
+- **Verificação estática agora:** 9 de 9 verificações de fonte passaram (separação das rotas, remoção de e-mail do SRE, autorização Master, tenant scope de monitor/envio/reprocessamento e proteção do token).
 - **Testado agora:** migration aplicada; consulta read-only confirmou a coluna UUID, policy instalada e RPC SRE sem referências à fila de e-mails.
 - **Verificação estática:** `PerformanceSRE.tsx` não contém aba nem referências a e-mail; os endpoints têm checagem de membership e filtros por tenant.
 - **Não validado:** build/type-check, autorização por sessão real, isolamento entre dois tenants, envio/reprocessamento real, interface em navegador e produção.
 - **Parcialmente implementado:** aba `Logs dos Serviços` e endpoint server-side de consulta dos logs gerenciados Supabase; a chamada de produção depende de `SUPABASE_ACCESS_TOKEN` com permissão Logs — Read configurado como variável server-side da Vercel.
-- **Pendente:** instrumentação persistida de uptime/latência e testes end-to-end com sessão Master.
+- **Consulta de logs testada:** a consulta ClickHouse foi executada contra a fonte gerenciada do Supabase e retornou 10 fontes na janela de 24h.
+- **Pendente:** configurar/confirmar `SUPABASE_ACCESS_TOKEN` no ambiente server-side Vercel com permissão Logs — Read; executar type-check/build e testes end-to-end com sessão Master.
 
 
 ## Extensão da visão de infraestrutura
