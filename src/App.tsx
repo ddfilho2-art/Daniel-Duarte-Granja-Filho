@@ -70,6 +70,7 @@ const AdminPerformance = lazyNamed(
   () => import("./pages/AdminPerformance"),
   "AdminPerformance",
 );
+const MasterSRE = lazyNamed(() => import("./pages/MasterSRE"), "MasterSRE");
 const PerfilAdmin = lazyNamed(() => import("./pages/PerfilAdmin"), "PerfilAdmin");
 
 const HRDashboard = lazyNamed(() => import("./pages/HR"), "HRDashboard");
@@ -309,7 +310,7 @@ const App = () => {
               <Route path="tenants" element={<MasterTenantList />} />
               <Route path="administradores" element={<MasterTenantAdminManagement />} />
               <Route path="branding" element={<MasterBrandingEditor />} />
-              <Route path="sre" element={<AdminPerformance />} />
+              <Route path="sre" element={<MasterSRE />} />
               <Route path="perfil" element={<MasterProfile />} />
             </Route>
 
