@@ -68,5 +68,7 @@ Em `supabase/functions/tenant-provisioning/index.ts`, a listagem agora percorre 
 - O indicador permanece parcial: somente objetos do bucket `tenant-branding` com caminho de tenant são somados junto dos anexos administrativos cujo tamanho está registrado. Isso não representa o armazenamento total de todos os dados do tenant.
 
   
-### Limitação operacional — publicação (2026-10-09)
-Duas tentativas de publicar a alteração via ferramenta de deploy falharam com erro `import map path does not exist` apontando para `deno.json`. A leitura da Edge Function ativa confirmou que a versão publicada ainda não contém a paginação. O código corrigido permanece na `main`; não considerar ativo em produção até resolver o deploy e reler a versão publicada.
+### Publicação e validação posterior (2026-10-09)
+A primeira tentativa de deploy falhou ao resolver o caminho do import map. A publicação foi concluída ao informar explicitamente `import_map_path: deno.json`. A Edge Function `tenant-provisioning` está ativa na versão 12. A releitura do runtime confirmou que a paginação está presente e o limite fixo `offset: 0` foi removido.
+
+**Ainda não validado:** execução real com mais de 1.000 objetos, build/type-check e teste formal de autorização Master versus usuário comum.
