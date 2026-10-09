@@ -612,21 +612,30 @@ export function MasterBrandingEditor() {
     );
   }, []);
 
-  useEffect(() => {
-    if (!selectedTenant) {
-      setVersions([]);
-      return;
-    }
-    getBrandingVersions(selectedTenant)
-      .then(setVersions)
-      .catch((err) => setError(err instanceof Error ? err.message : "Não foi possível carregar o histórico."));
-  }, [selectedTenant]);
+  const loadBranding = useCallback(async (tenantId: string) => {
+    if (!tenantId) { setVersions([]); setTheme({}); setLogoFile(null); setLogoPreview(""); return; }
+    setError("");
+    try {
+      const loaded = await getBrandingVersions(tenantId);
+      setVersions(loaded);
+      const current = loaded.find((v) => v.status === "draft") ?? loaded.find((v) => v.status === "published") ?? loaded[0];
+      if (!current) { setTheme({}); setLogoPreview(""); return; }
+      const keys = ["display_name", "sidebar_background", "sidebar_text", "sidebar_active", "sidebar_hover", "home_background", "hero_background", "hero_text", "primary_action", "accent", "primary_color", "secondary_color", "link_color", "focus_ring_color", "logo_primary_path"];
+      const next: BrandingDraftPayload = {};
+      for (const key of keys) {
+        const value = current[key];
+        if (typeof value === "string") (next as Record<string, unknown>)[key] = value;
+      }
+      setTheme(next);
+      const path = typeof current.logo_primary_path === "string" ? current.logo_primary_path : "";
+      setLogoPreview(path ? supabase.storage.from("tenant-branding").getPublicUrl(path).data.publicUrl : "");
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar o histórico."); }
+  }, []);
+
+  useEffect(() => { void loadBranding(selectedTenant); }, [selectedTenant, loadBranding]);
 
   useEffect(() => {
-    if (!logoFile) {
-      setLogoPreview("");
-      return;
-    }
+    if (!logoFile) return;
     const url = URL.createObjectURL(logoFile);
     setLogoPreview(url);
     return () => URL.revokeObjectURL(url);
@@ -649,10 +658,9 @@ export function MasterBrandingEditor() {
   ];
 
   const handleCreateDraft = async () => {
-    if (!selectedTenant || !reason.trim()) {
-      setError("Selecione uma empresa e informe o motivo da alteração.");
-      return;
-    }
+    if (loading) return;
+    if (!selectedTenant) { setError("Selecione uma empresa antes de salvar."); return; }
+    if (reason.trim().length < 3) { setError("Informe uma justificativa com pelo menos 3 caracteres."); return; }
     if (logoFile && (!["image/png", "image/webp"].includes(logoFile.type) || logoFile.size > 2 * 1024 * 1024)) {
       setError("Use um logo PNG ou WebP de até 2 MB.");
       return;
@@ -677,7 +685,7 @@ export function MasterBrandingEditor() {
       setSuccess(`Rascunho da identidade visual v${result.version ?? ""} criado. Revise a prévia e publique no histórico quando estiver pronto.`);
       setLogoFile(null);
       setReason("");
-      setVersions(await getBrandingVersions(selectedTenant));
+      await loadBranding(selectedTenant);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -686,17 +694,17 @@ export function MasterBrandingEditor() {
   };
 
   const handlePublish = async (brandingId: string) => {
-    if (!selectedTenant || !reason.trim()) {
-      setError("Informe o motivo da publicação.");
-      return;
-    }
+    if (loading) return;
+    if (!selectedTenant) { setError("Selecione uma empresa antes de publicar."); return; }
+    if (reason.trim().length < 3) { setError("Informe uma justificativa com pelo menos 3 caracteres para publicar."); return; }
     setLoading(true);
     setError("");
     setSuccess("");
     try {
       await publishBranding(selectedTenant, brandingId, reason.trim());
       setSuccess("Identidade visual publicada com sucesso.");
-      setVersions(await getBrandingVersions(selectedTenant));
+      await loadBranding(selectedTenant);
+      setReason("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -818,7 +826,7 @@ export function MasterBrandingEditor() {
               <p className="mt-1 text-xs text-slate-500">Obrigatório para manter o histórico da alteração.</p>
             </div>
             <div className="flex justify-end">
-              <button type="button" onClick={handleCreateDraft} disabled={loading || !reason.trim()}
+              <button type="button" onClick={handleCreateDraft} disabled={loading || !selectedTenant}
                 className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
                 {loading ? "Salvando..." : "Salvar como rascunho"}
               </button>
@@ -829,13 +837,15 @@ export function MasterBrandingEditor() {
             <div className="border-b border-slate-200 px-4 py-3"><h2 className="font-semibold text-slate-800">Histórico e publicação</h2></div>
             {versions.length === 0 ? <p className="p-6 text-sm text-slate-500">Nenhuma versão encontrada.</p> : (
               <table className="w-full text-sm">
-                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-4 py-2">Versão</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Criada em</th><th className="px-4 py-2">Ações</th></tr></thead>
+                <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500"><tr><th className="px-4 py-2">Versão</th><th className="px-4 py-2">Status</th><th className="px-4 py-2">Criada em</th><th className="px-4 py-2">Responsável</th><th className="px-4 py-2">Justificativa</th><th className="px-4 py-2">Ações</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
                   {versions.map((v) => <tr key={v.id as string} className="hover:bg-slate-50">
                     <td className="px-4 py-2 font-mono text-xs">v{v.version as number}</td>
                     <td className="px-4 py-2"><StatusBadge status={v.status as string} /></td>
                     <td className="px-4 py-2 text-xs text-slate-500">{new Date(v.created_at as string).toLocaleString("pt-BR")}</td>
-                    <td className="px-4 py-2">{v.status === "draft" && <button type="button" onClick={() => handlePublish(v.id as string)} disabled={loading || !reason.trim()} className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">Publicar</button>}</td>
+                    <td className="px-4 py-2 text-xs">{String(v.created_by_name || v.created_by_email || v.created_by || "-")}</td>
+                    <td className="px-4 py-2 text-xs max-w-sm">{String(v.change_reason || "-")}</td>
+                    <td className="px-4 py-2">{v.status === "draft" && <button type="button" onClick={() => handlePublish(v.id as string)} disabled={loading} className="rounded px-2 py-1 text-xs bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50">Publicar</button>}</td>
                   </tr>)}
                 </tbody>
               </table>
