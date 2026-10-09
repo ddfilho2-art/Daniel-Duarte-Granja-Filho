@@ -25,6 +25,7 @@ import {
 } from "../lib/tenant-provisioning";
 import { supabase } from "../lib/supabase";
 import DFLlogo from "../assets/DFLlogo.svg";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
   listTenantAdmins,
   listTenantAdminHistory,
@@ -65,6 +66,31 @@ export function MasterDashboard() {
 
   const active = tenants.filter((t) => t.status === "active").length;
   const suspended = tenants.filter((t) => t.status === "suspended").length;
+  const archived = tenants.filter((t) => t.status === "archived").length;
+  const endedContracts = tenants.filter((t) => Boolean(t.contract_ended_at)).length;
+  const tenantTypes = [
+    { name: "Empregadores", value: tenants.filter((t) => t.kind === "employer").length },
+    { name: "Clínicas", value: tenants.filter((t) => t.kind === "occupational_health_provider").length },
+  ];
+  const monthlyGrowth = Array.from({ length: 6 }, (_, offset) => {
+    const month = new Date();
+    month.setDate(1);
+    month.setMonth(month.getMonth() - (5 - offset));
+    const start = new Date(month.getFullYear(), month.getMonth(), 1);
+    const end = new Date(month.getFullYear(), month.getMonth() + 1, 1);
+    return {
+      month: start.toLocaleDateString("pt-BR", { month: "short" }).replace(".", ""),
+      empresas: tenants.filter((t) => {
+        const created = new Date(t.created_at);
+        return created >= start && created < end;
+      }).length,
+    };
+  });
+  const statusDistribution = [
+    { name: "Ativas", value: active, color: "#16a34a" },
+    { name: "Suspensas", value: suspended, color: "#d97706" },
+    { name: "Encerradas", value: archived, color: "#64748b" },
+  ].filter((item) => item.value > 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -80,11 +106,56 @@ export function MasterDashboard() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Total de Empresas" value={tenants.length} />
         <StatCard label="Ativas" value={active} color="text-green-600" />
         <StatCard label="Suspensas" value={suspended} color="text-amber-600" />
+        <StatCard label="Contratos encerrados" value={endedContracts} color="text-slate-600" />
       </div>
+
+      {!loading && !error && (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          <section className="rounded-xl border border-slate-200 bg-white p-5 xl:col-span-2">
+            <div className="mb-4">
+              <h2 className="font-semibold text-slate-800">Novas empresas por mês</h2>
+              <p className="text-xs text-slate-500">Últimos seis meses, calculados pela data de criação cadastrada.</p>
+            </div>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyGrowth} margin={{ top: 8, right: 8, left: -20, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="month" />
+                  <YAxis allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="empresas" name="Empresas criadas" fill="#0054A6" radius={[5, 5, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+          <section className="rounded-xl border border-slate-200 bg-white p-5">
+            <h2 className="font-semibold text-slate-800">Situação contratual</h2>
+            <p className="text-xs text-slate-500 mt-1">Distribuição dos tenants cadastrados.</p>
+            {statusDistribution.length ? (
+              <div className="h-52">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={statusDistribution} dataKey="value" nameKey="name" innerRadius={48} outerRadius={76} paddingAngle={3}>
+                      {statusDistribution.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            ) : <p className="py-12 text-center text-sm text-slate-500">Ainda não há empresas para comparar.</p>}
+            <div className="space-y-2">
+              {statusDistribution.map((entry) => <div key={entry.name} className="flex items-center justify-between text-sm"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />{entry.name}</span><strong>{entry.value}</strong></div>)}
+              <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-sm"><span className="text-slate-600">Clínicas</span><strong>{tenantTypes[1].value}</strong></div>
+              <div className="flex items-center justify-between text-sm"><span className="text-slate-600">Empregadores</span><strong>{tenantTypes[0].value}</strong></div>
+              <div className="flex items-center justify-between text-sm"><span className="text-slate-600">Arquivadas</span><strong>{archived}</strong></div>
+            </div>
+          </section>
+        </div>
+      )}
 
       {error && (
         <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
