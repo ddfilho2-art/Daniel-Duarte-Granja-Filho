@@ -131,10 +131,14 @@ const OverviewTab = ({
     },
     {
       label: "Intervenções Críticas (24h)",
-      valor: String(overviewData.intervencoes_criticas ?? 0),
+      valor: String(overviewData.intervencoes_criticas ?? "N/D"),
       icon: AlertTriangle,
-      isAlert: Number(overviewData.intervencoes_criticas) > 0,
-      status: Number(overviewData.intervencoes_criticas) > 0 ? "VERIFICAR" : "LOGS 24H",
+      isAlert: typeof overviewData.intervencoes_criticas === "number" && overviewData.intervencoes_criticas > 0,
+      status: typeof overviewData.intervencoes_criticas !== "number"
+        ? "SEM DADO"
+        : overviewData.intervencoes_criticas > 0
+          ? "VERIFICAR"
+          : "LOGS 24H",
     },
   ];
 
@@ -321,10 +325,10 @@ const CriticalTab = ({
     );
 
   const frozenUsers =
-    data?.pontos_criticos?.usuarios_congelados ||
-    data?.overview?.usuarios_congelados ||
-    0;
-  const hasCriticals = frozenUsers > 0;
+    data?.pontos_criticos?.usuarios_congelados ??
+    data?.overview?.usuarios_congelados ??
+    null;
+  const hasCriticals = typeof frozenUsers === "number" && frozenUsers > 0;
   const endpoints = data?.pontos_criticos?.endpoints_lentos || [];
 
   return (
@@ -362,7 +366,7 @@ const CriticalTab = ({
             <h5
               className={`text-6xl font-bold tracking-tighter italic ${hasCriticals ? "text-[#ED1C24]" : "text-[#0054A6]"}`}
             >
-              {frozenUsers}
+              {frozenUsers === null ? "N/D" : frozenUsers}
             </h5>
             <span className="text-xs font-bold text-slate-500 uppercase max-w-[200px]">
               Contas com status "congelado" ou inativo por longo período.
@@ -405,36 +409,47 @@ const CriticalTab = ({
 };
 
 const DatabaseTab = ({
-  data,
   loading,
 }: {
   data: SREMetrics | null;
   loading: boolean;
 }) => {
   const [infraData, setInfraData] = useState<any>(null);
+  const [infraError, setInfraError] = useState<string | null>(null);
   const [infraLoading, setInfraLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.rpc("get_infra_usage").then(({ data: rpcData, error }) => {
-      if (rpcData) {
-        setInfraData(Array.isArray(rpcData) ? rpcData[0] : rpcData);
-      } else if (error) {
-        console.error("Erro ao buscar get_infra_usage", error);
-      }
-      setInfraLoading(false);
-    });
+  const fetchInfra = useCallback(async () => {
+    setInfraLoading(true);
+    const { data: rpcData, error } = await supabase.rpc("get_infra_usage");
+    if (error) {
+      console.error("Erro ao buscar get_infra_usage", error);
+      setInfraError(error.message);
+      setInfraData(null);
+    } else if (rpcData) {
+      setInfraData(Array.isArray(rpcData) ? rpcData[0] : rpcData);
+      setInfraError(null);
+    } else {
+      setInfraError("A consulta não retornou dados.");
+      setInfraData(null);
+    }
+    setInfraLoading(false);
   }, []);
 
-  if (loading || infraLoading)
+  useEffect(() => {
+    void fetchInfra();
+  }, [fetchInfra]);
+
+  if (loading || infraLoading) {
     return (
       <div className="animate-pulse flex gap-4">
         <KPISkeleton />
+        <KPISkeleton />
       </div>
     );
-  const dbData = data?.database || {};
+  }
+
   const dbPercent = typeof infraData?.db_percent === "number" ? infraData.db_percent : null;
   const stPercent = typeof infraData?.st_percent === "number" ? infraData.st_percent : null;
-
   const getBarColor = (percent: number) => {
     if (percent < 70) return "bg-[#00A859]";
     if (percent < 90) return "bg-[#F8971D]";
@@ -442,63 +457,73 @@ const DatabaseTab = ({
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-right-4 duration-400">
-      <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
-        <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
-          <Database className="w-4 h-4 text-[#0054A6]" /> Cache Size
-        </h4>
-        <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A]">
-          {dbData.tamanho_cache || "N/D"}
-        </h3>
+    <div className="space-y-4 animate-in slide-in-from-right-4 duration-400">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">Medições diretas do PostgreSQL e dos metadados do Supabase Storage.</p>
+        <button onClick={() => void fetchInfra()} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+          Atualizar
+        </button>
       </div>
-      <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
-        <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-[#00A859]" /> Conexões Ativas
-        </h4>
-        <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A]">
-          {dbData.conexoes_ativas ?? "N/D"}
-        </h3>
-      </div>
-
-      <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-between">
-        <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
-          <Database className="w-4 h-4 text-[#0054A6]" /> Ocupação do Banco de
-          Dados
-        </h4>
-        <div>
-          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
-            {infraData?.db_used_str || "N/D"} / {infraData?.db_limit_str || "N/D"}
-          </h3>
-          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full ${dbPercent === null ? "bg-slate-300" : getBarColor(dbPercent)} transition-all duration-1000`}
-              style={{ width: `${dbPercent ?? 0}%` }}
-            />
-          </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
-            {dbPercent === null ? "Percentual não instrumentado" : `${dbPercent}% utilizado`}
-          </p>
+      {infraError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Não foi possível obter as métricas de infraestrutura: {infraError}
         </div>
-      </div>
-
-      <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-between">
-        <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-[#0054A6]" /> Armazenamento Global
-          (Storage)
-        </h4>
-        <div>
-          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
-            {infraData?.st_used_str || "N/D"} / {infraData?.st_limit_str || "N/D"}
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
+          <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Database className="w-4 h-4 text-[#0054A6]" /> Tamanho do Banco de Dados
+          </h4>
+          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A]">
+            {infraData?.db_used_str || "N/D"}
           </h3>
-          <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full ${stPercent === null ? "bg-slate-300" : getBarColor(stPercent)} transition-all duration-1000`}
-              style={{ width: `${stPercent ?? 0}%` }}
-            />
-          </div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
-            {stPercent === null ? "Percentual não instrumentado" : `${stPercent}% utilizado`}
-          </p>
+          <p className="mt-2 text-xs text-slate-500">Tamanho atual informado pelo PostgreSQL.</p>
+        </div>
+        <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
+          <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-[#00A859]" /> Conexões Ativas
+          </h4>
+          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A]">
+            {infraData?.db_connections_active ?? "N/D"}
+          </h3>
+          <p className="mt-2 text-xs text-slate-500">{infraData?.db_connections_total ?? "N/D"} conexões de cliente no total.</p>
+        </div>
+        <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
+          <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Database className="w-4 h-4 text-[#0054A6]" /> Ocupação do Banco
+          </h4>
+          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
+            {infraData?.db_used_str || "N/D"}
+          </h3>
+          {dbPercent === null ? (
+            <p className="text-xs text-slate-500">O limite do plano não está disponível nesta fonte; percentual não calculado.</p>
+          ) : (
+            <>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className={\`h-full \${getBarColor(dbPercent)} transition-all duration-1000\`} style={{ width: \`\${dbPercent}%\` }} />
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{dbPercent}% utilizado</p>
+            </>
+          )}
+        </div>
+        <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
+          <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-6 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[#0054A6]" /> Armazenamento Global (Storage)
+          </h4>
+          <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
+            {infraData?.st_used_str || "N/D"}
+          </h3>
+          <p className="mb-3 text-xs text-slate-500">{infraData?.st_objects_count ?? "N/D"} objetos no Storage.</p>
+          {stPercent === null ? (
+            <p className="text-xs text-slate-500">O limite do plano não está disponível nesta fonte; percentual não calculado.</p>
+          ) : (
+            <>
+              <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div className={\`h-full \${getBarColor(stPercent)} transition-all duration-1000\`} style={{ width: \`\${stPercent}%\` }} />
+              </div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">{stPercent}% utilizado</p>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -512,18 +537,29 @@ const ObservabilityTab = ({
   loading: boolean;
 }) => {
   const [obsData, setObsData] = useState<any>(null);
+  const [obsError, setObsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabase.rpc("get_observability_telemetry").then(({ data, error }) => {
-      if (data) {
-        setObsData(Array.isArray(data) ? data[0] : data);
-      } else if (error) {
-        console.error("Erro ao buscar get_observability_telemetry", error);
-      }
-      setLoading(false);
-    });
+  const fetchObservability = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase.rpc("get_observability_telemetry");
+    if (error) {
+      console.error("Erro ao buscar get_observability_telemetry", error);
+      setObsError(error.message);
+      setObsData(null);
+    } else if (data) {
+      setObsData(Array.isArray(data) ? data[0] : data);
+      setObsError(null);
+    } else {
+      setObsError("A consulta não retornou dados.");
+      setObsData(null);
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void fetchObservability();
+  }, [fetchObservability]);
 
   if (initialLoading || loading)
     return (
@@ -534,78 +570,68 @@ const ObservabilityTab = ({
     );
 
   const healthScore = typeof obsData?.health_score === "number" ? obsData.health_score : null;
-  const criticalCount = obsData?.critical_count || 0;
+  const criticalCount = typeof obsData?.critical_count === "number" ? obsData.critical_count : null;
   const incidents = obsData?.incidents || [];
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-400">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">Eventos de erro das tabelas de aplicação; não representa sozinho a saúde de todos os serviços.</p>
+        <button onClick={() => void fetchObservability()} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+          Atualizar
+        </button>
+      </div>
+      {obsError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Não foi possível obter os eventos de observabilidade: {obsError}
+        </div>
+      )}
       <h3 className="text-xl font-bold text-[#1A1A1A] uppercase italic mb-6 flex items-center gap-3">
-        <Layers className="text-[#0054A6] w-6 h-6" /> Telemetria de
-        Observabilidade
+        <Layers className="text-[#0054A6] w-6 h-6" /> Telemetria de Observabilidade
       </h3>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center gap-6">
-          <div
-            className={`p-6 rounded-full border-4 flex items-center justify-center w-24 h-24 ${healthScore === null ? "border-slate-300 text-slate-500" : healthScore > 80 ? "border-[#00A859] text-[#00A859]" : healthScore > 50 ? "border-[#F8971D] text-[#F8971D]" : "border-[#ED1C24] text-[#ED1C24]"}`}
-          >
-            <span className="text-3xl font-bold tracking-tighter">
-              {healthScore === null ? "N/D" : `${healthScore}%`}
-            </span>
+          <div className={\`p-6 rounded-full border-4 flex items-center justify-center w-24 h-24 \${healthScore === null ? "border-slate-300 text-slate-500" : healthScore > 80 ? "border-[#00A859] text-[#00A859]" : healthScore > 50 ? "border-[#F8971D] text-[#F8971D]" : "border-[#ED1C24] text-[#ED1C24]"}\`}>
+            <span className="text-3xl font-bold tracking-tighter">{healthScore === null ? "N/D" : \`\${healthScore}%\`}</span>
           </div>
           <div>
-            <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-              Score de saúde instrumentado
-            </h4>
+            <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">Score de saúde instrumentado</h4>
             <p className="text-sm text-slate-600">Disponibilidade real depende de probes sintéticos; ainda não há medição confiável.</p>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex flex-col justify-center">
           <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-[#ED1C24]" /> Incidentes
-            Críticos (24h)
+            <AlertTriangle className="w-4 h-4 text-[#ED1C24]" /> Incidentes Críticos (24h)
           </h4>
-          <span
-            className={`text-5xl font-bold tracking-tighter italic ${criticalCount > 0 ? "text-[#ED1C24]" : "text-[#00A859]"}`}
-          >
-            {criticalCount}
+          <span className={\`text-5xl font-bold tracking-tighter italic \${criticalCount === null ? "text-slate-500" : criticalCount > 0 ? "text-[#ED1C24]" : "text-[#00A859]"}\`}>
+            {criticalCount === null ? "N/D" : criticalCount}
           </span>
         </div>
       </div>
 
       <div className="bg-white rounded-xl border border-[#E2E8F0] shadow-sm p-6 mt-6">
-        <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-4">
-          Lista de Eventos
-        </h4>
-        {incidents.length > 0 ? (
+        <h4 className="text-[11px] font-bold text-[#1A1A1A] uppercase tracking-widest mb-4">Lista de Eventos</h4>
+        {obsError ? (
+          <p className="p-6 text-sm text-red-700">Histórico indisponível porque a consulta falhou.</p>
+        ) : incidents.length > 0 ? (
           <ul className="divide-y divide-slate-100">
             {incidents.map((inc: any, idx: number) => (
               <li key={idx} className="py-3 flex items-start gap-4 text-sm">
-                <span className="font-mono text-xs text-slate-400 shrink-0 whitespace-nowrap">
-                  [
-                  {inc.hora ||
-                    inc.created_at ||
-                    new Date().toLocaleTimeString("pt-BR")}
-                  ]
-                </span>
-                <span
-                  className={`font-bold shrink-0 ${inc.tipo?.toLowerCase().includes("error") || inc.tipo?.toLowerCase().includes("crítico") ? "text-[#ED1C24]" : "text-slate-600"}`}
-                >
-                  - [{inc.tipo || "LOG"}]:
-                </span>
-                <span className="text-slate-700">
-                  {inc.mensagem || inc.message}
-                </span>
+                <span className="font-mono text-xs text-slate-400 shrink-0 whitespace-nowrap">[{inc.hora || inc.created_at || "Horário não informado"}]</span>
+                <span className={\`font-bold shrink-0 \${inc.tipo?.toLowerCase().includes("error") || inc.tipo?.toLowerCase().includes("crítico") ? "text-[#ED1C24]" : "text-slate-600"}\`}>- [{inc.tipo || "LOG"}]:</span>
+                <span className="text-slate-700">{inc.mensagem || inc.message}</span>
               </li>
             ))}
           </ul>
         ) : (
           <div className="p-8 text-center bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-            <CheckCircle2 className="w-8 h-8 text-[#00A859] mx-auto mb-3" />
-            <p className="text-sm font-bold text-[#00A859] uppercase tracking-widest">
-              Nenhum erro encontrado nos logs de aplicação em 24h — isso não comprova disponibilidade.
+            <CheckCircle2 className="w-8 h-8 text-slate-500 mx-auto mb-3" />
+            <p className="text-sm font-bold text-slate-600 uppercase tracking-widest">
+              Nenhum evento de erro correspondente encontrado nos logs de aplicação nas últimas 24h.
             </p>
+            <p className="mt-2 text-xs text-slate-500">Isso não comprova disponibilidade nem ausência de falhas em logs de infraestrutura.</p>
           </div>
         )}
       </div>
@@ -963,6 +989,7 @@ function EmailMonitor() {
 export function PerformanceSRE() {
   const [activeTab, setActiveTab] = useState("overview");
   const [metrics, setMetrics] = useState<SREMetrics | null>(null);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState<string>("---");
 
@@ -972,15 +999,19 @@ export function PerformanceSRE() {
   const fetchRPCMetrics = useCallback(async () => {
     try {
       setLoading(true);
+      setMetricsError(null);
 
       const { data, error } = await supabase.rpc("get_sre_dashboard_metrics");
 
       if (error) {
         console.error("Erro ao buscar get_sre_dashboard_metrics", error);
-      }
-
-      if (data) {
+        setMetricsError(error.message);
+        setMetrics(null);
+      } else if (data) {
         setMetrics(data as SREMetrics);
+      } else {
+        setMetrics(null);
+        setMetricsError("A consulta principal não retornou dados.");
       }
 
       // Horário local do painel
@@ -989,8 +1020,10 @@ export function PerformanceSRE() {
           timeZone: "America/Sao_Paulo",
         }),
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[SRE-SYNC-FATAL]", err);
+      setMetricsError(err instanceof Error ? err.message : "Falha inesperada ao consultar o SRE.");
+      setMetrics(null);
     } finally {
       setLoading(false);
     }
@@ -1045,6 +1078,12 @@ export function PerformanceSRE() {
           </div>
         </div>
       </div>
+
+      {metricsError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Não foi possível carregar as métricas operacionais: {metricsError}. Os indicadores dependentes desta consulta ficam indisponíveis até a conexão/autorização ser corrigida.
+        </div>
+      )}
 
       {/* TABS (LAZY LOADING MANTIDO) */}
       <div className="flex flex-wrap gap-2 p-1.5 bg-[#F1F5F9] rounded-2xl w-fit border border-[#E2E8F0] mb-6 shadow-sm">
