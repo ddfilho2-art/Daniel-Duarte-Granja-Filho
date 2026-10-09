@@ -28,6 +28,7 @@ limit 30
 `;
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Cache-Control", "no-store");
   if (req.method !== "GET") {
     return res.status(405).json({ success: false, code: "METHOD_NOT_ALLOWED" });
   }
