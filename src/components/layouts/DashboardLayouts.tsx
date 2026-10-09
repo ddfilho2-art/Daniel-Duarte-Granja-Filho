@@ -140,7 +140,7 @@ function DashboardLayout({
       setPasswordError("As senhas não coincidem.");
       return;
     }
-    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,128}$/.test(newPassword)) {
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,128}$/.test(newPassword)) {
       setPasswordError("Use de 8 a 128 caracteres, com letra maiúscula, minúscula e número.");
       return;
     }
