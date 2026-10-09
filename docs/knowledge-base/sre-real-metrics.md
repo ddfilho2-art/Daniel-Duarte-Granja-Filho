@@ -28,7 +28,7 @@ A função preserva `SECURITY DEFINER`, `search_path` explícito e a checagem `p
 No frontend `src/components/PerformanceSRE.tsx`:
 - campos sem medição são exibidos como `N/D`, não como zero;
 - falhas de RPC/rede ficam visíveis;
-- a aba de banco apresenta valores diretos do PostgreSQL/Storage;
+- a aba de banco apresenta valores diretos do PostgreSQL/Storage e não duplica tamanho nos cards de percentual; os percentuais aparecem como `N/D` quando o limite do plano não está disponível;
 - falha na consulta principal não é apresentada como ausência de alertas;
 - a UI explica que logs de aplicação não comprovam disponibilidade.
 
@@ -52,7 +52,7 @@ Os valores variam com o uso e não devem ser codificados como constantes.
 
 ## Validação
 
-- **Testado:** migration aplicada; definição da RPC ativa relida; consultas SQL read-only confirmaram tamanho do banco, conexões e objetos de Storage; verificações textuais do frontend confirmaram a remoção dos falsos zeros e a presença dos estados de erro.
+- **Testado:** migration aplicada; definição da RPC ativa relida; consultas SQL read-only confirmaram tamanho do banco, conexões e objetos de Storage; verificações textuais do frontend confirmaram a remoção dos falsos zeros, os estados de erro e a apresentação honesta de percentuais não medidos.
 - **Não validado:** build/type-check, testes automatizados, chamada das RPCs por sessão Master real, teste negativo com usuário comum, teste visual e deploy Vercel.
 - **Próximos passos:** executar build/type-check; testar com sessão Master e com usuário de tenant; publicar manualmente o frontend; depois planejar ingestão segura dos logs de infraestrutura e probes sintéticos de uptime/latência.
 
