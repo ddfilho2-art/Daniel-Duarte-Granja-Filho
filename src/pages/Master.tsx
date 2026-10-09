@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Building2,
   Plus,
@@ -448,12 +448,12 @@ export function MasterTenantList() {
                             Encerrar contrato
                           </button>
                         )}
-                        <a
-                          href={`/master/administradores?tenant=${t.id}`}
+                        <Link
+                          to={`/master/administradores?tenant=${t.id}`}
                           className="rounded px-2 py-1 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
                         >
                           Administradores
-                        </a>
+                        </Link>
                         <a
                           href={`/empresa/${t.slug}`}
                           target="_blank"
