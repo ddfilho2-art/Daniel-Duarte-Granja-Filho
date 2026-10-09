@@ -62,3 +62,14 @@ O sintoma era correto. A causa era ausência de coleta e armazenamento de mediç
 - **Inspecionado:** definição atual da RPC principal confirmou os campos nulos e o alerta estático.
 - **Implementado:** Edge Function `sre-probe-ingest` publicada como versão 1 no projeto Supabase.
 - **Não validado:** inserção de amostras autenticadas, execução agendada do GitHub Actions, build/type-check, autorização runtime, interface em navegador e produção após publicação manual da Vercel.
+
+
+## Validação incremental — após integrar o Overview
+
+- **Testado no banco:** `public.sre_probe_health()` retornou `{"status":"ok"}`.
+- **Testado no banco:** `public.sre_probe_results` existe com RLS ativa; `anon` e `authenticated` não possuem privilégio direto de SELECT; `service_role` possui INSERT.
+- **Testado no banco:** `get_sre_slo_metrics()` não é executável por `anon`; o papel `authenticated` pode invocá-la, mas a função exige `is_platform_master_admin()` no corpo. A API também faz checagem Master antes de consultar a RPC.
+- **Implementado no banco:** migration `20261009161000_sre_overview_uptime_metrics.sql` atualiza `get_sre_dashboard_metrics()` para alimentar o uptime e o gráfico de latência a partir das sondagens, mantendo o guard de administrador global.
+- **Implementado na UI:** Overview reflete estados `measured`, `degraded`, `stale` e `not_measured`; o rótulo do gráfico só indica série instrumentada quando há pontos.
+- **Não validado:** não há amostras reais ainda; não foram executados build/type-check, testes de sessão autenticada ou validação visual. A consulta SQL de health é uma verificação de conectividade, não uma prova de funcionamento de todos os fluxos de negócio.
+- **Atenção do advisor:** o Supabase reporta RLS habilitada sem policy para a tabela de probes. Isso é intencional: nenhuma role de cliente recebe acesso direto; a ingestão usa service-role no servidor e a leitura passa pela RPC com guard Master. O advisor também lista alertas preexistentes sobre outras funções SECURITY DEFINER; não foram alterados neste escopo.
