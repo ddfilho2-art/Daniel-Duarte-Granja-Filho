@@ -106,6 +106,7 @@ function DashboardLayout({
   } = useAuth();
   const { showPasswordModal, closeChangePassword } = useUI();
 
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
@@ -139,20 +140,33 @@ function DashboardLayout({
       setPasswordError("As senhas não coincidem.");
       return;
     }
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,128}$/.test(newPassword)) {
+      setPasswordError("Use de 8 a 128 caracteres, com letra maiúscula, minúscula e número.");
+      return;
+    }
     setIsChangingPassword(true);
     setPasswordError("");
+    setPasswordSuccess("");
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user?.email) throw new Error("Não foi possível validar sua sessão.");
+      const { data: verified, error: verifyError } = await supabase.auth.signInWithPassword({
+        email: userData.user.email,
+        password: currentPassword,
       });
-      if (error) throw error;
+      if (verifyError || verified.user?.id !== userData.user.id) {
+        throw new Error("A senha atual está incorreta.");
+      }
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
       setPasswordSuccess("Senha alterada com sucesso!");
       setTimeout(() => {
         closeChangePassword();
         setPasswordSuccess("");
+        setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
-      }, 2000);
+      }, 1500);
     } catch (err: any) {
       setPasswordError(err.message || "Erro ao alterar senha.");
     } finally {
@@ -268,7 +282,7 @@ function DashboardLayout({
                 <h3 className="font-bold text-slate-900">Alterar Senha</h3>
               </div>
               <button
-                onClick={closeChangePassword}
+                onClick={() => { closeChangePassword(); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setPasswordError(""); setPasswordSuccess(""); }}
                 className="text-slate-400 hover:text-slate-600"
               >
                 <X className="w-5 h-5" />
@@ -290,6 +304,20 @@ function DashboardLayout({
 
               <div className="space-y-1">
                 <label className="text-sm font-semibold text-slate-700">
+                  Senha atual
+                </label>
+                <input
+                  required
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#0054A6]/20 outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-sm font-semibold text-slate-700">
                   Nova Senha
                 </label>
                 <input
@@ -298,8 +326,9 @@ function DashboardLayout({
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-[#0054A6]/20 outline-none transition-all"
-                  placeholder="Mínimo 6 caracteres"
-                  minLength={6}
+                  placeholder="Mínimo 8 caracteres, maiúscula, minúscula e número"
+                  minLength={8}
+                  maxLength={128}
                 />
               </div>
 
@@ -320,7 +349,7 @@ function DashboardLayout({
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-6">
                 <button
                   type="button"
-                  onClick={closeChangePassword}
+                  onClick={() => { closeChangePassword(); setCurrentPassword(""); setNewPassword(""); setConfirmPassword(""); setPasswordError(""); setPasswordSuccess(""); }}
                   className="px-6 py-2 text-sm font-medium bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Cancelar
