@@ -4,32 +4,33 @@ Projeto: Recruta AÍ
 Branch: main
 
 ## Registro
-A área Master > Identidade Visual apresentava o botão “Salvar como rascunho” desabilitado enquanto a justificativa estivesse vazia. A prévia do logo selecionado era local (URL.createObjectURL) e o editor não carregava os campos de tema da versão recuperada ao trocar/reabrir a empresa. O histórico não apresentava responsável nem justificativa.
+A área Master > Identidade Visual apresentava o botão “Salvar como rascunho” desabilitado enquanto a justificativa estivesse vazia. A prévia do logo selecionado era local (URL.createObjectURL) e o editor não carregava os campos de tema da versão recuperada ao trocar/reabrir a empresa. O histórico não apresentava responsável nem justificativa. Após a primeira correção, a tentativa de salvar passou a retornar `permission denied for function create_tenant_branding_draft` (403).
 
-## Evidências verificadas
-- src/pages/Master.tsx: os handlers validam justificativa, mas os botões também impediam o clique antes de a validação apresentar mensagem.
-- src/lib/tenant-provisioning.ts: o cliente chama a Edge Function para rascunho/publicação e lê versões por tenant_id.
-- O bucket tenant-branding existe, está público, tem limite configurado de 5 MiB e aceita PNG/WebP/ícones. A UI valida PNG/WebP até 2 MiB. O acesso público de leitura e as policies de escrita para administrador master existem.
-- create_tenant_branding_draft e publish_tenant_branding são SECURITY DEFINER com search_path = public, pg_temp e conferem auth.uid() contra o ator, além da role de master admin.
-- A criação de rascunho grava versão e evento platform.branding.draft_created em tenant_audit_logs na mesma função/transação. A publicação também possui evento de auditoria no fluxo da RPC.
-- A causa da prévia não persistente era, em parte, estrutural: ao selecionar a empresa o estado de tema era limpo e a página apenas buscava versões, sem hidratar o editor com os campos persistidos. A URL local serve somente à prévia do arquivo selecionado.
+## Evidência e causa-raiz confirmada
+- A consulta ao catálogo do PostgreSQL mostrou que `create_tenant_branding_draft(uuid, uuid, jsonb, text)` e `publish_tenant_branding(uuid, uuid, uuid, text)` tinham EXECUTE concedido somente a `postgres` e `service_role`; `authenticated` não tinha permissão.
+- A Edge Function passou a invocar as RPCs usando o cliente autenticado do usuário, para preservar `auth.uid()`. Isso foi correto para as verificações de identidade, mas revelou que faltava a concessão de EXECUTE ao papel `authenticated`.
+- As RPCs são `SECURITY DEFINER`, com `search_path = public, pg_temp`, e verificam internamente que `auth.uid() = p_actor_id` e que o usuário possui papel ativo `platform_master_admin`.
+- A correção foi conceder EXECUTE apenas a `authenticated` para as duas assinaturas exatas. Não foi concedido acesso a `anon`. A verificação posterior confirmou: authenticated = true, anon = false, service_role = true para ambas as funções.
+- Migration aplicada no projeto Supabase: `grant_authenticated_tenant_branding_rpcs`; arquivo versionado em `supabase/migrations/20261009121500_grant_authenticated_tenant_branding_rpcs.sql`.
+- A Edge Function `tenant-provisioning` também contém a correção anterior de uso do cliente autenticado e logs estruturados; versão 7 foi implantada anteriormente.
+
+## Evidências prévias verificadas
+- O bucket `tenant-branding` existe, está público, tem limite configurado de 5 MiB e aceita PNG/WebP/ícones. A UI valida PNG/WebP até 2 MiB.
+- A criação de rascunho grava versão e evento `platform.branding.draft_created` em `tenant_audit_logs` na mesma função/transação. A publicação também contém evento de auditoria na RPC.
+- A interface foi ajustada para habilitar a tentativa de salvamento e validar justificativa no handler; hidratar o tema persistido e reconstruir URL pública do logo; recarregar versões após salvar/publicar; mostrar os campos de autoria disponíveis e justificativa.
 
 ## Alterações gravadas
-Commit: 16f643d754152d59343badcddbed27c263a7d0b8
-Arquivo: src/pages/Master.tsx
-- Os botões deixam de ficar desabilitados somente por justificativa vazia; o handler valida e apresenta mensagem.
-- Bloqueio de submissão duplicada pelo estado loading e validação mínima da justificativa.
-- Carregamento do tema da versão encontrada e reconstrução da URL pública do logo persistido.
-- Recarregamento das versões após criar rascunho/publicar.
-- Histórico passou a mostrar o campo de responsável disponível na versão e a justificativa.
-- Texto de tipos de arquivo alinhado à validação real (PNG/WebP).
+- Commit UI inicial: `16f643d754152d59343badcddbed27c263a7d0b8`.
+- Commit Edge Function: `2d86738b4b5c71d04f20c5e8a9ba5f53547d754a`.
+- Commit migration de grants: `4e77f947687c7ec29e705e1968d157a0b9a3b0e0`.
+- Migration aplicada diretamente ao projeto Supabase e grants confirmados por consulta SQL.
 
 ## Limitações / não validado
-- Não foi executado teste de navegador, build, lint, type-check nem teste de integração após o commit.
+- A consulta de permissões confirma o acesso PostgreSQL, mas ainda não comprova o fluxo completo pela interface.
 - Não foi confirmado por teste funcional upload → persistência → reload → publicação → portal.
-- A identificação humana do responsável ainda precisa ser validada: a interface usa os campos de nome/e-mail se estiverem presentes, com fallback para ID. Não afirmar que nome/e-mail foi resolvido até confirmar a fonte autorizada dos dados de usuários.
-- Não foi criada migration: a inspeção mostrou que bucket, colunas de autoria/justificativa e eventos atômicos já existem. A auditoria deve ser verificada com testes funcionais e inspeção completa das RPCs antes de ampliar schema.
-- A UI usa getPublicUrl, coerente com o bucket público atual; reavaliar apenas se a política de exposição do logo mudar.
+- Não foi executado teste de navegador, build, lint, type-check nem teste de integração após as alterações.
+- A identificação humana do responsável ainda precisa ser validada: a interface usa os campos de nome/e-mail se estiverem presentes, com fallback para ID.
+- O uso de `getPublicUrl` corresponde à configuração atual de bucket público; reavaliar apenas se a política de exposição do logo mudar.
 
 ## O que aconteceu → por que aconteceu → o que mudou → como foi validado
-O botão não permitia acionar a validação; o editor não reidratava o tema salvo ao selecionar uma empresa; a prévia selecionada era uma URL local temporária. O código foi ajustado para habilitar a tentativa de salvamento e recarregar dados persistidos. Validado por inspeção do diff e commit gravado; testes funcionais e CI ainda pendentes.
+O salvamento falhava com 403 porque o papel autenticado não tinha EXECUTE nas RPCs de identidade visual. A Edge Function preservava corretamente o JWT do usuário, mas a permissão de banco faltava. Foi criada e aplicada uma migration concedendo EXECUTE somente ao papel `authenticated` nas duas funções; as próprias RPCs continuam validando identidade e papel de master admin. A consulta de verificação confirmou authenticated=true e anon=false. O teste end-to-end no navegador permanece pendente, portanto a manutenção ainda não pode ser considerada concluída.
