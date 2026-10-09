@@ -74,7 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { tenant, isTenantRoute } = useTenant();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
-  const [authorizationSyncVersion, setAuthorizationSyncVersion] = useState(0);
   const [authSession, setAuthSession] = useState<Session | null>(null);
   const [authorizationLoading, setAuthorizationLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -92,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [canAdministerTenant, setCanAdministerTenant] = useState(false);
   const [isPlatformMasterAdmin, setIsPlatformMasterAdmin] = useState(false);
   const profileRequestId = useRef(0);
+  const lastProfileSyncUserIdRef = useRef<string | null>(null);
   const loginInProgressRef = useRef(false);
 
   const synchronizeProfile = useCallback(
@@ -99,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const requestId = ++profileRequestId.current;
 
       if (!userId || !session || session.user.id !== userId) {
+        lastProfileSyncUserIdRef.current = null;
         setAuthUserId(null);
         setAuthSession(null);
         setProfile(null);
@@ -114,6 +115,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       setAuthSession(session);
+      // Renovações de token para o mesmo usuário não precisam recarregar o perfil
+      // nem reabrir o bloqueio de autorização. Isso evita RPCs duplicadas e loading preso.
+      if (lastProfileSyncUserIdRef.current === userId) return;
       setProfileLoading(true);
       if (isTenantRoute) setTenantMembershipLoading(true);
       try {
@@ -122,11 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Evita que ProtectedRoute avalie um papel global como ausente
         // entre a hidratação do perfil e a consulta de autorização.
         setAuthorizationLoading(true);
+        lastProfileSyncUserIdRef.current = userId;
         setAuthUserId(userId);
         setProfile(nextProfile);
-        // Reexecuta a sincronização mesmo quando o ID autenticado não mudou
-        // (por exemplo, TOKEN_REFRESHED), evitando loading preso em true.
-        setAuthorizationSyncVersion((version) => version + 1);
       } catch (error) {
         if (requestId !== profileRequestId.current) return;
         console.error("[AUTH] Falha ao carregar perfil autenticado:", error);
@@ -289,7 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authUserId, authorizationSyncVersion]);
+  }, [authUserId]);
 
   useEffect(() => {
     let active = true;
@@ -377,6 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // A autorização deve estar pendente antes de publicar o perfil autenticado
       // no contexto, evitando um redirecionamento prematuro de rotas Master.
       setAuthorizationLoading(true);
+      lastProfileSyncUserIdRef.current = nextProfile.uid;
       setAuthUserId(nextProfile.uid);
       setProfile(nextProfile);
 
@@ -434,6 +437,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     console.info("[AUTH DEBUG]", { event: "SIGN_OUT_REQUESTED", source: "AuthContext.signOut", userId: authUserId, session: Boolean(authSession) });
     ++profileRequestId.current;
+    lastProfileSyncUserIdRef.current = null;
     setAuthUserId(null);
     setAuthSession(null);
     setProfile(null);
