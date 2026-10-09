@@ -677,7 +677,6 @@ type SloEndpointMetrics = SloWindowMetrics & { endpoint: string };
 
 const SlosTab = ({
   data,
-  loading,
 }: {
   data: SREMetrics | null;
   loading: boolean;
