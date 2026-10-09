@@ -102,3 +102,18 @@
 | Implementar painel Master com isolamento e dados reais | Não iniciado | Agregar métricas por tenant sem expor dados pessoais de candidatos |
 | Testes de precisão, isolamento e regressão | Não iniciado | Comparar totais com consultas de referência e impedir cruzamento entre tenants |
 | Documentar e atualizar TODO | Em tratamento | Registro inicial adicionado |
+
+
+### Atualização — Consumo por empresa / paginação do Storage (2026-10-09)
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Diagnosticar limite de armazenamento | Concluído | A listagem de `tenant-branding` usava apenas `limit: 1000, offset: 0` |
+| Corrigir paginação da contagem de objetos e bytes | Concluído no código | Commit `d62f15ccf6a26b2e0fcf8ebca08460fbf9b1b5c6`; percorre páginas até o fim |
+| Deploy da Edge Function `tenant-provisioning` | Não iniciado | A alteração ainda precisa ser publicada no Supabase |
+| Validar consumo com mais de 1.000 objetos | Aguardando validação | Necessária massa de teste adequada; não há evidência desse volume no ambiente |
+| Validar autorização e isolamento | Aguardando validação | Master permitido; administrador comum deve receber 403 |
+| Build/type-check e regressão | Aguardando validação | Executar pipeline relevante após a alteração |
+| Deploy manual Vercel e validação visual | Não iniciado | Manter o deploy sob controle do usuário |
+
+**Observação de diagnóstico:** consulta somente leitura ao banco encontrou 1 tenant, 1 membership, 0 vagas, 0 candidatos, 0 candidaturas e 0 solicitações de IA no momento da consulta. Isso limita a validação comparativa com dados operacionais reais; nenhum dado pessoal foi consultado.
