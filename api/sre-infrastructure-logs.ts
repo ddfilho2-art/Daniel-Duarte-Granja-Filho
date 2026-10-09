@@ -99,12 +99,19 @@ export default async function handler(req: any, res: any) {
         ? payload.result.result
         : [];
 
-    const sources = rows.map((row: any) => ({
-      source: String(row.source || "unknown"),
-      events: Math.max(0, Number(row.events) || 0),
-      suspected_errors: Math.max(0, Number(row.suspected_errors) || 0),
-      last_event: typeof row.last_event === "string" ? row.last_event : null,
-    }));
+    const sources = rows.map((row: any) => {
+      const rawLastEvent = typeof row.last_event === "string" ? row.last_event : "";
+      const normalizedTimestamp = rawLastEvent && !/(Z|[+-]\\d{2}:\\d{2})$/i.test(rawLastEvent)
+        ? `${rawLastEvent}Z`
+        : rawLastEvent;
+      const parsedTimestamp = normalizedTimestamp ? new Date(normalizedTimestamp) : null;
+      return {
+        source: String(row.source || "unknown"),
+        events: Math.max(0, Number(row.events) || 0),
+        suspected_errors: Math.max(0, Number(row.suspected_errors) || 0),
+        last_event: parsedTimestamp && Number.isFinite(parsedTimestamp.getTime()) ? parsedTimestamp.toISOString() : null,
+      };
+    });
 
     return res.status(200).json({
       success: true,
