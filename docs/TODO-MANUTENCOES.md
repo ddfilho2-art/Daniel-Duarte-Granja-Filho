@@ -171,3 +171,23 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Build, type-check e regressão | Aguardando validação | Executar pipeline após lote |
 | Atualizar Base de Conhecimento e plano por perfil | Concluído | Causa, mudança, testes SQL e pendências registrados |
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+
+## Manutenção — 2026-10-09 — Redefinição e alteração de senha de administradores
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consultar código atual de perfil, Auth e gestão de administradores | Concluído | Inspecionados PerfilAdmin, modal global de senha, tenant-admin-management e cliente de gestão |
+| Definir política e limites de autorização | Concluído | Master redefine somente administrador ativo do tenant selecionado; usuário altera a própria senha com validação da senha atual |
+| Criar migration de auditoria | Concluído | Migration aplicada; tabela com RLS, acesso direto revogado para anon/authenticated |
+| Implementar ação segura no backend | Concluído — código e deploy Supabase | tenant-admin-management versão 5 ACTIVE; action reset_admin_password |
+| Implementar ação de redefinição na interface Master | Concluído — código | Botão por administrador ativo, confirmação de senha e justificativa obrigatória |
+| Melhorar autoatendimento de alteração de senha | Concluído — código | Solicita senha atual, confirma identidade, aplica política de 8–128 caracteres com maiúscula/minúscula/número |
+| Validar tabela e privilégios de auditoria | Concluído | SQL confirmou RLS, acesso service_role e ausência de privilégios anon/authenticated |
+| Build e type-check | Aguardando validação | Não executados nesta sessão |
+| Teste funcional Master → reset de admin ativo → login com nova senha | Aguardando validação | Não foi alterada senha real durante validação técnica |
+| Testes negativos de tenant/user/role e conta Master como alvo | Aguardando validação | Confirmar respostas 403/400 sem alteração de senha |
+| Teste funcional de autoatendimento com senha atual correta/incorreta | Aguardando validação | Executar no navegador |
+| Regressão de login Master, admin tenant e isolamento | Aguardando validação | Garantir que as duas áreas continuam separadas |
+| Atualizar Base de Conhecimento | Concluído | docs/knowledge-base/tenant-admin-password-management.md |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
