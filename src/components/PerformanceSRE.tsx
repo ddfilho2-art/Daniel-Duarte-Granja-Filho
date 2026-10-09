@@ -935,7 +935,10 @@ export function PerformanceSRE() {
         {activeTab === "database" && (
           <DatabaseTab data={metrics} loading={loading} />
         )}
-        {activeTab === "observability" && (\n          <ObservabilityTab data={metrics} loading={loading} />\n        )}\n        {activeTab === "infraLogs" && <InfrastructureLogsTab />}
+        {activeTab === "observability" && (
+          <ObservabilityTab data={metrics} loading={loading} />
+        )}
+        {activeTab === "infraLogs" && <InfrastructureLogsTab />}
         {activeTab === "slos" && <SlosTab data={metrics} loading={loading} />}      </div>
 
       {/* FOOTER DFL STRUCTURAL */}
