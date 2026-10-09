@@ -34,3 +34,10 @@ A área Master > Identidade Visual apresentava o botão “Salvar como rascunho�
 
 ## O que aconteceu → por que aconteceu → o que mudou → como foi validado
 O salvamento falhava com 403 porque o papel autenticado não tinha EXECUTE nas RPCs de identidade visual. A Edge Function preservava corretamente o JWT do usuário, mas a permissão de banco faltava. Foi criada e aplicada uma migration concedendo EXECUTE somente ao papel `authenticated` nas duas funções; as próprias RPCs continuam validando identidade e papel de master admin. A consulta de verificação confirmou authenticated=true e anon=false. O teste end-to-end no navegador permanece pendente, portanto a manutenção ainda não pode ser considerada concluída.
+
+## Correção adicional — publicação reutiliza justificativa do rascunho
+- Sintoma relatado em 2026-10-09: após salvar o rascunho, a justificativa era limpa do estado do formulário; ao clicar em Publicar, a validação exigia novamente pelo menos 3 caracteres, apesar de a justificativa já estar gravada na versão.
+- Causa confirmada no código: `handleCreateDraft` limpava `reason` após salvar; `handlePublish` dependia exclusivamente desse estado vazio e o botão passava somente o ID da versão.
+- Correção no commit `0f389b233b950c06ad360160cca5cda29f9368fd`: o botão passa também `change_reason` persistido da versão; o handler usa essa justificativa para publicar. Para rascunhos antigos sem justificativa válida, a tela informa que é necessário salvar uma nova versão com justificativa.
+- Auditoria preservada: a RPC recebe a justificativa registrada e continua registrando autor/data da publicação e motivo no evento de auditoria.
+- Validação: confirmação estática do código alterado e commit registrado. Ainda não executados build, testes automatizados ou validação no navegador; status permanece `AGUARDANDO VALIDAÇÃO`.
