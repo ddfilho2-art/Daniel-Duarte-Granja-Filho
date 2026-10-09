@@ -44,3 +44,14 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - **Correção:** incluir `authorizationLoading` na desestruturação do contexto. Commit `b81c754d3d35f474d01ec6a8b887415c9970810b`.
 - **Validação:** código corrigido e commitado; build, type-check e teste em navegador aguardam validação. Não houve deploy Vercel.
 - **Lição:** depois de alterar contratos de contexto usados por rotas, verificar tanto o campo na interface quanto sua desestruturação e executar build/type-check antes de declarar a manutenção validada.
+
+
+## Incidente confirmado — Master conseguia autenticar no portal de tenant (2026-10-09)
+
+- **Sintoma confirmado pelo usuário:** a conta Administrador da Plataforma conseguia fazer login dentro de outro tenant.
+- **Causa-raiz confirmada no banco:** a função public.get_current_tenant_access(uuid) retornava hasAccess=true quando is_platform_master_admin() era verdadeiro, mesmo sem membership no tenant. A própria RPC autorizava explicitamente o Master como se tivesse acesso a todos os tenants. A guarda anterior em tenant-admin-management bloqueava a criação de novos vínculos, mas não impedia o login no portal tenant.
+- **Correção aplicada:** migration supabase/migrations/20261009190000_block_platform_master_tenant_access.sql altera a RPC para retornar hasAccess=false, roles vazias e canAdministerTenant=false para contas Master, mesmo se existir vínculo residual. O acesso global continua reservado às rotas e funções próprias do Master.
+- **Migration aplicada ao Supabase:** sucesso reportado pela ferramenta em 2026-10-09.
+- **Validação SQL executada:** conta Master consultada recebeu hasAccess=false, roles=[] e isPlatformMasterAdmin=true no tenant ativo exemplostore. Um administrador real desse tenant continuou recebendo hasAccess=true, role tenant_admin e canAdministerTenant=true.
+- **Pendente:** teste manual pelo navegador no portal do tenant, build/type-check e regressão de login Master; deploy Vercel segue manual e não foi realizado nesta manutenção.
+- **Lição reutilizável:** impedir que o Master seja cadastrado como administrador não basta. A RPC central de autorização de tenant também precisa negar acesso ao portal, sem afetar operações globais específicas do Master.
