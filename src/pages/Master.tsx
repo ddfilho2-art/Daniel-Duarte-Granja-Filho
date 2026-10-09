@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import {
   listTenants,
+  getTenantUsage,
+  type TenantUsageItem,
   provisionTenant,
   suspendTenant,
   activateTenant,
@@ -42,10 +44,38 @@ import {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "N/D";
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} ${units[unitIndex]}`;
+}
+
 export function MasterDashboard() {
   const [tenants, setTenants] = useState<TenantListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [usage, setUsage] = useState<TenantUsageItem[]>([]);
+  const [usageLoading, setUsageLoading] = useState(true);
+  const [usageError, setUsageError] = useState("");
+
+  const fetchUsage = useCallback(async () => {
+    try {
+      setUsageLoading(true);
+      setUsageError("");
+      setUsage(await getTenantUsage());
+    } catch (err: unknown) {
+      setUsageError(err instanceof Error ? err.message : "Não foi possível carregar o consumo por empresa.");
+    } finally {
+      setUsageLoading(false);
+    }
+  }, []);
 
   const fetchTenants = useCallback(async () => {
     try {
@@ -62,7 +92,8 @@ export function MasterDashboard() {
 
   useEffect(() => {
     fetchTenants();
-  }, [fetchTenants]);
+    fetchUsage();
+  }, [fetchTenants, fetchUsage]);
 
   const active = tenants.filter((t) => t.status === "active").length;
   const suspended = tenants.filter((t) => t.status === "suspended").length;
@@ -162,6 +193,72 @@ export function MasterDashboard() {
           <AlertTriangle className="h-4 w-4" /> {error}
         </div>
       )}
+
+      <section className="rounded-xl border border-slate-200 bg-white">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-800">Consumo por empresa</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Registros operacionais e armazenamento atribuível identificado no momento da consulta.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={fetchUsage}
+              disabled={usageLoading}
+              className="rounded-lg border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
+            >
+              {usageLoading ? "Atualizando..." : "Atualizar consumo"}
+            </button>
+          </div>
+        </div>
+        {usageError ? (
+          <div className="m-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            Não foi possível carregar as métricas de consumo. {usageError}
+          </div>
+        ) : usageLoading ? (
+          <div className="p-6 text-sm text-slate-500">Consultando métricas reais por empresa...</div>
+        ) : usage.length === 0 ? (
+          <div className="p-6 text-sm text-slate-500">Nenhuma métrica de empresa disponível.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Empresa</th>
+                  <th className="px-4 py-3 text-right">Usuários vinculados</th>
+                  <th className="px-4 py-3 text-right">Vagas</th>
+                  <th className="px-4 py-3 text-right">Candidatos</th>
+                  <th className="px-4 py-3 text-right">Candidaturas</th>
+                  <th className="px-4 py-3 text-right">Solicitações de IA</th>
+                  <th className="px-4 py-3 text-right">Auditoria</th>
+                  <th className="px-4 py-3 text-right">Armazenamento atribuído</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {usage.map((item) => (
+                  <tr key={item.tenant_id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium">{item.display_name}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.memberships}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.vacancies}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.candidates}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.applications}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.ai_requests}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.audit_events}</td>
+                    <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                      {formatBytes(item.attributed_storage_bytes)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
+          Armazenamento parcial: inclui arquivos de identidade visual e anexos de operações administrativas atribuíveis à empresa. Arquivos sem vínculo inequívoco com um tenant, banco de dados, memória RAM e CPU compartilhadas não são rateados nem estimados aqui.
+        </p>
+      </section>
 
       <div className="rounded-xl border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-4 py-3">
