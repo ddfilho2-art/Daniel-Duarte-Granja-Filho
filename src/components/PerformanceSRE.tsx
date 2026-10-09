@@ -37,7 +37,7 @@ interface SREMetrics {
     usuarios_congelados?: number;
     vagas_ativas?: number; // v6.2
     intervencoes_criticas?: number; // v6.2
-    uptime_real?: number; // v6.2
+    uptime_real?: number | null; // null = ainda não instrumentado
     grafico_performance?: { name: string; valor: number }[];
   };
   pontos_criticos?: {
@@ -105,31 +105,36 @@ const OverviewTab = ({
 
   // Fallback seguro em caso de nulos (Poka-Yoke)
   const overviewData = data?.overview || {};
+  const uptimeMeasured = typeof overviewData.uptime_real === "number" && Number.isFinite(overviewData.uptime_real);
 
   const signals = [
     {
       label: "Uptime Global",
-      valor: `${overviewData.uptime_real ?? 0}%`,
+      valor: uptimeMeasured ? `${overviewData.uptime_real}%` : "N/D",
       icon: Activity,
       isAlert: false,
+      status: uptimeMeasured ? "MEDIDO" : "SEM MEDIÇÃO",
     },
     {
       label: "Total de Usuários",
-      valor: String(overviewData.total_usuarios ?? 0),
+      valor: String(overviewData.total_usuarios ?? "N/D"),
       icon: Users,
       isAlert: false,
+      status: "DADO REAL",
     },
     {
       label: "Vagas Abertas",
-      valor: String(overviewData.vagas_ativas ?? 0),
+      valor: String(overviewData.vagas_ativas ?? "N/D"),
       icon: Briefcase,
       isAlert: false,
+      status: "DADO REAL",
     },
     {
       label: "Intervenções Críticas (24h)",
       valor: String(overviewData.intervencoes_criticas ?? 0),
       icon: AlertTriangle,
       isAlert: Number(overviewData.intervencoes_criticas) > 0,
+      status: Number(overviewData.intervencoes_criticas) > 0 ? "VERIFICAR" : "LOGS 24H",
     },
   ];
 
@@ -164,7 +169,7 @@ const OverviewTab = ({
                     : "bg-emerald-50 text-emerald-700 border-emerald-200"
                 }`}
               >
-                {s.isAlert ? "WARNING" : "HEALTHY"}
+                {s.status || (s.isAlert ? "VERIFICAR" : "DADO REAL")}
               </span>
             </div>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">
@@ -187,10 +192,10 @@ const OverviewTab = ({
           <h3 className="text-xs font-bold text-[#1A1A1A] uppercase tracking-widest italic mb-8 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-[#0054A6]" />
-              Live Latency Stream (ms)
+              Histórico de latência instrumentada (ms)
             </div>
             <span className="text-[9px] text-[#00A859] animate-pulse">
-              ● RPC STREAM
+              ● DADOS REAIS
             </span>
           </h3>
           <div
@@ -427,8 +432,8 @@ const DatabaseTab = ({
       </div>
     );
   const dbData = data?.database || {};
-  const dbPercent = Number(infraData?.db_percent) || 0;
-  const stPercent = Number(infraData?.st_percent) || 0;
+  const dbPercent = typeof infraData?.db_percent === "number" ? infraData.db_percent : null;
+  const stPercent = typeof infraData?.st_percent === "number" ? infraData.st_percent : null;
 
   const getBarColor = (percent: number) => {
     if (percent < 70) return "bg-[#00A859]";
@@ -443,7 +448,7 @@ const DatabaseTab = ({
           <Database className="w-4 h-4 text-[#0054A6]" /> Cache Size
         </h4>
         <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A]">
-          {dbData.tamanho_cache || "14 MB"}
+          {dbData.tamanho_cache || "N/D"}
         </h3>
       </div>
       <div className="bg-white p-8 rounded-xl border border-[#E2E8F0] shadow-sm">
@@ -451,7 +456,7 @@ const DatabaseTab = ({
           <Activity className="w-4 h-4 text-[#00A859]" /> Conexões Ativas
         </h4>
         <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A]">
-          {dbData.conexoes_ativas || 12}
+          {dbData.conexoes_ativas ?? "N/D"}
         </h3>
       </div>
 
@@ -462,16 +467,16 @@ const DatabaseTab = ({
         </h4>
         <div>
           <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
-            {infraData?.db_used_str} / {infraData?.db_limit_str}
+            {infraData?.db_used_str || "N/D"} / {infraData?.db_limit_str || "N/D"}
           </h3>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className={`h-full ${getBarColor(dbPercent)} transition-all duration-1000`}
-              style={{ width: `${dbPercent}%` }}
+              className={`h-full ${dbPercent === null ? "bg-slate-300" : getBarColor(dbPercent)} transition-all duration-1000`}
+              style={{ width: `${dbPercent ?? 0}%` }}
             />
           </div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
-            {dbPercent}% utilizado
+            {dbPercent === null ? "Percentual não instrumentado" : `${dbPercent}% utilizado`}
           </p>
         </div>
       </div>
@@ -483,16 +488,16 @@ const DatabaseTab = ({
         </h4>
         <div>
           <h3 className="text-4xl font-bold tracking-tighter italic text-[#1A1A1A] mb-4">
-            {infraData?.st_used_str} / {infraData?.st_limit_str}
+            {infraData?.st_used_str || "N/D"} / {infraData?.st_limit_str || "N/D"}
           </h3>
           <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className={`h-full ${getBarColor(stPercent)} transition-all duration-1000`}
-              style={{ width: `${stPercent}%` }}
+              className={`h-full ${stPercent === null ? "bg-slate-300" : getBarColor(stPercent)} transition-all duration-1000`}
+              style={{ width: `${stPercent ?? 0}%` }}
             />
           </div>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">
-            {stPercent}% utilizado
+            {stPercent === null ? "Percentual não instrumentado" : `${stPercent}% utilizado`}
           </p>
         </div>
       </div>
@@ -528,7 +533,7 @@ const ObservabilityTab = ({
       </div>
     );
 
-  const healthScore = obsData?.health_score ?? 100;
+  const healthScore = typeof obsData?.health_score === "number" ? obsData.health_score : null;
   const criticalCount = obsData?.critical_count || 0;
   const incidents = obsData?.incidents || [];
 
@@ -542,19 +547,17 @@ const ObservabilityTab = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="bg-white p-6 rounded-xl border border-[#E2E8F0] shadow-sm flex items-center gap-6">
           <div
-            className={`p-6 rounded-full border-4 flex items-center justify-center w-24 h-24 ${healthScore > 80 ? "border-[#00A859] text-[#00A859]" : healthScore > 50 ? "border-[#F8971D] text-[#F8971D]" : "border-[#ED1C24] text-[#ED1C24]"}`}
+            className={`p-6 rounded-full border-4 flex items-center justify-center w-24 h-24 ${healthScore === null ? "border-slate-300 text-slate-500" : healthScore > 80 ? "border-[#00A859] text-[#00A859]" : healthScore > 50 ? "border-[#F8971D] text-[#F8971D]" : "border-[#ED1C24] text-[#ED1C24]"}`}
           >
             <span className="text-3xl font-bold tracking-tighter">
-              {healthScore}%
+              {healthScore === null ? "N/D" : `${healthScore}%`}
             </span>
           </div>
           <div>
             <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-1">
-              Disponibilidade Operacional
+              Score de saúde instrumentado
             </h4>
-            <p className="text-2xl font-bold text-[#1A1A1A] tracking-tighter italic">
-              Saúde do Sistema
-            </p>
+            <p className="text-sm text-slate-600">Disponibilidade real depende de probes sintéticos; ainda não há medição confiável.</p>
           </div>
         </div>
 
@@ -601,7 +604,7 @@ const ObservabilityTab = ({
           <div className="p-8 text-center bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
             <CheckCircle2 className="w-8 h-8 text-[#00A859] mx-auto mb-3" />
             <p className="text-sm font-bold text-[#00A859] uppercase tracking-widest">
-              Sistema Estável - Nenhum log crítico
+              Nenhum erro encontrado nos logs de aplicação em 24h — isso não comprova disponibilidade.
             </p>
           </div>
         )}
@@ -980,7 +983,7 @@ export function PerformanceSRE() {
         setMetrics(data as SREMetrics);
       }
 
-      // Sincronização Fuso Horário RJ (UTC-3)
+      // Horário local do painel
       setLastSync(
         new Date().toLocaleTimeString("pt-BR", {
           timeZone: "America/Sao_Paulo",
@@ -996,7 +999,7 @@ export function PerformanceSRE() {
   // Sync Automático & Inicial
   useEffect(() => {
     fetchRPCMetrics();
-    // RPC-Pull a cada 30 segundos
+    // Atualização dos indicadores a cada 30 segundos
     const interval = setInterval(fetchRPCMetrics, 30000);
     return () => clearInterval(interval);
   }, [fetchRPCMetrics]);
@@ -1015,7 +1018,7 @@ export function PerformanceSRE() {
             </h1>
             <div className="flex items-center gap-3 mt-1.5 text-[#4D4D4D] text-[10px] font-bold">
               <span className="flex items-center gap-1.5 uppercase tracking-widest bg-[#F1F5F9] px-2.5 py-1 rounded border border-[#E2E8F0] shadow-sm text-[#0054A6]">
-                <Database className="w-3 h-3" /> PUSH: RPC Data Layer
+                <Database className="w-3 h-3" /> Fonte: tabelas operacionais
               </span>
               <span className="opacity-60 italic flex items-center gap-2">
                 <RefreshCw
@@ -1037,7 +1040,7 @@ export function PerformanceSRE() {
           <div className="flex items-center gap-3 py-2 px-6 bg-[#F1F5F9] border border-[#E2E8F0] rounded-full shadow-inner">
             <div className="w-2.5 h-2.5 bg-[#00A859] rounded-full shadow-[0_0_8px_#00A859]" />
             <span className="text-[10px] font-bold text-[#1A1A1A] uppercase tracking-widest">
-              Zero-Calc Active
+              Métricas da aplicação · atualização a cada 30s
             </span>
           </div>
         </div>
