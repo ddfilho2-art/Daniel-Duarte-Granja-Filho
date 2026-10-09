@@ -35,3 +35,12 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - Cada empresa/clínica deve ter administrador próprio e vínculo explícito à empresa correspondente.
 - Não alterar memberships existentes por suposição. Primeiro identificar usuário, tenant, status, histórico e impacto; depois corrigir de forma auditável.
 - Não usar apenas o `perfil` legado ou controles de interface para autorizar operações privilegiadas; a Edge Function e o banco devem validar o papel global.
+
+
+## Incidente subsequente: tela branca após alteração de autorização
+
+- **Sintoma:** página inicial carregava, mas clicar em Login levava a tela branca.
+- **Causa-raiz identificada estaticamente:** `src/App.tsx` referenciava `authorizationLoading` no `ProtectedRoute`, mas não desestruturava o campo retornado por `useAuth()`. A referência não declarada pode lançar `ReferenceError` ao renderizar a rota protegida.
+- **Correção:** incluir `authorizationLoading` na desestruturação do contexto. Commit `b81c754d3d35f474d01ec6a8b887415c9970810b`.
+- **Validação:** código corrigido e commitado; build, type-check e teste em navegador aguardam validação. Não houve deploy Vercel.
+- **Lição:** depois de alterar contratos de contexto usados por rotas, verificar tanto o campo na interface quanto sua desestruturação e executar build/type-check antes de declarar a manutenção validada.
