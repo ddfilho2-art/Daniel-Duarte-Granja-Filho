@@ -164,6 +164,23 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    const tenantId = typeof req.headers?.["x-tenant-id"] === "string" ? req.headers["x-tenant-id"].trim() : "";
+    const tenantUuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!tenantUuidPattern.test(tenantId)) return res.status(400).json({ success: false, code: "TENANT_REQUIRED", requestId });
+
+    const [{ data: membership, error: membershipError }, { data: tenant, error: tenantError }] = await Promise.all([
+      supabase.from("tenant_memberships").select("tenant_id,roles,status").eq("user_id", authUser.id).eq("tenant_id", tenantId).eq("status", "active").maybeSingle(),
+      supabase.from("tenants").select("id,kind,status").eq("id", tenantId).maybeSingle(),
+    ]);
+    if (membershipError || tenantError) {
+      console.error("[SEND-EMAIL] tenant authorization lookup failed", { requestId, membershipError: membershipError?.message, tenantError: tenantError?.message });
+      return res.status(503).json({ success: false, code: "AUTHORIZATION_CHECK_FAILED", requestId });
+    }
+    const tenantRoles = Array.isArray(membership?.roles) ? membership.roles : [];
+    if (!membership || !tenantRoles.some((role: string) => ["tenant_admin", "tenant_admin_substitute", "hr"].includes(role)) || tenant?.kind !== "employer" || tenant?.status !== "active") {
+      return res.status(403).json({ success: false, code: "TENANT_ACCESS_DENIED", requestId });
+    }
+
     const { data: operator, error: operatorError } = await supabase
       .from("users")
       .select("id, perfil, status")
@@ -284,6 +301,7 @@ export default async function handler(req: any, res: any) {
     const { data: queued, error: insertError } = await supabase
       .from("email_queue")
       .insert({
+        tenant_id: tenantId,
         payload,
         status: "pending",
         attempts: 0,
