@@ -63,7 +63,7 @@
 | Validar autorização e isolamento | Aguardando validação | Master autorizado; administrador comum de empresa recebe 403 na ação |
 | Validar métricas e limites de armazenamento | Aguardando validação | Valores comparados com fontes; limitação parcial visível |
 | Build, type-check e regressão | Não iniciado | Pipeline relevante verde |
-| Atualizar Base de Conhecimento | Concluído neste registro | Diagnóstico, implementação, limites e testes pendentes documentados |
+| Atualizar Base de Conhecimento | Concluído | Registro reutilizável em `docs/knowledge-base/tenant-resource-usage.md` |
 | Deploy Supabase Edge Function | Não iniciado | Versão implantada e ação verificada |
 | Deploy manual Vercel | Não iniciado | Dashboard publicado e validado em produção |
 
