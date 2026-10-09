@@ -133,6 +133,15 @@ export function revokeTenantAdmin(payload: {
   );
 }
 
+export function resetTenantAdminPassword(payload: {
+  tenantId: string;
+  userId: string;
+  newPassword: string;
+  justification: string;
+}) {
+  return callEdge<{ auditId: string }>("reset_admin_password", payload);
+}
+
 export async function createTenantAdminAttachment(
   tenantId: string,
   operationId: string,
