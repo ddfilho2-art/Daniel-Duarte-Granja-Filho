@@ -56,6 +56,7 @@ interface EdgeResponse {
   result?: Record<string, unknown>;
   tenants?: TenantListItem[];
   tenant?: TenantDetail;
+  versions?: Record<string, unknown>[];
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
