@@ -74,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { tenant, isTenantRoute } = useTenant();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [authorizationSyncVersion, setAuthorizationSyncVersion] = useState(0);
   const [authSession, setAuthSession] = useState<Session | null>(null);
   const [authorizationLoading, setAuthorizationLoading] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
@@ -123,6 +124,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthorizationLoading(true);
         setAuthUserId(userId);
         setProfile(nextProfile);
+        // Reexecuta a sincronização mesmo quando o ID autenticado não mudou
+        // (por exemplo, TOKEN_REFRESHED), evitando loading preso em true.
+        setAuthorizationSyncVersion((version) => version + 1);
       } catch (error) {
         if (requestId !== profileRequestId.current) return;
         console.error("[AUTH] Falha ao carregar perfil autenticado:", error);
@@ -285,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authUserId]);
+  }, [authUserId, authorizationSyncVersion]);
 
   useEffect(() => {
     let active = true;
