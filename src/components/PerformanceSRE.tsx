@@ -195,7 +195,7 @@ const OverviewTab = ({
               Histórico de latência instrumentada (ms)
             </div>
             <span className="text-[9px] text-[#00A859] animate-pulse">
-              ● DADOS REAIS
+              ● SEM SÉRIE INSTRUMENTADA
             </span>
           </h3>
           <div
@@ -283,20 +283,20 @@ const OverviewTab = ({
             SRE Fast-Track Validation
           </h4>
           <h3 className="text-2xl font-bold text-white tracking-tighter italic mb-6">
-            Operação RPC ativa. Latência resolvida no servidor.
+            Telemetria disponível parcialmente; disponibilidade e latência ainda não são medidas.
           </h3>
           <div className="flex flex-col gap-4">
             <div className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-[#00A859] uppercase italic flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <Server className="w-4 h-4" /> Zero-Calc Client
               </span>
-              <span>ON</span>
+              <span>RPC</span>
             </div>
             <div className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-xs font-bold text-white uppercase italic flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4" /> DFL Protocol v6.1
               </span>
-              <span className="text-[#0054A6]">READY</span>
+              <span className="text-amber-400">PARCIAL</span>
             </div>
           </div>
         </div>
@@ -660,12 +660,12 @@ const SlosTab = ({
           ))
         ) : (
           <div className="p-16 border-2 border-dashed border-[#00A859]/30 bg-[#00A859]/5 rounded-xl text-center">
-            <CheckCircle2 className="w-12 h-12 text-[#00A859] mx-auto mb-4" />
-            <h4 className="text-lg font-bold text-[#00A859] uppercase italic tracking-tighter">
-              Zero Alertas Ativos
+            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+            <h4 className="text-lg font-bold text-amber-700 uppercase italic tracking-tighter">
+              Sem alertas registrados
             </h4>
             <p className="text-sm font-medium text-slate-600 mt-2">
-              Todos os SLOs estão sendo cumpridos com precisão.
+              Nenhum alerta foi retornado pela fonte consultada. Disponibilidade e latência ainda não têm instrumentação suficiente para afirmar cumprimento de SLO.
             </p>
           </div>
         )}
