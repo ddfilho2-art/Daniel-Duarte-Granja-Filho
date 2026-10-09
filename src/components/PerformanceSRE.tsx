@@ -26,6 +26,7 @@ import {
   Area,
 } from "recharts";
 import { supabase } from "../lib/supabase";
+import { safeFetch } from "../lib/api";
 
 // --- DATA STRUCTURES ---
 interface SREMetrics {
@@ -58,6 +59,7 @@ const TABS = [
   { id: "critical", label: "Pontos Críticos", icon: AlertTriangle },
   { id: "database", label: "Banco de Dados", icon: Database },
   { id: "observability", label: "Observabilidade", icon: Layers },
+  { id: "infraLogs", label: "Logs dos Serviços", icon: Server },
   { id: "slos", label: "Alertas & SLOs", icon: Bell },
 ];
 
@@ -717,6 +719,90 @@ const SlosTab = ({
   );
 };
 
+type InfrastructureLogSource = {
+  source: string;
+  events: number;
+  suspected_errors: number;
+  last_event: string | null;
+};
+
+function InfrastructureLogsTab() {
+  const [sources, setSources] = useState<InfrastructureLogSource[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [windowEnd, setWindowEnd] = useState<string | null>(null);
+
+  const fetchInfrastructureLogs = useCallback(async () => {
+    setLoadingLogs(true);
+    setErrorMessage(null);
+    try {
+      const response = await safeFetch("/api/sre-infrastructure-logs");
+      if (!response.ok) {
+        const code = response.data?.code;
+        if (code === "INFRA_LOGS_NOT_CONFIGURED") {
+          throw new Error("Integração de logs não configurada. Configure SUPABASE_ACCESS_TOKEN no ambiente server-side da Vercel, com permissão de leitura de logs deste projeto.");
+        }
+        if (code === "INFRA_LOGS_ACCESS_DENIED") {
+          throw new Error("O token configurado não tem permissão para ler os logs deste projeto. Verifique o escopo Logs — Read.");
+        }
+        throw new Error(response.data?.message || code || "Não foi possível consultar os logs da infraestrutura.");
+      }
+      setSources(Array.isArray(response.data?.sources) ? response.data.sources : []);
+      setWindowEnd(typeof response.data?.window?.end === "string" ? response.data.window.end : null);
+    } catch (error: unknown) {
+      setSources([]);
+      setErrorMessage(error instanceof Error ? error.message : "Falha ao consultar os logs gerenciados.");
+    } finally {
+      setLoadingLogs(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchInfrastructureLogs();
+  }, [fetchInfrastructureLogs]);
+
+  const totalEvents = sources.reduce((sum, item) => sum + (Number(item.events) || 0), 0);
+  const totalErrors = sources.reduce((sum, item) => sum + (Number(item.suspected_errors) || 0), 0);
+
+  return (
+    <div className="space-y-6 animate-in slide-in-from-bottom-2">
+      <div className="flex flex-col gap-3 rounded-xl border border-[#E2E8F0] bg-white p-6 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Telemetria dos serviços Supabase</h2>
+          <p className="mt-1 text-sm text-slate-500">Resumo dos logs gerenciados por serviço na janela móvel de 24 horas. Isso não substitui probes de disponibilidade nem histórico de latência.</p>
+          {windowEnd && <p className="mt-2 text-xs text-slate-400">Atualizado em {new Date(windowEnd).toLocaleString("pt-BR")}</p>}
+        </div>
+        <button onClick={() => void fetchInfrastructureLogs()} disabled={loadingLogs} className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">
+          <RefreshCw className={`h-4 w-4 ${loadingLogs ? "animate-spin" : ""}`} /> Atualizar logs
+        </button>
+      </div>
+
+      {errorMessage && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">{errorMessage}</div>}
+
+      {loadingLogs ? (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3"><KPISkeleton /><KPISkeleton /><KPISkeleton /></div>
+      ) : !errorMessage ? (
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-xl border border-[#E2E8F0] bg-white p-6"><p className="text-xs font-bold uppercase tracking-widest text-slate-500">Eventos (24h)</p><p className="mt-2 text-3xl font-bold text-slate-900">{totalEvents.toLocaleString("pt-BR")}</p></div>
+            <div className="rounded-xl border border-[#E2E8F0] bg-white p-6"><p className="text-xs font-bold uppercase tracking-widest text-slate-500">Eventos suspeitos de erro</p><p className="mt-2 text-3xl font-bold text-red-600">{totalErrors.toLocaleString("pt-BR")}</p></div>
+            <div className="rounded-xl border border-[#E2E8F0] bg-white p-6"><p className="text-xs font-bold uppercase tracking-widest text-slate-500">Fontes com atividade</p><p className="mt-2 text-3xl font-bold text-slate-900">{sources.length}</p></div>
+          </div>
+          <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white">
+            <div className="border-b border-slate-200 px-6 py-4"><h3 className="text-sm font-bold text-slate-900">Atividade por serviço</h3></div>
+            {sources.length === 0 ? <div className="p-10 text-center text-sm text-slate-500">Nenhum evento retornado na janela consultada. Isso não comprova, isoladamente, que todos os serviços estejam saudáveis.</div> : (
+              <div className="overflow-x-auto"><table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs font-bold uppercase text-slate-500"><tr><th className="px-6 py-3">Fonte</th><th className="px-6 py-3 text-right">Eventos</th><th className="px-6 py-3 text-right">Suspeitas de erro</th><th className="px-6 py-3">Último evento</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">{sources.map((item) => <tr key={item.source} className="hover:bg-slate-50"><td className="px-6 py-3 font-mono text-xs font-semibold text-slate-800">{item.source}</td><td className="px-6 py-3 text-right tabular-nums">{Number(item.events || 0).toLocaleString("pt-BR")}</td><td className={`px-6 py-3 text-right tabular-nums ${Number(item.suspected_errors || 0) > 0 ? "font-bold text-red-600" : "text-slate-500"}`}>{Number(item.suspected_errors || 0).toLocaleString("pt-BR")}</td><td className="px-6 py-3 text-xs text-slate-500">{item.last_event ? new Date(item.last_event).toLocaleString("pt-BR") : "N/D"}</td></tr>)}</tbody>
+              </table></div>
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 // --- COMPONENTE PRINCIPAL ---
 
 export function PerformanceSRE() {
@@ -849,9 +935,7 @@ export function PerformanceSRE() {
         {activeTab === "database" && (
           <DatabaseTab data={metrics} loading={loading} />
         )}
-        {activeTab === "observability" && (
-          <ObservabilityTab data={metrics} loading={loading} />
-        )}
+        {activeTab === "observability" && (\n          <ObservabilityTab data={metrics} loading={loading} />\n        )}\n        {activeTab === "infraLogs" && <InfrastructureLogsTab />}
         {activeTab === "slos" && <SlosTab data={metrics} loading={loading} />}      </div>
 
       {/* FOOTER DFL STRUCTURAL */}
