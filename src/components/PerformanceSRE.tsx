@@ -36,6 +36,8 @@ interface SREMetrics {
     vagas_ativas?: number; // v6.2
     intervencoes_criticas?: number; // v6.2
     uptime_real?: number | null; // null = ainda não instrumentado
+    uptime_status?: string;
+    last_probe_at?: string | null;
     grafico_performance?: { name: string; valor: number }[];
   };
   pontos_criticos?: {
@@ -104,14 +106,21 @@ const OverviewTab = ({
   // Fallback seguro em caso de nulos (Poka-Yoke)
   const overviewData = data?.overview || {};
   const uptimeMeasured = typeof overviewData.uptime_real === "number" && Number.isFinite(overviewData.uptime_real);
+  const uptimeStatus = overviewData.uptime_status || (uptimeMeasured ? "measured" : "not_measured");
 
   const signals = [
     {
       label: "Uptime Global",
       valor: uptimeMeasured ? `${overviewData.uptime_real}%` : "N/D",
       icon: Activity,
-      isAlert: false,
-      status: uptimeMeasured ? "MEDIDO" : "SEM MEDIÇÃO",
+      isAlert: uptimeStatus === "degraded" || uptimeStatus === "stale",
+      status: uptimeStatus === "measured"
+        ? "MEDIDO"
+        : uptimeStatus === "degraded"
+          ? "COM FALHAS"
+          : uptimeStatus === "stale"
+            ? "ATRASADO"
+            : "SEM MEDIÇÃO",
     },
     {
       label: "Total de Usuários",
@@ -199,7 +208,7 @@ const OverviewTab = ({
               Histórico de latência instrumentada (ms)
             </div>
             <span className="text-[9px] text-slate-500">
-              ● SEM SÉRIE INSTRUMENTADA
+              ● {chartData.length > 0 ? "SÉRIE INSTRUMENTADA" : "SEM SÉRIE INSTRUMENTADA"}
             </span>
           </h3>
           <div
