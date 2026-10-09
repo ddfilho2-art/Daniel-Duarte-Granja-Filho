@@ -178,7 +178,7 @@ Deno.serve(async (request) => {
           return count || 0;
         };
 
-        const [memberships, vacancies, candidates, applications, aiRequests, auditEvents, brandingFiles] =
+        const [memberships, vacancies, candidates, applications, aiRequests, auditEvents] =
           await Promise.all([
             countForTenant("tenant_memberships"),
             countForTenant("vagas"),
@@ -186,15 +186,28 @@ Deno.serve(async (request) => {
             countForTenant("candidaturas"),
             countForTenant("ai_analysis_requests"),
             countForTenant("tenant_audit_logs"),
-            admin.storage.from("tenant-branding").list(tenant.id, { limit: 1000, offset: 0 }),
           ]);
 
-        if (brandingFiles.error) throw brandingFiles.error;
-        const brandingObjectList = (brandingFiles.data || []).filter((file) => file.id || file.metadata);
-        const brandingBytes = brandingObjectList.reduce((sum, file) => {
-          const size = Number(file.metadata?.size);
-          return sum + (Number.isFinite(size) && size > 0 ? size : 0);
-        }, 0);
+        // Paginate Storage metadata instead of silently capping attribution at the first 1,000 entries.
+        // Count only actual objects (not folder placeholders); this remains partial attribution by design.
+        const storagePageSize = 1000;
+        let brandingFileCount = 0;
+        let brandingBytes = 0;
+        for (let offset = 0; ; offset += storagePageSize) {
+          const { data: files, error: brandingFilesError } = await admin.storage
+            .from("tenant-branding")
+            .list(tenant.id, { limit: storagePageSize, offset });
+          if (brandingFilesError) throw brandingFilesError;
+
+          const objects = (files || []).filter((file) => file.id || file.metadata);
+          brandingFileCount += objects.length;
+          brandingBytes += objects.reduce((sum, file) => {
+            const size = Number(file.metadata?.size);
+            return sum + (Number.isFinite(size) && size > 0 ? size : 0);
+          }, 0);
+
+          if (!files || files.length < storagePageSize) break;
+        }
 
         const { data: operations, error: operationsError } = await admin
           .from("tenant_admin_operations")
@@ -225,7 +238,7 @@ Deno.serve(async (request) => {
           applications,
           ai_requests: aiRequests,
           audit_events: auditEvents,
-          branding_file_count: brandingObjectList.length,
+          branding_file_count: brandingFileCount,
           branding_bytes: brandingBytes,
           admin_attachment_bytes: adminAttachmentBytes,
           attributed_storage_bytes: brandingBytes + adminAttachmentBytes,
