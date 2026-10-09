@@ -651,6 +651,21 @@ const ObservabilityTab = ({
   );
 };
 
+type SloWindowMetrics = {
+  sample_count: number;
+  success_count: number;
+  failed_count: number;
+  availability_percent: number | null;
+  latency_p50_ms: number | null;
+  latency_p95_ms: number | null;
+  latency_p99_ms: number | null;
+  last_check_at: string | null;
+  stale: boolean;
+  status: "not_measured" | "stale" | "degraded" | "measured" | string;
+};
+
+type SloEndpointMetrics = SloWindowMetrics & { endpoint: string };
+
 const SlosTab = ({
   data,
   loading,
@@ -658,63 +673,189 @@ const SlosTab = ({
   data: SREMetrics | null;
   loading: boolean;
 }) => {
-  if (loading)
+  const [sloData, setSloData] = useState<{
+    generated_at?: string;
+    last_24h?: SloWindowMetrics;
+    last_30d?: SloWindowMetrics;
+    endpoints?: SloEndpointMetrics[];
+  } | null>(null);
+  const [sloLoading, setSloLoading] = useState(true);
+  const [sloError, setSloError] = useState<string | null>(null);
+
+  const fetchSloMetrics = useCallback(async () => {
+    setSloLoading(true);
+    setSloError(null);
+    try {
+      const response = await safeFetch("/api/sre-slo-metrics");
+      if (!response.ok || response.data?.success !== true) {
+        throw new Error(response.data?.message || response.data?.code || "Não foi possível consultar as métricas de SLO.");
+      }
+      setSloData(response.data.metrics || null);
+    } catch (error: unknown) {
+      setSloData(null);
+      setSloError(error instanceof Error ? error.message : "Falha ao consultar as métricas de SLO.");
+    } finally {
+      setSloLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchSloMetrics();
+  }, [fetchSloMetrics]);
+
+  if (sloLoading) {
     return (
-      <div className="animate-pulse flex gap-4">
-        <KPISkeleton />
-      </div>
-    );
-  if (!data) {
-    return (
-      <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-        Os alertas e SLOs estão indisponíveis porque a consulta principal do SRE não retornou dados. Isso não deve ser interpretado como ausência de alertas.
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 animate-pulse">
+        {Array(4).fill(0).map((_, index) => <KPISkeleton key={index} />)}
       </div>
     );
   }
-  const alertas = data.alertas_slos?.lista_alertas || [];
+
+  const last24h = sloData?.last_24h;
+  const last30d = sloData?.last_30d;
+  const hasMeasurements = Number(last24h?.sample_count || 0) > 0;
+  const probeStatus = last24h?.status || "not_measured";
+  const statusLabel = probeStatus === "measured"
+    ? "Medições recentes"
+    : probeStatus === "degraded"
+      ? "Falhas registradas"
+      : probeStatus === "stale"
+        ? "Medição atrasada"
+        : "Não medido";
+  const statusClass = probeStatus === "measured"
+    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+    : probeStatus === "degraded"
+      ? "bg-red-50 text-red-700 border-red-200"
+      : "bg-amber-50 text-amber-800 border-amber-200";
+
+  const availability = (value: number | null | undefined) =>
+    value === null || value === undefined ? "N/D" : Number(value).toFixed(2) + "%";
+  const latency = (value: number | null | undefined) =>
+    value === null || value === undefined ? "N/D" : Math.round(Number(value)) + " ms";
+  const lastCheck = last24h?.last_check_at
+    ? new Date(last24h.last_check_at).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    : "Nenhuma amostra registrada";
+
+  const metricCards = [
+    {
+      title: "Disponibilidade observada · 24h",
+      value: availability(last24h?.availability_percent),
+      detail: (last24h?.sample_count || 0) + " verificações registradas",
+    },
+    {
+      title: "Disponibilidade observada · 30 dias",
+      value: availability(last30d?.availability_percent),
+      detail: (last30d?.sample_count || 0) + " verificações registradas",
+    },
+    {
+      title: "Latência p95 · 24h",
+      value: latency(last24h?.latency_p95_ms),
+      detail: "Somente verificações bem-sucedidas",
+    },
+    {
+      title: "Falhas de probe · 24h",
+      value: String(last24h?.failed_count ?? "N/D"),
+      detail: "Respostas inválidas, HTTP não exitoso ou timeout",
+    },
+  ];
+
+  const alerts = (data?.alertas_slos?.lista_alertas || []).filter(
+    (alerta) => !(alerta.titulo === "Disponibilidade e latência" && alerta.status === "not_measured"),
+  );
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-400">
-      <h3 className="text-xl font-bold text-[#1A1A1A] uppercase italic mb-6 flex items-center gap-3">
-        <Bell className="text-[#F8971D] w-6 h-6" /> Alertas e SLOs
-      </h3>
-      <div className="space-y-4">
-        {alertas.length > 0 ? (
-          alertas.map((alerta, idx) => (
-            <div
-              key={idx}
-              className="bg-white p-6 rounded-xl border border-l-4 border-l-slate-400 border-[#E2E8F0] shadow-sm flex items-center gap-6"
-            >
-              <div className="bg-red-50 p-3 rounded-lg text-[#ED1C24]">
-                <AlertCircle className="w-6 h-6" />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-[#1A1A1A] uppercase tracking-widest">
-                  {alerta.titulo}
-                </span>
-                <span className="text-sm font-medium text-slate-600 mt-1">
-                  {alerta.erro}
-                </span>
-              </div>
-              <div className="ml-auto">
-                <span className="bg-[#ED1C24] text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase shadow-sm">
-                  {alerta.status}
-                </span>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="p-16 border-2 border-dashed border-[#00A859]/30 bg-[#00A859]/5 rounded-xl text-center">
-            <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
-            <h4 className="text-lg font-bold text-amber-700 uppercase italic tracking-tighter">
-              Sem alertas registrados
-            </h4>
-            <p className="text-sm font-medium text-slate-600 mt-2">
-              Nenhum alerta foi retornado pela fonte consultada. Disponibilidade e latência ainda não têm instrumentação suficiente para afirmar cumprimento de SLO.
-            </p>
+      <div className="flex flex-col gap-4 rounded-xl border border-[#E2E8F0] bg-white p-6 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="text-xl font-bold text-[#1A1A1A] uppercase italic flex items-center gap-3">
+            <Bell className="text-[#F8971D] w-6 h-6" /> Disponibilidade, latência e SLOs
+          </h3>
+          <p className="mt-2 text-sm text-slate-500">
+            Probes sintéticos externos verificam a página publicada e o endpoint de saúde com dependência do Supabase.
+          </p>
+          <p className="mt-1 text-xs text-slate-400">Última verificação: {lastCheck}</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className={"rounded-full border px-3 py-1.5 text-xs font-bold " + statusClass}>{statusLabel}</span>
+          <button onClick={() => void fetchSloMetrics()} disabled={sloLoading} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 disabled:opacity-50">
+            <RefreshCw className={"h-4 w-4 " + (sloLoading ? "animate-spin" : "")} /> Atualizar
+          </button>
+        </div>
+      </div>
+
+      {sloError && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          Não foi possível consultar o histórico de SLO: {sloError}
+        </div>
+      )}
+
+      {!hasMeasurements && !sloError && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+          Ainda não existem amostras de probes. Configure os segredos do GitHub Actions e do Supabase para iniciar as medições; os indicadores serão preenchidos após as primeiras execuções.
+        </div>
+      )}
+
+      {probeStatus === "stale" && (
+        <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+          As medições estão atrasadas há mais de 15 minutos. Verifique o workflow de probes e a ingestão no Supabase.
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {metricCards.map((metric) => (
+          <div key={metric.title} className="rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{metric.title}</p>
+            <p className="mt-3 text-3xl font-bold tracking-tight text-[#1A1A1A]">{metric.value}</p>
+            <p className="mt-2 text-xs text-slate-500">{metric.detail}</p>
           </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+        <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-[#1A1A1A]">Detalhamento por endpoint · últimas 24 horas</h4>
+        {Array.isArray(sloData?.endpoints) && sloData.endpoints.length > 0 ? (
+          <div className="space-y-3">
+            {sloData.endpoints.map((endpoint) => (
+              <div key={endpoint.endpoint} className="grid grid-cols-1 gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4 md:grid-cols-5 md:items-center">
+                <div>
+                  <p className="text-xs font-bold text-slate-800">{endpoint.endpoint === "homepage" ? "Página principal" : "Saúde da aplicação + Supabase"}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{endpoint.sample_count} amostras</p>
+                </div>
+                <div><p className="text-[10px] uppercase text-slate-500">Disponibilidade</p><p className="font-semibold text-slate-800">{availability(endpoint.availability_percent)}</p></div>
+                <div><p className="text-[10px] uppercase text-slate-500">Latência p50 / p95</p><p className="font-semibold text-slate-800">{latency(endpoint.latency_p50_ms)} / {latency(endpoint.latency_p95_ms)}</p></div>
+                <div><p className="text-[10px] uppercase text-slate-500">Falhas</p><p className={endpoint.failed_count > 0 ? "font-semibold text-red-700" : "font-semibold text-slate-800"}>{endpoint.failed_count}</p></div>
+                <div><p className="text-[10px] uppercase text-slate-500">Estado</p><p className="font-semibold text-slate-800">{endpoint.status === "measured" ? "Medições recentes" : endpoint.status === "degraded" ? "Falhas registradas" : endpoint.status === "stale" ? "Atrasado" : "Não medido"}</p></div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Sem amostras por endpoint no período.</p>
         )}
       </div>
+
+      <div className="rounded-xl border border-[#E2E8F0] bg-white p-6 shadow-sm">
+        <h4 className="mb-4 text-sm font-bold uppercase tracking-widest text-[#1A1A1A]">Alertas da aplicação · últimas 24 horas</h4>
+        {alerts.length > 0 ? (
+          <div className="space-y-3">
+            {alerts.map((alerta, index) => (
+              <div key={index} className="flex items-start gap-4 rounded-lg border border-amber-100 bg-amber-50/50 p-4">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-800">{alerta.titulo}</p>
+                  <p className="mt-1 text-sm text-slate-600">{alerta.erro}</p>
+                </div>
+                <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase text-amber-800">{alerta.status}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Nenhum alerta de aplicação retornado pela fonte atual. Isso não substitui a análise das medições sintéticas.</p>
+        )}
+      </div>
+
+      <p className="text-xs text-slate-500">
+        Os percentuais são disponibilidade observada, não uma garantia de SLA. A janela de 30 dias só fica representativa depois de acumular histórico; as metas de SLO devem ser definidas com base no comportamento observado.
+      </p>
     </div>
   );
 };
