@@ -117,3 +117,11 @@
 | Deploy manual Vercel e validação visual | Não iniciado | Manter o deploy sob controle do usuário |
 
 **Observação de diagnóstico:** consulta somente leitura ao banco encontrou 1 tenant, 1 membership, 0 vagas, 0 candidatos, 0 candidaturas e 0 solicitações de IA no momento da consulta. Isso limita a validação comparativa com dados operacionais reais; nenhum dado pessoal foi consultado.
+
+  
+### Bloqueio de publicação — consumo por tenant (2026-10-09)
+
+A tentativa de publicar a versão com paginação da Edge Function `tenant-provisioning` foi bloqueada pela ferramenta de deploy, que retornou erro de resolução do caminho do import map (`deno.json`). A leitura do runtime confirmou que a versão ativa não contém a correção de paginação; portanto, o código está na `main`, mas **não está publicado no Supabase**. Não afirmar que a correção está ativa em produção.
+
+- **Status:** Bloqueado — publicação via ferramenta disponível falhou duas vezes com o mesmo erro.
+- **Próxima ação:** resolver o formato esperado para `import_map_path` ou publicar pelo fluxo Supabase CLI aprovado; depois reler a função ativa e validar.
