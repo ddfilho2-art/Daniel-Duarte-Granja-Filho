@@ -52,3 +52,9 @@ O salvamento falhava com 403 porque o papel autenticado não tinha EXECUTE nas R
 - A listagem do histórico passou para a Edge Function autenticada `tenant-provisioning`, que valida o usuário como platform master admin e enriquece a resposta com nome disponível nos metadados e e-mail do usuário, sem expor `auth.users` ao frontend. Edge Function implantada como versão 8.
 - Commits do código: UI `ad079ca254e0e9e6e15aa3a31b7a954875b34a32`; cliente de branding `de9a8415629469b4e8eb5da69cf0ae555e838b51`, com tipagem da resposta complementada em `d54dbf3ae104cf66033aa2f9b8755c62841a6bde`; Edge Function `ebb01016b3f69d9fc8402eded7832df49d538733`.
 - Limitações de validação: a Edge Function foi implantada com sucesso na versão 8; ainda não foi executado build/CI nem o teste completo no navegador. O portal e a tela Master precisam ser testados após o próximo deploy manual da aplicação web. O nome civil continuará ausente se não estiver cadastrado em metadados; nesse caso, a interface deve exibir o e-mail como identificação legível.
+
+
+## Confirmação funcional do usuário e próximo foco — 2026-10-09
+- O usuário confirmou: “tudo funcionando”. Isso valida, para fins do checklist manual, a prévia do logo ao selecionar tenant, o comportamento das cores e a exibição legível do responsável depois do deploy.
+- Consulta de leitura em `tenant_audit_logs` encontrou eventos reais de `platform.branding.draft_created` e `platform.branding.published` para Exemplo Store. Os detalhes contêm justificativa, número da versão e, no evento de publicação, `previous_branding_id`; o ator e timestamp também estão registrados.
+- Próximo foco de manutenção: segurança e integridade da auditoria, isolamento por tenant e teste de publicação/versão anterior, seguido de regressão. Ainda não foi executada uma matriz automatizada de testes nem uma validação de CI/build nesta etapa; não declarar tudo encerrado até registrar esses resultados.
