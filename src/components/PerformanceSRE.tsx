@@ -394,7 +394,7 @@ const CriticalTab = ({
             <div className="p-8 text-center bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
               <CheckCircle2 className="w-8 h-8 text-[#00A859] mx-auto mb-3" />
               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
-                Todos OS NODES ESTÁVEIS
+                Sem dados de latência instrumentada
               </p>
             </div>
           )}
@@ -638,7 +638,7 @@ const SlosTab = ({
           alertas.map((alerta, idx) => (
             <div
               key={idx}
-              className="bg-white p-6 rounded-xl border border-l-4 border-l-[#ED1C24] border-[#E2E8F0] shadow-sm flex items-center gap-6"
+              className="bg-white p-6 rounded-xl border border-l-4 border-l-slate-400 border-[#E2E8F0] shadow-sm flex items-center gap-6"
             >
               <div className="bg-red-50 p-3 rounded-lg text-[#ED1C24]">
                 <AlertCircle className="w-6 h-6" />
