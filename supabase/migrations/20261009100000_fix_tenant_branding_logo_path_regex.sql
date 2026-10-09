@@ -46,15 +46,15 @@ begin
   v_favicon := case when p_theme ? 'favicon_path'
     then nullif(trim(p_theme ->> 'favicon_path'), '') else v_current.favicon_path end;
   if v_logo_primary is not null
-    and v_logo_primary !~ ('^' || p_tenant_id::text || '/[0-9a-f-]{36}\.(png|webp)$') then
+    and v_logo_primary !~ ('^' || p_tenant_id::text || '/[0-9a-f-]{36}[.](png|webp)$') then
     raise exception using errcode = '22023', message = 'invalid_logo_primary_path';
   end if;
   if v_logo_light is not null
-    and v_logo_light !~ ('^' || p_tenant_id::text || '/[0-9a-f-]{36}\.(png|webp)$') then
+    and v_logo_light !~ ('^' || p_tenant_id::text || '/[0-9a-f-]{36}[.](png|webp)$') then
     raise exception using errcode = '22023', message = 'invalid_logo_light_path';
   end if;
   if v_favicon is not null
-    and v_favicon !~ ('^' || p_tenant_id::text || '/[0-9a-f-]{36}\.(png|webp|ico)$') then
+    and v_favicon !~ ('^' || p_tenant_id::text || '/[0-9a-f-]{36}[.](png|webp|ico)$') then
     raise exception using errcode = '22023', message = 'invalid_favicon_path';
   end if;
   insert into public.tenant_branding_versions (
