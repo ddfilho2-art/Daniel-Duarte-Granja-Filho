@@ -20,7 +20,7 @@ using (
     where tm.tenant_id = email_queue.tenant_id
       and tm.user_id = (select auth.uid())
       and tm.status = 'active'
-      and tm.roles && array['tenant_admin', 'tenant_admin_substitute']::text[]
+      and tm.roles && array['tenant_admin', 'tenant_admin_substitute']::public.tenant_role[]
       and t.kind = 'employer'
       and t.status = 'active'
   )
