@@ -154,3 +154,20 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Build e type-check | Aguardando validação | Ainda não executados nesta sessão |
 | Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
 | Testar login e rota Master | Aguardando validação | Login abre e autentica sem tela branca |
+
+
+## Manutenção — 2026-10-09 — Bloquear login Master no portal de tenant
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consultar Base de Conhecimento e código/RPC atual | Concluído | Revisados histórico de separação Master/tenant, AuthContext, tenant-access.ts e definição real de get_current_tenant_access |
+| Identificar causa-raiz | Concluído | RPC autorizava explicitamente Master por v_is_platform_master OR cardinality(v_roles) > 0 |
+| Criar migration versionada na main | Concluído | supabase/migrations/20261009190000_block_platform_master_tenant_access.sql; commit 9455924950daf5a600b424b97dcea0db2dec4b29 |
+| Aplicar correção no Supabase | Concluído | apply_migration retornou sucesso; definição ativa relida |
+| Testar autorização Master por SQL | Concluído | Resultado real: hasAccess=false, roles=[], canAdministerTenant=false, isPlatformMasterAdmin=true |
+| Testar administrador legítimo do tenant por SQL | Concluído | Resultado real: hasAccess=true, roles=[tenant_admin], canAdministerTenant=true |
+| Testar login Master no portal pelo navegador | Aguardando validação | Esperado: login recusado com mensagem de ausência de vínculo e sessão encerrada |
+| Confirmar login Master em /master | Aguardando validação | A conta continua acessando apenas o fluxo global próprio |
+| Build, type-check e regressão | Aguardando validação | Executar pipeline após lote |
+| Atualizar Base de Conhecimento e plano por perfil | Concluído | Causa, mudança, testes SQL e pendências registrados |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
