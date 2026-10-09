@@ -186,6 +186,23 @@ async function ensureUserProfile(
   }
 }
 
+async function assertNotPlatformMaster(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<void> {
+  const { data: platformRole, error } = await admin
+    .from("platform_user_roles")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("role", "platform_master_admin")
+    .eq("active", true)
+    .is("revoked_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (platformRole) throw new Error("platform_master_cannot_be_tenant_admin");
+}
+
 async function resolveUser(
   admin: ReturnType<typeof createClient>,
   body: Extract<Action, { action: "add_admin" | "replace_admin" }>,
@@ -194,6 +211,7 @@ async function resolveUser(
     if (!UUID.test(body.userId)) throw new Error("invalid_user_id");
     const { data, error } = await admin.auth.admin.getUserById(body.userId);
     if (error || !data.user) throw new Error("auth_user_not_found");
+    await assertNotPlatformMaster(admin, data.user.id);
     const email = data.user.email || "";
     if (!EMAIL.test(email)) throw new Error("user_email_required");
     await ensureUserProfile(admin, data.user.id, email, body.nome?.trim() || email.split("@")[0], false);
@@ -218,6 +236,7 @@ async function resolveUser(
   if (existingProfile?.id) {
     const { data, error } = await admin.auth.admin.getUserById(existingProfile.id);
     if (error || !data.user) throw new Error("auth_user_not_found");
+    await assertNotPlatformMaster(admin, data.user.id);
     await ensureUserProfile(admin, data.user.id, email, nome, false);
     return { userId: data.user.id, createdAuthUser: false };
   }
@@ -432,7 +451,7 @@ Deno.serve(async (request) => {
   } catch (error) {
     const raw = error instanceof Error ? error.message : String(error);
     const code = raw === "unauthorized" ? "UNAUTHORIZED"
-      : raw === "platform_master_admin_required" ? "FORBIDDEN"
+      : raw === "platform_master_admin_required" || raw === "platform_master_cannot_be_tenant_admin" ? "FORBIDDEN"
       : raw === "INVALID_ACTION" ? "INVALID_ACTION"
       : raw.startsWith("duplicate key") ? "CONFLICT"
       : "INVALID_REQUEST";
