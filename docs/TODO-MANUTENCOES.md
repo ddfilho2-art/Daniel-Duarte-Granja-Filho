@@ -134,9 +134,9 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 |---|---|---|
 | Registrar os dois sintomas | Concluído | Ação Administradores redirecionava à home; comportamento sugeria reutilização da conta Master |
 | Diagnosticar guarda de rota | Concluído — inspeção estática | `ProtectedRoute` não aguardava `authorizationLoading`; link usava navegação completa |
-| Corrigir ação Administradores | Concluído — código | `Link` SPA no arquivo `src/pages/Master.tsx`; guarda aguarda autorização em `src/App.tsx` |
+| Corrigir ação Administradores | Concluído — código | `Link` SPA em `src/pages/Master.tsx`; `src/App.tsx` aguarda autorização; `src/contexts/AuthContext.tsx` sinaliza autorização pendente antes de publicar o perfil |
 | Bloquear conta global Master na associação como tenant admin | Concluído — código e deploy Supabase | `tenant-admin-management` versão 4 ACTIVE; runtime contém verificação explícita e 403 |
-| Consultar memberships atuais da conta Master | Concluído — leitura somente | Nenhum vínculo de tenant encontrado para a conta Master consultada |
+| Consultar memberships atuais da conta Master | Concluído — leitura somente | Nenhum vínculo de tenant encontrado para a conta Master consultada; os dois tenants atuais possuem um administrador ativo cada |
 | Confirmar build/type-check/testes automatizados | Aguardando validação | Ainda não executados nesta sessão |
 | Testar ação Administradores no navegador | Aguardando validação | Deve abrir gestão do tenant correto e manter sessão Master |
 | Testar tentativa de associar Master a tenant | Aguardando validação | Backend retorna 403 e não grava vínculo |
