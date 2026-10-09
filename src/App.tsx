@@ -137,6 +137,7 @@ const ProtectedRoute = ({
     authLoading,
     profileLoading,
     tenantMembershipLoading,
+    authorizationLoading,
     tenantRoles,
     clinicRoles,
     hasClinicAccess,
