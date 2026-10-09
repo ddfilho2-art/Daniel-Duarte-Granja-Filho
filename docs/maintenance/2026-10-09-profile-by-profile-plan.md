@@ -48,16 +48,17 @@ Corrigir e validar a ferramenta por perfil, em lotes delimitados. Não alterar f
 
 **Mudanças aplicadas**
 - `src/App.tsx`: a proteção de rota agora aguarda `authorizationLoading`.
+- `src/contexts/AuthContext.tsx`: marca a autorização como pendente antes de publicar o perfil autenticado no contexto, evitando uma janela de redirecionamento antes do início do efeito de autorização.
 - `src/pages/Master.tsx`: a ação “Administradores” usa `Link` do React Router, preservando navegação SPA e query `tenant`.
 - `supabase/functions/tenant-admin-management/index.ts`: verifica o papel global antes de associar usuário existente e responde 403 se a conta for Master.
 - Edge Function `tenant-admin-management` publicada na versão 4, status `ACTIVE`; leitura do runtime confirmou a presença da guarda de segurança.
-- Consulta somente leitura ao banco: a conta Master ativa consultada não possui memberships de tenant, nem ativas nem revogadas. Portanto, não foi encontrada associação indevida existente para essa conta. Isso não prova, por si só, que todos os tenants já possuam administradores próprios.
+- Consultas somente leitura ao banco: a conta Master ativa consultada não possui memberships de tenant, nem ativas nem revogadas. Os dois tenants atuais têm um administrador de tenant ativo cada; nenhuma associação de administrador ativo foi atribuída à conta Master consultada. Isso não prova que o fluxo corrigido já foi testado.
 
 **TODO desta correção**
 | Etapa | Status | Evidência / critério |
 |---|---|---|
 | Diagnóstico da navegação | Concluído — inspeção estática | Navegação completa e ausência de espera por `authorizationLoading` identificadas |
-| Corrigir navegação da ação “Administradores” | Concluído — código | Ação usa `Link` SPA e guarda aguarda autorização |
+| Corrigir navegação da ação “Administradores” | Concluído — código | Ação usa `Link` SPA; `ProtectedRoute` aguarda autorização e `AuthContext` sinaliza autorização pendente antes de publicar o perfil |
 | Impedir conta Master como administrador de tenant | Concluído — código e Edge Function | Versão 4 ACTIVE; runtime contém verificação e retorno 403 |
 | Verificar memberships atuais da conta Master | Concluído — somente leitura | Nenhuma membership de tenant encontrada para a conta Master consultada |
 | Build, type-check e testes automatizados | Aguardando validação | Pipeline precisa confirmar a alteração de frontend e função |
