@@ -110,7 +110,7 @@
 |---|---|---|
 | Diagnosticar limite de armazenamento | Concluído | A listagem de `tenant-branding` usava apenas `limit: 1000, offset: 0` |
 | Corrigir paginação da contagem de objetos e bytes | Concluído no código | Commit `d62f15ccf6a26b2e0fcf8ebca08460fbf9b1b5c6`; percorre páginas até o fim |
-| Deploy da Edge Function `tenant-provisioning` | Não iniciado | A alteração ainda precisa ser publicada no Supabase |
+| Deploy da Edge Function `tenant-provisioning` | Concluído | Versão 12 ACTIVE confirmada após publicação |
 | Validar consumo com mais de 1.000 objetos | Aguardando validação | Necessária massa de teste adequada; não há evidência desse volume no ambiente |
 | Validar autorização e isolamento | Aguardando validação | Master permitido; administrador comum deve receber 403 |
 | Build/type-check e regressão | Aguardando validação | Executar pipeline relevante após a alteração |
@@ -119,9 +119,10 @@
 **Observação de diagnóstico:** consulta somente leitura ao banco encontrou 1 tenant, 1 membership, 0 vagas, 0 candidatos, 0 candidaturas e 0 solicitações de IA no momento da consulta. Isso limita a validação comparativa com dados operacionais reais; nenhum dado pessoal foi consultado.
 
   
-### Bloqueio de publicação — consumo por tenant (2026-10-09)
+### Resolução do bloqueio de publicação — consumo por tenant (2026-10-09)
 
-A tentativa de publicar a versão com paginação da Edge Function `tenant-provisioning` foi bloqueada pela ferramenta de deploy, que retornou erro de resolução do caminho do import map (`deno.json`). A leitura do runtime confirmou que a versão ativa não contém a correção de paginação; portanto, o código está na `main`, mas **não está publicado no Supabase**. Não afirmar que a correção está ativa em produção.
+A primeira tentativa de publicação falhou ao resolver o caminho do import map. A publicação seguinte, com `import_map_path: deno.json` explícito, foi concluída.
 
-- **Status:** Bloqueado — publicação via ferramenta disponível falhou duas vezes com o mesmo erro.
-- **Próxima ação:** resolver o formato esperado para `import_map_path` ou publicar pelo fluxo Supabase CLI aprovado; depois reler a função ativa e validar.
+- **Status:** Edge Function `tenant-provisioning` versão 12, `ACTIVE`.
+- **Validação pós-deploy:** releitura da função ativa confirmou a presença de `storagePageSize` e ausência do antigo `offset: 0` fixo.
+- **Ainda pendente:** teste funcional com mais de 1.000 objetos, build/type-check da aplicação e teste formal de autorização Master/tenant comum.
