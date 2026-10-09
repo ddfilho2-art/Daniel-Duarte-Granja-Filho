@@ -36,6 +36,36 @@ Corrigir e validar a ferramenta por perfil, em lotes delimitados. Não alterar f
 - A documentação anterior registra confirmação do usuário de que logo, cores e identificação do responsável passaram a funcionar; não repetir essas correções sem nova evidência de regressão.
 - A Edge Function `tenant-provisioning` foi publicada na versão 12 para corrigir paginação das métricas de armazenamento atribuível. A releitura do runtime confirmou a paginação; teste com mais de 1.000 objetos ainda não foi executado.
 
+### Diagnóstico e correção — navegação e separação Master/tenant (2026-10-09)
+
+**Sintomas registrados**
+- Na tabela Empresas, a ação “Administradores” retornava à tela inicial.
+- Ao criar empresa/clínica, o usuário observou comportamento que sugeria reutilização do login Master como administrador do tenant.
+
+**Causas encontradas na inspeção**
+- O link da ação usava navegação completa por `<a href>`; em paralelo, `ProtectedRoute` não aguardava `authorizationLoading` antes de avaliar `isPlatformMasterAdmin`. Na inicialização da sessão, isso permitia redirecionamento prematuro.
+- `tenant-admin-management` podia localizar uma conta existente pelo e-mail ou ID e reutilizá-la como administrador do tenant sem rejeitar explicitamente contas com papel global `platform_master_admin`.
+
+**Mudanças aplicadas**
+- `src/App.tsx`: a proteção de rota agora aguarda `authorizationLoading`.
+- `src/pages/Master.tsx`: a ação “Administradores” usa `Link` do React Router, preservando navegação SPA e query `tenant`.
+- `supabase/functions/tenant-admin-management/index.ts`: verifica o papel global antes de associar usuário existente e responde 403 se a conta for Master.
+- Edge Function `tenant-admin-management` publicada na versão 4, status `ACTIVE`; leitura do runtime confirmou a presença da guarda de segurança.
+- Consulta somente leitura ao banco: a conta Master ativa consultada não possui memberships de tenant, nem ativas nem revogadas. Portanto, não foi encontrada associação indevida existente para essa conta. Isso não prova, por si só, que todos os tenants já possuam administradores próprios.
+
+**TODO desta correção**
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Diagnóstico da navegação | Concluído — inspeção estática | Navegação completa e ausência de espera por `authorizationLoading` identificadas |
+| Corrigir navegação da ação “Administradores” | Concluído — código | Ação usa `Link` SPA e guarda aguarda autorização |
+| Impedir conta Master como administrador de tenant | Concluído — código e Edge Function | Versão 4 ACTIVE; runtime contém verificação e retorno 403 |
+| Verificar memberships atuais da conta Master | Concluído — somente leitura | Nenhuma membership de tenant encontrada para a conta Master consultada |
+| Build, type-check e testes automatizados | Aguardando validação | Pipeline precisa confirmar a alteração de frontend e função |
+| Teste funcional da ação “Administradores” em produção | Aguardando validação | Clicar na ação abre a gestão da empresa selecionada sem retornar à home |
+| Teste negativo de reutilização da conta Master | Aguardando validação | Tentativa de associar conta Master retorna 403 e não grava membership |
+| Confirmar que cada tenant possui seu administrador próprio | Aguardando validação | Conferir lista de administradores por tenant e testar login separado |
+| Atualizar Base de Conhecimento após validação | Em tratamento | Registrar resultados finais e eventuais limitações |
+
 ### TODO
 | Etapa | Status | Critério |
 |---|---|---|
