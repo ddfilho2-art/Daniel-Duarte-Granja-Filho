@@ -118,6 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const nextProfile = await loadProfileForAuthUser(userId);
         if (requestId !== profileRequestId.current) return;
+        // Evita que ProtectedRoute avalie um papel global como ausente
+        // entre a hidratação do perfil e a consulta de autorização.
+        setAuthorizationLoading(true);
         setAuthUserId(userId);
         setProfile(nextProfile);
       } catch (error) {
@@ -367,6 +370,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setTenantMembershipLoading(false);
       }
 
+      // A autorização deve estar pendente antes de publicar o perfil autenticado
+      // no contexto, evitando um redirecionamento prematuro de rotas Master.
+      setAuthorizationLoading(true);
       setAuthUserId(nextProfile.uid);
       setProfile(nextProfile);
 
