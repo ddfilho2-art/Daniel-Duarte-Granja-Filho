@@ -157,3 +157,8 @@ Implementada a redefinição de senha pelo Master e a alteração da própria se
 | Regressão de login/logout, Master/tenant e acesso negado | Aguardando validação | Garantir que o isolamento e redirecionamentos permanecem corretos |
 | Atualizar Base de Conhecimento e TODO | Concluído — documentação | Registro deste incidente adicionado |
 | Deploy Vercel | Não iniciado | Continua manual e sob controle do usuário |
+
+
+## Reavaliação — piora da latência no login Master (2026-10-09)
+
+O usuário relatou que a correção com contador de sincronização piorou o tempo do primeiro login do Administrador da Plataforma. Foi removida a estratégia `authorizationSyncVersion`, que disparava nova consulta de autorização após sincronizações repetidas. Commit atual: `29dff80d19a0b3a246ffbda37315c0f646ea43e5`. Agora, `lastProfileSyncUserIdRef` evita recarregar o perfil quando o evento de sessão pertence ao mesmo usuário já sincronizado. A verificação inicial de autorização permanece intacta. Build e teste de navegador ainda pendentes; não houve deploy Vercel.
