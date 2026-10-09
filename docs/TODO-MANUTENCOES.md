@@ -143,3 +143,14 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Auditar administradores próprios de todos os tenants | Aguardando validação | Confirmar que cada empresa/clínica tem usuário próprio; não corrigir dados sem identificar vínculos exatos |
 | Atualizar Base de Conhecimento com resultados funcionais | Em tratamento | Finalizar após evidência de testes |
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+
+## Regressão — tela branca ao clicar em Login (2026-10-09)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Diagnosticar tela branca | Concluído — inspeção estática | `src/App.tsx` usava `authorizationLoading` sem desestruturá-lo de `useAuth()` |
+| Corrigir referência | Concluído — código | Commit `b81c754d3d35f474d01ec6a8b887415c9970810b` |
+| Build e type-check | Aguardando validação | Ainda não executados nesta sessão |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
+| Testar login e rota Master | Aguardando validação | Login abre e autentica sem tela branca |
