@@ -19,3 +19,7 @@
 ## Definition of Done
 
 A coleta e a visualização passaram pela validação funcional reportada pelo usuário. A manutenção completa de engenharia permanece parcialmente aberta até os testes automatizados e o teste formal de autorização serem executados. Não há deploy Vercel novo nesta etapa.
+
+  
+### Confirmação de documentação
+A execução do workflow e o dashboard foram confirmados pelo usuário como funcionais. O build/type-check e o teste formal Master/tenant continuam pendentes.
