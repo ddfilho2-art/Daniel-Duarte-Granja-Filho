@@ -357,3 +357,9 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Verificar conteúdo da versão ativa | Concluído | Fonte ativa contém `auth.getUser(token)` e log estruturado da validação |
 | Testar criação/listagem RH com sessão real | Aguardando validação | Ainda depende de teste funcional do usuário; nenhuma conta foi criada/alterada por esta manutenção |
 | Investigar CORS 403 de `email-verification` | Não iniciado | Investigação separada, não corrigida nesta publicação |
+
+| Corrigir regex que rejeitava e-mail válido após criação RH | Concluído | Regex corrigida e validações movidas antes de criar conta; Edge Function `admin-users` v14 ACTIVE |
+| Validar cadastro RH após v14 | Aguardando validação | Não repetir os dois e-mails já criados; confirmar fluxo com endereço novo somente após planejamento do teste |
+| Recuperar/confirmar estado dos registros RH criados parcialmente | Em tratamento | Duas contas já estão como RH com membership ativa; nenhuma conta foi excluída ou alterada |
+| Corrigir allowlist CORS da confirmação de candidato | Em tratamento | `email-verification` retorna OPTIONS 403; adicionar origem de produção a `ALLOWED_ORIGINS` preservando origens existentes |
+| Validar fluxo de confirmação de candidato e tenant | Não iniciado | Signup Auth 200 não garante envio do código; validar preflight, envio, confirmação e membership/tenant |
