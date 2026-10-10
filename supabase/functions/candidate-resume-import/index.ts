@@ -37,7 +37,7 @@ function cors(req: Request) {
   return {
     ...headers,
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+    "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, idempotency-key, x-tenant-id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
