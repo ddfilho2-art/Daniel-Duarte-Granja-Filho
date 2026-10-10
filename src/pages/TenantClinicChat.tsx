@@ -9,7 +9,7 @@ import {
   type TenantClinicMessage,
 } from "../lib/tenant-clinic-chat";
 
-type ContractOption = { id: string; clinic_tenant_id: string };
+type ContractOption = { id: string; clinic_tenant_id: string; clinic_name: string };
 type JobOption = { id: string; titulo: string; status: string };
 
 export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
@@ -55,8 +55,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     let active = true;
     const loadOptions = async () => {
       const [contractResult, jobResult] = await Promise.all([
-        supabase.from("occupational_health_contracts")
-          .select("id,clinic_tenant_id").eq("employer_tenant_id", tenant.id).eq("status", "active"),
+        supabase.rpc("list_my_occupational_health_contracts"),
         supabase.from("vagas").select("id,titulo,status")
           .eq("tenant_id", tenant.id).in("status", ["Aberta", "aberta", "active", "ativo"]).order("titulo"),
       ]);
@@ -171,7 +170,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
               Contrato / clínica
               <select required value={contractId} onChange={(e) => setContractId(e.target.value)} className="rounded-lg border px-3 py-2 font-normal">
                 <option value="">Selecione um contrato ativo</option>
-                {contracts.map((c) => <option key={c.id} value={c.id}>Clínica vinculada · {c.clinic_tenant_id.slice(0, 8)}</option>)}
+                {contracts.map((c) => <option key={c.id} value={c.id}>{c.clinic_name}</option>)}
               </select>
               {contracts.length === 0 && <span className="text-xs font-normal text-amber-700">É necessário existir um contrato ativo com Saúde Ocupacional.</span>}
             </label>
