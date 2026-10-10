@@ -363,3 +363,26 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não realizado | Continua manual sob controle do usuário |
 
 **Risco residual:** sem CAPTCHA, a automação distribuída de solicitações fica mais fácil. Os limites por IP/e-mail foram mantidos; validar comportamento e monitorar volume de e-mails após publicação.
+
+## Manutenção — atualização de e-mail de colaborador RH (2026-10-10)
+
+**Branch:** `maintenance/correcao-email-rh`  
+**Status geral:** Em tratamento — código alterado; validação técnica pendente. Nenhum deploy ou alteração de dados de produção foi realizado.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consultar base de conhecimento, TODO e código atual | Concluído | `admin-users/index.ts`, `src/lib/admin-users.ts` e documentação relacionados consultados |
+| Corrigir validação do e-mail | Implementado na branch | Expressão regular corrigida e entrada normalizada |
+| Evitar gravar o perfil antes de atualizar Auth | Implementado na branch | Auth atualizado antes de `public.users`; falha de sincronização identificada com código específico |
+| Melhorar mensagens de erro seguras | Implementado na branch | Códigos de duplicidade, falha de verificação, usuário Auth ausente e sincronização parcial mapeados |
+| Preservar identidade e vínculo RH | Aguardando validação | Testar mesmo UUID, perfil, status e membership antes/depois |
+| Lint, type-check e build | Não validado | Ainda não executados |
+| Testes de e-mail válido, inválido e duplicado | Aguardando validação | Executar em ambiente de teste com contas controladas |
+| Testar falha de Auth e falha parcial de sincronização | Aguardando validação | Confirmar mensagens e procedimento seguro de recuperação |
+| Verificar política de confirmação de mudança de e-mail do Supabase | Aguardando validação | Não ativar confirmação automática nem presumir comportamento do projeto |
+| Atualizar base de conhecimento | Concluído — branch | `docs/knowledge-base/admin-users-rh-creation.md` |
+| Deploy Supabase / Vercel | Não iniciado | Deploys permanecem manuais e sob controle do usuário |
+| Integrar à `main` | Não iniciado | Somente após validação técnica, revisão do diff e aprovação do usuário |
+
+**Limitação atual:** a correção está isolada na branch e ainda não está validada. Não marcar como concluída nem publicar até executar os testes pendentes.
+
