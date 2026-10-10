@@ -486,7 +486,7 @@ export function HRLayout() {
 export function AdminLayout() {
   const menuItems = [
     { to: "/admin", icon: Home, label: "Dashboard Admin" },
-    { to: "/admin/users", icon: Users, label: "Gestão de Usuários" },
+    { to: "/admin/users", icon: Users, label: "Gestão de Usuários de RH" },
     { to: "/admin/transferencias", icon: Repeat, label: "Transferências" },
     { to: "/admin/auditoria", icon: Shield, label: "Auditoria" },
     { to: "/admin/performance", icon: Activity, label: "Operação de E-mails" },
