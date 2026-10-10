@@ -212,6 +212,11 @@ Deno.serve(async (request) => {
         await admin.from("tenant_clinic_appointments").update({ status: "failed" }).eq("id", appointmentId);
         return jsonResponse({ success: false, code: "APPOINTMENT_CONFIRMATION_FAILED", requestId: id }, 502, cors);
       }
+      await admin.from("tenant_audit_logs").insert({
+        tenant_id: conversation.employer_tenant_id, actor_id: auth.user.id,
+        action: "tenant_clinic.appointment.confirmed", resource_type: "tenant_clinic_appointment",
+        resource_id: String(appointmentId), details: { starts_at: start, ends_at: end, timezone },
+      });
       return jsonResponse({ success: true, appointmentId, status: "confirmed", startsAt: start, endsAt: end, requestId: id }, 200, cors);
     }
 
@@ -251,6 +256,11 @@ Deno.serve(async (request) => {
         return jsonResponse({ success: false, code: "GOOGLE_EVENT_RESCHEDULE_FAILED", requestId: id }, 502, cors);
       }
       await admin.from("tenant_clinic_appointments").update({ status: "confirmed", google_event_id: eventId }).eq("id", appointmentId);
+      await admin.from("tenant_audit_logs").insert({
+        tenant_id: conversation.employer_tenant_id, actor_id: auth.user.id,
+        action: "tenant_clinic.appointment.rescheduled", resource_type: "tenant_clinic_appointment",
+        resource_id: appointmentId, details: { starts_at: start, ends_at: end, timezone },
+      });
       return jsonResponse({ success: true, appointmentId, status: "confirmed", startsAt: start, endsAt: end, requestId: id }, 200, cors);
     }
 
@@ -273,6 +283,11 @@ Deno.serve(async (request) => {
         status: "cancelled", cancellation_reason: reason,
       }).eq("id", appointmentId);
       if (updateError) return jsonResponse({ success: false, code: "APPOINTMENT_CANCEL_SAVE_FAILED", requestId: id }, 502, cors);
+      await admin.from("tenant_audit_logs").insert({
+        tenant_id: appointment.employer_tenant_id, actor_id: auth.user.id,
+        action: "tenant_clinic.appointment.cancelled", resource_type: "tenant_clinic_appointment",
+        resource_id: appointmentId, details: { reason },
+      });
       return jsonResponse({ success: true, appointmentId, status: "cancelled", requestId: id }, 200, cors);
     }
 
