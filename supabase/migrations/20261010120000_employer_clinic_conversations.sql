@@ -119,7 +119,10 @@ begin
     from public.vagas v
     where v.id::text = p_job_id
       and v.tenant_id = v_contract.employer_tenant_id
-      and lower(coalesce(v.status,'')) in ('aberta','active','ativo');
+      and (
+        lower(coalesce(v.status,'')) in ('aberta','active','ativo')
+        or upper(coalesce(v.status_vaga,'')) = 'ABERTA'
+      );
     if v_job_title is null then raise exception using errcode='42501', message='active_job_not_found_in_employer_tenant'; end if;
   end if;
   if p_medical_referral_id is not null then
