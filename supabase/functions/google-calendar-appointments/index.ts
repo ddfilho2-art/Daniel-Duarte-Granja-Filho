@@ -231,6 +231,7 @@ Deno.serve(async (request) => {
         description: "Agendamento operacional registrado pelo Recruta AÍ. Consulte a conversa vinculada para detalhes administrativos. Não inclua informações clínicas neste evento.",
         start: { dateTime: start, timeZone: timezone },
         end: { dateTime: end, timeZone: timezone },
+        attendees: auth.user.email ? [{ email: auth.user.email }] : [],
         extendedProperties: { private: { recrutaAppointmentId: String(appointmentId), recrutaConversationId: conversationId } },
       };
       let created = await google(calendarPath + "/events?sendUpdates=all", { method: "POST", body: JSON.stringify(eventBody) });
