@@ -1,7 +1,7 @@
 # Manutenção — Cadastro por código de seis dígitos
 
 Data: 2026-10-10
-Status: Em tratamento — PR #8 integrado à main; Edge Function versão 10 ACTIVE; build e teste funcional pendentes.
+Status: Em tratamento — PR #8 integrado à main; Edge Function versão 11 ACTIVE; build e teste funcional pendentes.
 
 ## Problema
 
@@ -26,9 +26,9 @@ O cadastro público de candidato usava `supabase.auth.signUp()`. Com confirmaç�
 ## Publicação realizada
 
 - PR #8 integrado à `main` no commit `d7e259c9fff3ffac6ddfafa6a967ae601a14a71d`.
-- Edge Function `email-verification` publicada como versão 10, status `ACTIVE`, com `verify_jwt=false` preservado e import map ativo. A releitura da função publicada confirmou a ação `register`.
+- Edge Function `email-verification` publicada inicialmente como versão 10, status `ACTIVE`, com `verify_jwt=false` preservado e import map ativo.\n- Após relato de CORS em produção, `supabase/functions/_shared/http.ts` foi atualizado para incluir a origem exata `https://daniel-duarte-granja-filho.vercel.app`, mantendo as origens adicionais de `ALLOWED_ORIGINS`.\n- Edge Function republicada como versão 11, status `ACTIVE`; releitura confirmou a allowlist compilada com a origem de produção.\n- A chamada HTTP OPTIONS não pôde ser confirmada a partir deste ambiente por falha de resolução DNS para o host Supabase; é necessária uma tentativa controlada pelo navegador para validar o preflight.
 - Nenhum deploy Vercel foi realizado; continua manual, sob controle do usuário.
 
 ## Status de validação
 
-Build/type-check e teste funcional real ainda não foram executados. Não marcar a manutenção como validada sem teste controlado do Resend e do fluxo completo.
+Build/type-check e teste funcional real ainda não foram executados. Não marcar a manutenção como validada sem teste controlado do Resend e do fluxo completo.\n\n## Correção CORS (2026-10-10)\n\nCausa: a origem de produção não estava incluída na allowlist calculada por `ALLOWED_ORIGINS`, então a função respondia ao preflight sem `Access-Control-Allow-Origin`.\n\nCorreção: incluir explicitamente a origem de produção no conjunto permitido em `supabase/functions/_shared/http.ts`, sem wildcard. Publicada a versão 11 da Edge Function `email-verification`.\n\nValidação: metadados da versão 11 e conteúdo publicado conferidos. O preflight HTTP real ainda está pendente, pois o ambiente da sessão não conseguiu resolver o host Supabase. Não marcar como validado até o navegador confirmar o OPTIONS e o cadastro controlado.
