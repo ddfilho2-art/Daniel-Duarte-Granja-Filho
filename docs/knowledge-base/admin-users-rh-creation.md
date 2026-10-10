@@ -2,7 +2,7 @@
 
 **Data:** 2026-10-10  
 **Projeto:** Recruta AÍ  
-**Status:** Correção de código implementada; deploy/validação funcional pendentes.
+**Status:** Correção de código implementada; Edge Function versão 12 publicada ACTIVE; validação funcional pendente.
 
 ## Sintoma
 
@@ -36,7 +36,7 @@ O trigger de criação de usuário gera uma linha padrão em `public.users` com 
 
 ## Validação necessária
 
-1. Conferir a versão ativa da Edge Function depois do deploy.
+1. **Concluído:** Edge Function `admin-users` publicada como versão 12 ACTIVE; leitura posterior confirmou a nova guarda `createdAuthUserInThisRequest` no código ativo.
 2. Cadastrar um usuário RH com e-mail ainda não utilizado, senha válida e tenant correto.
 3. Confirmar perfil `RH`, login informado, senha definida, membership ativa com papel `hr` e exibição na lista do tenant.
 4. Confirmar que tentar cadastrar e-mail de conta preexistente com perfil Candidato continua bloqueado.
