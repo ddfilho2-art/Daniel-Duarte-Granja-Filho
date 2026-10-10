@@ -221,7 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        const platformRpcStartedAt = Date.now();
         console.info("[RPC DEBUG]", {
+          phase: "start",
           source: "authorization-effect",
           rpc: "is_platform_master_admin",
           userId: session.user.id,
@@ -231,6 +233,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: platformData,
           error: platformError,
         } = await supabase.rpc("is_platform_master_admin");
+        console.info("[RPC DEBUG]", {
+          phase: "finish",
+          source: "authorization-effect",
+          rpc: "is_platform_master_admin",
+          userId: session.user.id,
+          durationMs: Date.now() - platformRpcStartedAt,
+          ok: !platformError,
+          errorCode: platformError?.code ?? null,
+          errorMessage: platformError?.message ?? null,
+        });
 
         if (!active) return;
 
@@ -244,7 +256,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsPlatformMasterAdmin(platformData === true);
         }
 
+        const clinicRpcStartedAt = Date.now();
         console.info("[RPC DEBUG]", {
+          phase: "start",
           source: "authorization-effect",
           rpc: "get_current_clinic_access",
           userId: session.user.id,
@@ -252,6 +266,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         const { data: clinicData, error: clinicError } =
           await supabase.rpc("get_current_clinic_access");
+        console.info("[RPC DEBUG]", {
+          phase: "finish",
+          source: "authorization-effect",
+          rpc: "get_current_clinic_access",
+          userId: session.user.id,
+          durationMs: Date.now() - clinicRpcStartedAt,
+          ok: !clinicError,
+          errorCode: clinicError?.code ?? null,
+          errorMessage: clinicError?.message ?? null,
+        });
 
         if (!active) return;
 
