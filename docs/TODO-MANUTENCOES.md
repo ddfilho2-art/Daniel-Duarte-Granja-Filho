@@ -347,3 +347,13 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Investigar 403 CORS de `email-verification` | Não iniciado | Questão separada; validar origem e `ALLOWED_ORIGINS`, sem wildcard |
 | Unificar e testar fluxo de confirmação de candidato | Não iniciado | Não alterar o fluxo sem definir se a confirmação será por link Supabase ou código de seis dígitos |
 | Deploy Vercel | Não iniciado | Manual, sob controle do usuário; não executar automaticamente |
+
+
+### Atualização após publicação — 2026-10-10
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Publicar `admin-users` no Supabase | Concluído | Versão 13 `ACTIVE`, `verify_jwt=true` |
+| Verificar conteúdo da versão ativa | Concluído | Fonte ativa contém `auth.getUser(token)` e log estruturado da validação |
+| Testar criação/listagem RH com sessão real | Aguardando validação | Ainda depende de teste funcional do usuário; nenhuma conta foi criada/alterada por esta manutenção |
+| Investigar CORS 403 de `email-verification` | Não iniciado | Investigação separada, não corrigida nesta publicação |
