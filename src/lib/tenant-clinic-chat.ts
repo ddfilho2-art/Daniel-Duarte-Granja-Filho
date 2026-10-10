@@ -97,7 +97,7 @@ async function calendarAction(body: Record<string, unknown>) {
 }
 export async function getTenantClinicAvailability(conversationId: string, timeMin: string, timeMax: string, appointmentId?: string | null) {
   const data = await calendarAction({ action: "availability", conversationId, timeMin, timeMax, appointmentId: appointmentId || undefined });
-  return (data.busy || []) as BusyInterval[];
+  return { busy: (data.busy || []) as BusyInterval[], timezone: String(data.timezone || "America/Sao_Paulo") };
 }
 export async function listTenantClinicAppointments(conversationId: string) {
   const { data, error } = await supabase.rpc("list_tenant_clinic_appointments", { p_conversation_id: conversationId });
