@@ -20,6 +20,9 @@ export function ClinicUserManagement() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [calendarId, setCalendarId] = useState("");
+  const [calendarTimezone, setCalendarTimezone] = useState("America/Sao_Paulo");
+  const [calendarSaving, setCalendarSaving] = useState(false);
 
   const invoke = async (body: Record<string, unknown>) => {
     const { data, error: invokeError } = await supabase.functions.invoke("clinic-user-management", { body });
@@ -72,6 +75,33 @@ export function ClinicUserManagement() {
   }, []);
 
   useEffect(() => { if (tenantId) void loadUsers(tenantId); }, [tenantId, loadUsers]);
+
+  useEffect(() => {
+    let active = true;
+    const loadCalendar = async () => {
+      if (!tenantId) return;
+      const { data, error: rpcError } = await supabase.rpc("get_my_clinic_calendar_integration", { p_tenant_id: tenantId });
+      if (!active) return;
+      if (rpcError) { setError("Não foi possível carregar a configuração do Google Calendar."); return; }
+      const config = Array.isArray(data) ? data[0] : data;
+      setCalendarId(config?.calendar_id || "");
+      setCalendarTimezone(config?.timezone || "America/Sao_Paulo");
+    };
+    void loadCalendar();
+    return () => { active = false; };
+  }, [tenantId]);
+
+  const saveCalendar = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!tenantId) return;
+    setCalendarSaving(true); setError(""); setNotice("");
+    const { error: rpcError } = await supabase.rpc("save_my_clinic_calendar_integration", {
+      p_tenant_id: tenantId, p_calendar_id: calendarId.trim(), p_timezone: calendarTimezone.trim(),
+    });
+    if (rpcError) setError("Não foi possível salvar o calendário. Confira o ID do calendário e o fuso horário.");
+    else setNotice("Calendário da clínica salvo. A integração também exige credenciais OAuth configuradas nos secrets do Supabase.");
+    setCalendarSaving(false);
+  };
 
   const createUser = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -139,6 +169,14 @@ export function ClinicUserManagement() {
         </label>}
         {error && <div role="alert" className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</div>}
         {notice && <div role="status" className="mb-4 rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-teal-800">{notice}</div>}
+
+        {tenantId && <form onSubmit={saveCalendar} className="mb-6 grid gap-3 rounded-xl border bg-white p-4 shadow-sm md:grid-cols-3">
+          <div className="flex items-center gap-2 md:col-span-3"><ShieldCheck className="h-5 w-5 text-teal-700" /><h2 className="font-semibold text-slate-900">Integração Google Calendar</h2></div>
+          <label className="grid gap-1 text-sm text-slate-700">ID do calendário corporativo<input required minLength={3} maxLength={500} value={calendarId} onChange={(e) => setCalendarId(e.target.value)} className="rounded-lg border px-3 py-2" placeholder="ID em Configurações do Google Calendar" /></label>
+          <label className="grid gap-1 text-sm text-slate-700">Fuso horário<input required value={calendarTimezone} onChange={(e) => setCalendarTimezone(e.target.value)} className="rounded-lg border px-3 py-2" placeholder="America/Sao_Paulo" /></label>
+          <div className="flex items-end"><button disabled={calendarSaving} className="w-full rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white disabled:opacity-50">{calendarSaving ? "Salvando..." : "Salvar calendário"}</button></div>
+          <p className="text-xs text-slate-500 md:col-span-3">As credenciais OAuth (client ID, client secret e refresh token) devem ser configuradas como secrets da Edge Function no Supabase. Não informe senhas nem tokens aqui.</p>
+        </form>}
 
         {tenantId && <form onSubmit={createUser} className="mb-6 grid gap-3 rounded-xl border bg-white p-4 shadow-sm md:grid-cols-4">
           <div className="flex items-center gap-2 md:col-span-4"><UserPlus className="h-5 w-5 text-teal-700" /><h2 className="font-semibold text-slate-900">Adicionar usuário da clínica</h2></div>
