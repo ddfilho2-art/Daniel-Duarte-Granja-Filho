@@ -284,7 +284,7 @@ Deno.serve(async (request) => {
         start: { dateTime: start, timeZone: timezone }, end: { dateTime: end, timeZone: timezone },
         extendedProperties: { private: { recrutaAppointmentId: appointmentId, recrutaConversationId: old.conversation_id } },
       };
-      const updated = await google(calendarPath + "/events/" + encodeURIComponent(eventId), { method: "PATCH", body: JSON.stringify(eventBody) });
+      const updated = await google(calendarPath + "/events/" + encodeURIComponent(eventId) + "?sendUpdates=all", { method: "PATCH", body: JSON.stringify(eventBody) });
       if (!updated.response.ok) {
         await admin.from("tenant_clinic_appointments").update({
           starts_at: previous.starts_at, ends_at: previous.ends_at, timezone: previous.timezone,
