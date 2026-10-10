@@ -328,3 +328,40 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Recuperar ou descartar a conta residual da tentativa | Aguardando decisão | Não excluir nem promover sem decisão explícita |
 | Deploy Vercel | Não iniciado | Continua manual e separado do deploy da Edge Function |
 
+
+
+## Manutenção — HTTP 401 na Edge Function admin-users (2026-10-10)
+
+**Sintoma reportado:** chamada a `/functions/v1/admin-users` retorna HTTP 401 durante a operação de usuários RH.
+
+**Ajuste implementado na branch `maintenance/auth-email-flow-2026-10-10`:** passar explicitamente o bearer token a `userClient.auth.getUser(token)`, com logging estruturado sem dados secretos e diferenciação entre credencial inválida (401) e falha transitória de validação (503). Commit `20ac9cc57cd0de48b8b5b227a26cf11726e2f754`.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Reinspecionar a versão atual de `admin-users` | Concluído | Identificado `auth.getUser()` sem argumento explícito, embora o token seja extraído do bearer |
+| Corrigir validação para passar o token explicitamente | Concluído — código na branch | Commit `20ac9cc57cd0de48b8b5b227a26cf11726e2f754`; ainda não validado em execução |
+| Registrar diagnóstico e limites na base de conhecimento | Concluído — código na branch | `docs/knowledge-base/admin-users-rh-creation.md` |
+| Executar build/type-check/testes | Aguardando validação | Não declarar aprovado sem execução real |
+| Publicar Edge Function `admin-users` no Supabase | Não iniciado | Publicação separada do deploy Vercel; sob controle do usuário |
+| Repetir criação/listagem de usuário RH e verificar status/logs | Aguardando validação | Confirmar se 401 ocorre no gateway ou dentro da função |
+| Investigar 403 CORS de `email-verification` | Não iniciado | Questão separada; validar origem e `ALLOWED_ORIGINS`, sem wildcard |
+| Unificar e testar fluxo de confirmação de candidato | Não iniciado | Não alterar o fluxo sem definir se a confirmação será por link Supabase ou código de seis dígitos |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário; não executar automaticamente |
+
+
+### Atualização após publicação — 2026-10-10
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Publicar `admin-users` no Supabase | Concluído | Versão 14 `ACTIVE`, `verify_jwt=true`; regex e validação antecipada confirmadas na fonte ativa |
+| Verificar conteúdo da versão ativa | Concluído | Fonte ativa contém `auth.getUser(token)` e log estruturado da validação |
+| Testar criação/listagem RH com sessão real | Aguardando validação | Ainda depende de teste funcional do usuário; nenhuma conta foi criada/alterada por esta manutenção |
+| Corrigir CORS 403 de `email-verification` | Concluído | Versão 5 `ACTIVE` permite explicitamente a origem canônica de produção, normaliza origens e não usa `*` |
+
+| Corrigir regex que rejeitava e-mail válido após criação RH | Concluído | Regex corrigida e validações movidas antes de criar conta; Edge Function `admin-users` v14 ACTIVE |
+| Validar cadastro RH após v14 | Aguardando validação | Não repetir os dois e-mails já criados; confirmar fluxo com endereço novo somente após planejamento do teste |
+| Recuperar/confirmar estado dos registros RH criados parcialmente | Em tratamento | Duas contas já estão como RH com membership ativa; nenhuma conta foi excluída ou alterada |
+| Corrigir allowlist CORS da confirmação de candidato | Em tratamento | `email-verification` retorna OPTIONS 403; adicionar origem de produção a `ALLOWED_ORIGINS` preservando origens existentes |
+| Validar fluxo de confirmação de candidato e tenant | Não iniciado | Signup Auth 200 não garante envio do código; validar preflight, envio, confirmação e membership/tenant |
+
+| Validar preflight e fluxo de confirmação após versão 5 | Aguardando validação | Publicação e fonte confirmadas; teste funcional real ainda pendente |

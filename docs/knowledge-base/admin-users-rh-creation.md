@@ -44,3 +44,41 @@ O trigger de criação de usuário gera uma linha padrão em `public.users` com 
 6. Executar build/type-check e testes automatizados; não marcá-los como aprovados sem execução real.
 
 **Deploy Vercel:** permanece manual, sob controle do usuário. A Edge Function Supabase é implantada separadamente.
+
+
+## Aditivo — HTTP 401 ao consultar/criar usuários RH (2026-10-10)
+
+**Nova evidência:** a tentativa recente reportada pelo usuário retorna HTTP 401 na chamada a `/functions/v1/admin-users`. Este sintoma é diferente do HTTP 400 por `PROFILE_CONFLICT` descrito acima e não deve ser tratado como se fosse a mesma falha.
+
+**Ajuste de código nesta branch de manutenção:**
+- `supabase/functions/admin-users/index.ts`: a validação de identidade agora chama explicitamente `userClient.auth.getUser(token)`, em vez de depender apenas do cabeçalho global do cliente. Isso remove a ambiguidade de fornecer o token à operação de validação.
+- A falha de validação gera log estruturado com status/código de Auth, sem registrar o token, e retorna `401 UNAUTHORIZED` para credencial inválida ou `503 IDENTITY_VALIDATION_UNAVAILABLE` para falha transitória de validação.
+- Commit: `20ac9cc57cd0de48b8b5b227a26cf11726e2f754`.
+- Branch: `maintenance/auth-email-flow-2026-10-10`.
+
+**Limites da validação:** o commit foi gravado no GitHub, mas ainda não houve execução de testes, publicação da Edge Function nem teste funcional após deploy. Portanto, o ajuste está **implementado no código da branch, não validado**. O HTTP 401 também pode ocorrer no gateway antes de a função executar; conferir logs de invocação e o corpo/status retornado após publicar antes de atribuir causa definitiva.
+
+**Problema correlato, separado:** a investigação anterior identificou uma requisição `OPTIONS` de `email-verification` respondendo 403 por política de CORS. Esta alteração não corrige CORS nem o fluxo de confirmação de candidatos. Não liberar origens indiscriminadamente; confirmar a origem exata e a configuração `ALLOWED_ORIGINS` em uma manutenção própria.
+
+
+### Publicação do ajuste de 401 — 2026-10-10
+
+- **Concluído:** Edge Function `admin-users` publicada no projeto Supabase `dmzagrakkduddofkqjhg`, versão **13**, status `ACTIVE`, mantendo `verify_jwt=true`.
+- **Concluído:** leitura posterior da função ativa confirmou a presença de `auth.getUser(token)` e do evento estruturado `admin_users_identity_validation_failed`.
+- **Pendente:** teste funcional com uma sessão real de administrador RH/tenant após a publicação. Não foi criada conta de teste nem alterada qualquer conta existente.
+- **Pendente:** investigar separadamente o CORS 403 do `email-verification`; esta publicação não o altera.
+
+
+### Incidente de cadastro parcial após publicação — 2026-10-10
+
+**Evidência de produção:** às 12:03:14Z e 12:04:17Z, a Edge Function respondeu HTTP 400, enquanto as consultas somente leitura encontraram duas contas RH criadas nesses mesmos instantes, ambas com perfil RH, membership `hr` ativa no tenant e hash de senha presente. Isso confirma que a mensagem de falha foi exibida apesar de o registro RH existir; não excluí nem alterei essas contas.
+
+**Causa-raiz identificada no código:** `updateLegacyUser` continha uma expressão regular de e-mail com barras invertidas duplicadas (`/^[^\\\\s@]+@[^\\\\s@]+\\\\.[^\\\\s@]+$/`), que rejeitava e-mails válidos. A validação ocorria depois de `createMember`, portanto a conta e a membership já podiam ter sido criadas antes de a função retornar `INVALID_INPUT`. A tela traduz esse código para “Revise os dados informados”.
+
+**Correção aplicada na branch e publicada no Supabase:**
+- Regex corrigida para `/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/`.
+- Validação de nome, e-mail, login e política de senha movida para antes de qualquer criação de conta/membership.
+- Testes estáticos da expressão: e-mails válidos de teste aceitos; endereço sem domínio recusado.
+- Edge Function `admin-users` versão **14 ACTIVE**, `verify_jwt=true`; leitura posterior confirmou a regex corrigida, validação antecipada e `auth.getUser(token)`.
+
+**Pendente:** validar funcionalmente uma nova criação com e-mail não utilizado após esta publicação. Para as duas contas já existentes, não repetir criação com os mesmos e-mails: elas já têm perfil RH e membership ativa. Nenhuma conta foi excluída ou modificada durante a investigação.

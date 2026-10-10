@@ -5,12 +5,19 @@ const DEFAULT_HEADERS = {
 } as const;
 
 function configuredOrigins(): Set<string> {
-  return new Set(
-    (Deno.env.get("ALLOWED_ORIGINS") ?? "")
-      .split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  );
+  const configured = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+  const appUrl = (Deno.env.get("APP_URL") ?? "").trim().replace(/\/+$/, "");
+
+  // Keep the production app explicitly allowlisted even when ALLOWED_ORIGINS
+  // was configured without it. This is a fixed origin, not a wildcard.
+  return new Set([
+    "https://daniel-duarte-granja-filho.vercel.app",
+    ...configured,
+    ...(appUrl ? [appUrl] : []),
+  ]);
 }
 
 export function corsHeaders(request: Request): Record<string, string> | null {

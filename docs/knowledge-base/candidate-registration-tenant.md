@@ -52,3 +52,20 @@ Como `logAudit` ocorre após a criação de Auth e antes do `signOut`, uma falha
 7. Executar build/type-check e testes automatizados antes de marcar a manutenção como validada.
 
 **Deploy:** nenhuma implantação da Vercel foi feita nesta análise. Permanece manual, sob controle do usuário.
+
+
+## Aditivo — falha de confirmação de cadastro observada em produção (2026-10-10)
+
+- Os logs registram `POST /auth/v1/signup` com HTTP 200, seguido de `OPTIONS /functions/v1/email-verification` com HTTP 403 às 11:39:05Z. O cadastro Auth pode, portanto, existir mesmo sem o envio/validação do código de confirmação.
+- A consulta somente leitura encontrou duas contas recentes com perfil padrão `Candidato` e sem tenant/membership. Não foram apagadas nem alteradas.
+- Causa imediata comprovada para o envio: o helper ativo `_shared/http.ts` permite apenas origens listadas em `ALLOWED_ORIGINS`; o preflight 403 mostra que a origem da aplicação não está sendo aceita pela configuração ativa.
+- Correção aplicada na fonte compartilhada e publicada: `email-verification` versão **5 ACTIVE** agora inclui explicitamente `https://daniel-duarte-granja-filho.vercel.app` na allowlist, normaliza barras finais nas origens configuradas e continua sem usar `*`. A versão ativa foi lida novamente e confirma essa origem. A configuração do secret `ALLOWED_ORIGINS` ainda deve ser mantida coerente com as origens legítimas, mas não é mais a única forma de incluir a origem canônica de produção.
+- Há vários `POST /auth/v1/signup` com HTTP 200 em sequência às 12:08Z, mas a consulta de contas recentes não mostrou novos registros correspondentes a essas chamadas; não interpretar o status 200 isoladamente como confirmação de que uma nova conta foi criada ou que o e-mail foi entregue.
+- **Pendente:** ajustar `ALLOWED_ORIGINS`, testar uma confirmação de candidato controlada no portal de tenant e comprovar o vínculo correto ao tenant. Não repetir o cadastro com os e-mails já tentados.
+
+
+### Publicação da correção CORS — 2026-10-10
+
+- **Concluído:** Edge Function `email-verification` publicada como versão **5 ACTIVE**, mantendo `verify_jwt=false` conforme configuração anterior do endpoint público de verificação.
+- **Concluído:** fonte ativa verificada: origem canônica de produção explicitamente permitida, origens de `ALLOWED_ORIGINS` preservadas e normalizadas; sem curingas.
+- **Pendente:** teste funcional pós-publicação do preflight `OPTIONS`, solicitação/envio do código, confirmação e vínculo do candidato ao tenant. Não repetir e-mails que já geraram contas Auth.

@@ -684,7 +684,7 @@ async function updateLegacyUser(
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!nome.trim() || nome.trim().length < 3 || !emailRegex.test(normalizedEmail)) {
       return { success: false, code: "INVALID_INPUT", error: "Nome ou e-mail inválido" };
     }
@@ -886,13 +886,34 @@ async function handleRequest(
       global: { headers: { Authorization: `Bearer ${token}` } },
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: userData } = await userClient.auth.getUser();
+    // Pass the bearer token explicitly. With persistSession:false, relying only on
+    // the client's global Authorization header can leave getUser() without the
+    // token it needs to validate the caller consistently.
+    const { data: userData, error: identityError } = await userClient.auth.getUser(token);
 
-    if (!userData.user) {
+    if (identityError || !userData.user) {
+      const isUnauthorized =
+        identityError?.status === 401 ||
+        identityError?.status === 403 ||
+        !identityError;
+
+      console.warn(JSON.stringify({
+        event: "admin_users_identity_validation_failed",
+        authStatus: identityError?.status ?? null,
+        authCode: identityError?.code ?? null,
+        hasUser: Boolean(userData.user),
+      }));
+
       return new Response(
-        JSON.stringify({ success: false, error: "Invalid token" }),
+        JSON.stringify({
+          success: false,
+          code: isUnauthorized ? "UNAUTHORIZED" : "IDENTITY_VALIDATION_UNAVAILABLE",
+          error: isUnauthorized
+            ? "Token inválido ou expirado. Entre novamente e tente de novo."
+            : "Não foi possível validar sua sessão neste momento. Tente novamente.",
+        }),
         {
-          status: 401,
+          status: isUnauthorized ? 401 : 503,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
@@ -992,6 +1013,26 @@ async function handleRequest(
           };
         } else {
           const normalizedEmail = body.email.trim().toLowerCase();
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          const validPassword =
+            body.password.length >= 8 &&
+            /[A-Z]/.test(body.password) &&
+            /[a-z]/.test(body.password) &&
+            /[0-9]/.test(body.password);
+          if (
+            body.nome.trim().length < 3 ||
+            !emailRegex.test(normalizedEmail) ||
+            !body.login.trim() ||
+            !validPassword
+          ) {
+            result = {
+              success: false,
+              code: "INVALID_INPUT",
+              error: "Confira nome, e-mail, login e a política de senha antes de cadastrar.",
+            };
+            break;
+          }
+
           const { data: existingAuthUsers, error: existingAuthError } =
             await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
 
