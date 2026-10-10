@@ -101,3 +101,12 @@ Cada tenant de Saúde Ocupacional precisa ter seu próprio ID de calendário e f
 ### Status honesto
 
 O código e as migrations estão registrados no GitHub, mas **não foram executados build/type-check, testes automatizados ou validação no Supabase nesta rodada**. Não marcar como validado até aplicar migrations, configurar os secrets e executar os testes consolidados. Não houve deploy da Vercel.
+
+
+### Reforços de segurança adicionados depois da implementação inicial
+
+- O upload/download de anexo do chat exige que a conversa esteja vinculada a um encaminhamento médico ativo e valida novamente `can_access_medical_referral`; isso evita usar uma conversa genérica para compartilhar ASO sem vínculo de atendimento.
+- O formulário de criação permite selecionar encaminhamento somente do contrato/clínica escolhidos; a RPC valida novamente o vínculo no backend.
+- O calendário é configurado por tenant clínico; não existe um Calendar ID global compartilhado entre clínicas.
+- O endpoint de agenda valida acesso à conversa antes de tentar obter token OAuth. O título do evento no Google não inclui assunto livre da conversa nem dados de candidato; auditoria de cancelamento não armazena o motivo em texto livre.
+- A gestão de usuários da clínica aparece no portal somente para usuário que administra ao menos um tenant clínico; o backend exige `clinic_admin` no tenant informado.
