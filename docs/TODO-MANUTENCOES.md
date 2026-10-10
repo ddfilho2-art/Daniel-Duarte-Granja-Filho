@@ -501,3 +501,18 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Não realizar sem autorização explícita |
 
 **Status geral:** Em tratamento. A especificação foi registrada. Chat empresa–clínica, anexos ASO e integração Google Calendar ainda não estão implementados. Não considerar a manutenção concluída nem validada.
+
+
+## Atualização de execução — Empresa ↔ Saúde Ocupacional (2026-10-10, código registrado)
+
+| Entrega | Status | Arquivos / dependências |
+|---|---|---|
+| Menu empresa: diferenciar Gestão de Usuários de RH | Código registrado; não validado | `src/components/layouts/DashboardLayouts.tsx` |
+| Chat independente empresa ↔ clínica, com vaga opcional | Código registrado; não validado | `TenantClinicChat.tsx`, `tenant-clinic-chat.ts`, migrations `20261010120000` a `20261010130000` |
+| Anexos privados no chat, incluindo ASO em PDF/imagem | Código registrado; não validado | `tenant-clinic-chat-storage`, bucket privado e RPC de listagem; PDF/PNG/JPEG até 10 MB |
+| Agenda Google Calendar por tenant clínico | Código registrado; configuração externa pendente | Migrations `20261010140000` a `20261010160000`; Edge Function `google-calendar-appointments`; exige OAuth secrets e calendar ID por tenant |
+| Gestão de usuários da Saúde Ocupacional | Código registrado; não validado | `ClinicUserManagement.tsx`, `clinic-user-management`, RPC `list_my_clinic_admin_tenants` |
+| Build, type-check, testes de autorização e E2E | Pendente — não validado | O usuário fará validação consolidada posteriormente; executar após aplicar migrations e secrets |
+| Deploy Vercel | Não iniciado | Não realizar sem autorização explícita |
+
+**Atenção:** commits no GitHub não aplicam automaticamente as migrations ao Supabase nem configuram secrets. O chat e a gestão de usuários dependem das migrations; o Google Calendar depende também dos secrets OAuth e do ID de calendário configurado para cada tenant. Não marcar como concluído/validado até a validação consolidada do usuário.
