@@ -170,3 +170,37 @@ A correção não remove automaticamente contas antigas que ficaram órfãs na v
 Se o frontend informar `EMAIL_ALREADY_REGISTERED`, consultar primeiro `auth.users` e verificar confirmação, último login e vínculos antes de remover qualquer conta. Neste incidente, o e-mail informado correspondia a uma conta de teste recém-criada, não confirmada, sem login e sem perfil/candidato/membership/role relacionado. A conta específica foi removida e a ausência foi confirmada em Auth e tabelas públicas. Não apagar usuários apenas com base na mensagem do frontend.
 
 A Edge Function `email-verification` versão 12 tenta fazer rollback apenas da conta criada na requisição corrente quando a entrega inicial falha. Após publicação, repetir um teste controlado e conferir logs de rollback se ocorrer erro. A restrição de teste do Resend pode continuar impedindo o envio para destinatários não autorizados.
+
+
+## 2026-10-10 — CORS da função candidate-resume-import
+
+### Sintoma
+Ao acionar a importação de currículo com IA no portal da empresa, o navegador reportou que o preflight de
+`https://dmzagrakkduddofkqjhg.supabase.co/functions/v1/candidate-resume-import` não recebeu
+`Access-Control-Allow-Origin` para a origem de produção `https://daniel-duarte-granja-filho.vercel.app`.
+A chamada falhou no navegador antes de a função processar o currículo.
+
+### Causa identificada
+A função tinha uma allowlist baseada exclusivamente na variável `ALLOWED_ORIGINS`. Diferentemente do helper
+compartilhado `supabase/functions/_shared/http.ts`, não adicionava a origem oficial de produção como fallback.
+Quando a variável não estava configurada ou não continha a origem exata, `cors(req)` retornava `null`; a
+função devolvia 403 sem cabeçalhos CORS e o browser mascarava o corpo da resposta por causa da política CORS.
+
+### Correção aplicada
+- A origem canônica `https://daniel-duarte-granja-filho.vercel.app` é adicionada à allowlist mesmo se
+  `ALLOWED_ORIGINS` estiver ausente/incompleta.
+- Os cabeçalhos permitidos incluem `authorization`, `apikey`, `content-type`, `x-client-info`,
+  `idempotency-key` e `x-tenant-id`.
+- A verificação JWT permanece habilitada (`verify_jwt=true`); a autenticação do usuário, a validação do
+  vínculo do candidato com o tenant e a lógica de extração via Gemini foram preservadas.
+- Código atualizado na `main`, commit `40e059caf4fd813c30346b110d6ea731377be6e9`.
+- Edge Function publicada no Supabase como versão 8, status ACTIVE.
+
+### Validação pendente
+A publicação foi confirmada pela versão da função, mas ainda não foi executado um teste de navegador após a
+correção. No portal, repetir a importação de um PDF permitido. Critério de aceite: o preflight deve passar,
+a requisição POST deve chegar à função e a resposta deve preencher o formulário para revisão do candidato.
+Se falhar novamente, registrar o status e a resposta da requisição OPTIONS/POST sem compartilhar tokens,
+cookies ou o conteúdo integral do currículo.
+
+Nenhum deploy da Vercel foi realizado.
