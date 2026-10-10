@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useTenant } from "../contexts/TenantContext";
 import {
   bookTenantClinicAppointment, cancelTenantClinicAppointment, createTenantClinicConversation,
-  getTenantClinicAttachmentUrl, getTenantClinicAvailability, listTenantClinicAppointments,
+  getTenantClinicAttachmentUrl, getTenantClinicAvailability, getTenantClinicCalendarTimezone, listTenantClinicAppointments,
   listTenantClinicAttachments, listTenantClinicConversations, listTenantClinicMessages,
   rescheduleTenantClinicAppointment, sendTenantClinicMessage, uploadTenantClinicAttachment,
   type TenantClinicAppointment, type TenantClinicAttachment, type TenantClinicConversation,
@@ -13,6 +13,26 @@ import {
 
 type ContractOption = { id: string; clinic_tenant_id: string; clinic_name: string };
 type JobOption = { id: string; titulo: string; status: string };
+
+function zonedDateTimeToIso(date: string, time: string, timezone: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const target = Date.UTC(year, month - 1, day, hour, minute, 0);
+  let guess = target;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date(guess));
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const represented = Date.UTC(Number(values.year), Number(values.month) - 1, Number(values.day),
+      Number(values.hour), Number(values.minute), Number(values.second));
+    const difference = target - represented;
+    guess += difference;
+    if (difference === 0) break;
+  }
+  return new Date(guess).toISOString();
+}
 
 export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
   const { tenant } = useTenant();
@@ -147,9 +167,12 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     if (!selectedId || !appointmentDate) return;
     setCheckingSlots(true); setError(""); setAvailableSlots([]); setSelectedSlot("");
     try {
-      const startOfDay = new Date(appointmentDate + "T08:00:00");
-      const endOfDay = new Date(appointmentDate + "T18:00:00");
-      const busy = await getTenantClinicAvailability(selectedId, startOfDay.toISOString(), endOfDay.toISOString(), reschedulingId);
+      const timezone = await getTenantClinicCalendarTimezone(selectedId);
+      setCalendarTimezone(timezone);
+      const startOfDay = new Date(zonedDateTimeToIso(appointmentDate, "08:00", timezone));
+      const endOfDay = new Date(zonedDateTimeToIso(appointmentDate, "18:00", timezone));
+      const availability = await getTenantClinicAvailability(selectedId, startOfDay.toISOString(), endOfDay.toISOString(), reschedulingId);
+      const busy = availability.busy;
       const slots: { start: string; end: string; label: string }[] = [];
       for (let cursor = new Date(startOfDay); cursor.getTime() + 30 * 60000 <= endOfDay.getTime(); cursor = new Date(cursor.getTime() + 30 * 60000)) {
         const end = new Date(cursor.getTime() + 30 * 60000);
@@ -157,7 +180,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
         if (busy.some((item) => new Date(item.start).getTime() < end.getTime() && new Date(item.end).getTime() > cursor.getTime())) continue;
         slots.push({
           start: cursor.toISOString(), end: end.toISOString(),
-          label: cursor.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + " – " + end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+          label: cursor.toLocaleTimeString("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }) + " – " + end.toLocaleTimeString("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }),
         });
       }
       setAvailableSlots(slots);
@@ -172,7 +195,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     if (!slot || !selectedId) return;
     setSavingAppointment(true); setError("");
     try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+      const timezone = calendarTimezone || "America/Sao_Paulo";
       if (reschedulingId) {
         await rescheduleTenantClinicAppointment({ appointmentId: reschedulingId, startsAt: slot.start, endsAt: slot.end, timezone });
       } else {
