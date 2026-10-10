@@ -53,3 +53,13 @@ Branch `fix/email-delivery-failure-recovery`: a função agora captura o código
 - A conta de teste deixada pela versão 11 ainda pode exigir recuperação manual após confirmar o endereço exato.
 - Resolver a restrição de envio Resend antes de repetir o teste. Não disparar tentativas em sequência nem remover contas sem confirmação.
 - Não houve deploy Vercel.
+
+
+## Atualização de publicação — 2026-10-10
+
+- PR #9 foi integrado à `main` por squash no commit `400dc524d51e87163b21a99267e04fca9e4b2721`.
+- Edge Function `email-verification` publicada como versão 12, status `ACTIVE`; `verify_jwt=false` e import map preservados.
+- A leitura posterior da função publicada confirmou o novo diagnóstico limitado do erro Resend e o rollback do usuário Auth recém-criado quando falha o envio inicial.
+- Build/type-check e testes automatizados não foram executados; não declarar validado ainda.
+- O usuário fará um teste controlado com uma conta Google. A restrição do domínio de teste Resend continua ativa: se esse destinatário não estiver autorizado no Resend, o envio pode continuar falhando com 403. A correção deve então remover o usuário criado nessa tentativa e registrar o código resumido do provedor.
+- Nenhum deploy Vercel foi realizado.
