@@ -53,7 +53,7 @@ function mapVerificationError(error?: string) {
 export function VerifyEmail() {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = (location.state || {}) as { email?: string; name?: string };
+  const state = (location.state || {}) as { email?: string; name?: string; deliveryPending?: boolean };
   const email = state.email || sessionStorage.getItem("pending_verify_email") || "";
   const name = state.name || sessionStorage.getItem("pending_verify_name") || "";
 
