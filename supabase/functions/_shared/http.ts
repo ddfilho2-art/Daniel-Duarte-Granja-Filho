@@ -7,9 +7,9 @@ const DEFAULT_HEADERS = {
 function configuredOrigins(): Set<string> {
   const configured = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
     .split(",")
-    .map((origin) => origin.trim().replace(/\\/+$/, ""))
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
     .filter(Boolean);
-  const appUrl = (Deno.env.get("APP_URL") ?? "").trim().replace(/\\/+$/, "");
+  const appUrl = (Deno.env.get("APP_URL") ?? "").trim().replace(/\/+$/, "");
 
   // Keep the production app explicitly allowlisted even when ALLOWED_ORIGINS
   // was configured without it. This is a fixed origin, not a wildcard.
