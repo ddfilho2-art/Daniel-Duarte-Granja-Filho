@@ -318,6 +318,7 @@ export function OccupationalHealthPortal() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [canManageUsers, setCanManageUsers] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -329,6 +330,14 @@ export function OccupationalHealthPortal() {
   };
 
   useEffect(() => { void load(); }, []);
+
+  useEffect(() => {
+    let active = true;
+    void supabase.rpc("list_my_clinic_admin_tenants").then(({ data, error: rpcError }) => {
+      if (active) setCanManageUsers(!rpcError && Array.isArray(data) && data.length > 0);
+    });
+    return () => { active = false; };
+  }, []);
 
   const totals = useMemo(() => ({
     pending: referrals.filter((item) => item.status === "referred").length,
@@ -363,7 +372,7 @@ export function OccupationalHealthPortal() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/saude-ocupacional/conversas" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Conversas com empresas</Link>
-            <Link to="/saude-ocupacional/usuarios" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Gestão de Usuários</Link>
+            {canManageUsers && <Link to="/saude-ocupacional/usuarios" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Gestão de Usuários</Link>}
             <button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Atualizar</button>
           </div>
         </header>
