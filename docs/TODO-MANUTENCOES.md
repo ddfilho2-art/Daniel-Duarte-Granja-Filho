@@ -347,3 +347,5 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Supabase / Vercel | Não realizado | Branch separada; deploy Vercel continua manual |
 
 **Limitação:** Auth, public.users, membership e serviço de e-mail não formam uma transação distribuída. Não declarar validado até executar os cenários de falha parcial e autorização em ambiente de teste.
+
+| RH: retomar criação parcialmente concluída sem redefinir senha em repetições normais | Implementado na branch | Marcador admin_user_creation_pending; limpa somente após perfil/login/senha serem atualizados; teste automatizado ainda pendente |
