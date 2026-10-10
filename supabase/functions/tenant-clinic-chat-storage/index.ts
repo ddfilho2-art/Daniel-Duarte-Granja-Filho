@@ -56,7 +56,10 @@ Deno.serve(async (request) => {
     if (conversationError || !conversation) return jsonResponse({ success: false, code: "CONVERSATION_NOT_FOUND", requestId: id }, 404, cors);
     if (conversation.status !== "open") return jsonResponse({ success: false, code: "CONVERSATION_CLOSED", requestId: id }, 409, cors);
 
-    const { data: isClinic } = await userClient.rpc("is_active_clinic_member", { p_clinic_tenant_id: conversation.clinic_tenant_id });
+    const { data: isClinic, error: sideError } = await userClient.rpc("is_active_clinic_member", { p_clinic_tenant_id: conversation.clinic_tenant_id });
+    if (sideError || typeof isClinic !== "boolean") {
+      return jsonResponse({ success: false, code: "ACTOR_SIDE_FAILED", requestId: id }, 403, cors);
+    }
     const senderSide = isClinic ? "clinic" : "employer";
 
     if (body.action === "sign_upload") {
@@ -78,7 +81,7 @@ Deno.serve(async (request) => {
         storage_path: path, original_name: fileName, mime_type: mimeType, byte_size: byteSize,
       });
       if (insertError) return jsonResponse({ success: false, code: "ATTACHMENT_REGISTER_FAILED", requestId: id }, 500, cors);
-      return jsonResponse({ success: true, code: "UPLOAD_AUTHORIZED", requestId: id, uploadUrl: signed.signedUrl, storagePath: path }, 200, cors);
+      return jsonResponse({ success: true, code: "UPLOAD_AUTHORIZED", requestId: id, uploadUrl: signed.signedUrl, uploadToken: signed.token, storagePath: path }, 200, cors);
     }
 
     if (body.action === "sign_download") {
