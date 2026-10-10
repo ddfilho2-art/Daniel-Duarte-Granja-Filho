@@ -204,3 +204,24 @@ Se falhar novamente, registrar o status e a resposta da requisição OPTIONS/POS
 cookies ou o conteúdo integral do currículo.
 
 Nenhum deploy da Vercel foi realizado.
+
+
+### Correção complementar — cabeçalho x-tenant-id ausente no preflight (2026-10-10)
+
+O teste de produção relatou que o browser ainda bloqueava o POST porque `x-tenant-id` não constava em
+`Access-Control-Allow-Headers`. Revisão do código da versão 8 mostrou que o cabeçalho só estava na ramificação
+`if (!origin)`, enquanto a ramificação usada no navegador (com Origin permitido) ainda retornava a lista antiga.
+A correção inicial foi, portanto, incompleta.
+
+Correção aplicada:
+- Adicionada a lista completa `authorization, apikey, content-type, x-client-info, idempotency-key, x-tenant-id`
+  também à resposta CORS para a origem permitida.
+- Commit `e09fda42b0b3798493fb88e0afc340acbb1abb19`.
+- Edge Function `candidate-resume-import` publicada como versão 9, ACTIVE, com `verify_jwt=true`.
+- Nenhum deploy Vercel realizado.
+
+Validação pendente: tentar novamente a importação no browser. Uma tentativa externa de executar o preflight diretamente
+a partir do ambiente de manutenção não pôde resolver o host do Supabase, portanto a versão publicada está confirmada,
+mas a resposta HTTP ao vivo ainda não foi inspecionada. Se o erro persistir, capturar no DevTools a requisição OPTIONS
+e conferir exatamente `Access-Control-Allow-Origin` e `Access-Control-Allow-Headers`; não compartilhar tokens,
+cookies ou o currículo.
