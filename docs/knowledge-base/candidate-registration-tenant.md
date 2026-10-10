@@ -265,3 +265,6 @@ cookies ou o currículo.
 - A seleção do encaminhamento no frontend é apenas conveniência; a RPC `create_tenant_clinic_conversation` revalida empresa, clínica e contrato.
 - Calendar ID e fuso são configurados por tenant clínico. Não compartilhar um calendário entre clínicas por meio de um secret global.
 - A função de agenda deve validar o acesso à conversa antes de renovar o token OAuth; eventos Google não devem conter assunto livre, nome de candidato ou informação clínica.
+
+
+- Atualização 2026-10-10: anexos ASO exigem encaminhamento acessível; troca de Calendar ID é bloqueada com reservas ativas; agenda usa fuso horário por tenant clínico; anexos deixam de ser listados quando o encaminhamento perde acesso. Código registrado, ainda sem build/type-check/testes.
