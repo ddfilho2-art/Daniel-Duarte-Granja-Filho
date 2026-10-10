@@ -315,7 +315,7 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Confirmar o estado residual da tentativa | Concluído — somente leitura | Perfil legado Candidato, sem membership; não houve mutação manual |
 | Corrigir a condição de conflito de perfil | Concluído — código na main | Só permite a promoção da linha padrão quando a mesma requisição criou o Auth user |
 | Melhorar mensagem de conflito preexistente | Concluído — código na main | `PROFILE_CONFLICT` mapeado para orientação compreensível |
-| Deploy da Edge Function Supabase | Aguardando | Confirmar versão ativa após publicação |
+| Deploy da Edge Function Supabase | Concluído — versão 12 ACTIVE | Leitura após publicação confirmou a nova guarda no código ativo |
 | Build/type-check e testes automatizados | Não validado | Ainda não executados |
 | Teste real de criação RH com e-mail novo | Aguardando validação | Não criar conta de teste em produção sem necessidade/controle |
 | Teste negativo com e-mail já vinculado a perfil Candidato | Aguardando validação | Deve continuar bloqueado |
