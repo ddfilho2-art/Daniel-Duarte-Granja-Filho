@@ -236,6 +236,14 @@ Deno.serve(async (request) => {
               invalidateError.code,
             );
           }
+          if (isRegistration) {
+            console.error("candidate_signup_email_delivery_failed", currentRequestId);
+            return jsonResponse(
+              { success: false, code: "EMAIL_DELIVERY_FAILED", requestId: currentRequestId },
+              502,
+              cors,
+            );
+          }
           throw error;
         }
       }
