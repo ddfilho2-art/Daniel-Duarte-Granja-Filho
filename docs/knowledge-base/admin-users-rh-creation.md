@@ -67,3 +67,18 @@ O trigger de criação de usuário gera uma linha padrão em `public.users` com 
 - **Concluído:** leitura posterior da função ativa confirmou a presença de `auth.getUser(token)` e do evento estruturado `admin_users_identity_validation_failed`.
 - **Pendente:** teste funcional com uma sessão real de administrador RH/tenant após a publicação. Não foi criada conta de teste nem alterada qualquer conta existente.
 - **Pendente:** investigar separadamente o CORS 403 do `email-verification`; esta publicação não o altera.
+
+
+### Incidente de cadastro parcial após publicação — 2026-10-10
+
+**Evidência de produção:** às 12:03:14Z e 12:04:17Z, a Edge Function respondeu HTTP 400, enquanto as consultas somente leitura encontraram duas contas RH criadas nesses mesmos instantes, ambas com perfil RH, membership `hr` ativa no tenant e hash de senha presente. Isso confirma que a mensagem de falha foi exibida apesar de o registro RH existir; não excluí nem alterei essas contas.
+
+**Causa-raiz identificada no código:** `updateLegacyUser` continha uma expressão regular de e-mail com barras invertidas duplicadas (`/^[^\\\\s@]+@[^\\\\s@]+\\\\.[^\\\\s@]+$/`), que rejeitava e-mails válidos. A validação ocorria depois de `createMember`, portanto a conta e a membership já podiam ter sido criadas antes de a função retornar `INVALID_INPUT`. A tela traduz esse código para “Revise os dados informados”.
+
+**Correção aplicada na branch e publicada no Supabase:**
+- Regex corrigida para `/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/`.
+- Validação de nome, e-mail, login e política de senha movida para antes de qualquer criação de conta/membership.
+- Testes estáticos da expressão: e-mails válidos de teste aceitos; endereço sem domínio recusado.
+- Edge Function `admin-users` versão **14 ACTIVE**, `verify_jwt=true`; leitura posterior confirmou a regex corrigida, validação antecipada e `auth.getUser(token)`.
+
+**Pendente:** validar funcionalmente uma nova criação com e-mail não utilizado após esta publicação. Para as duas contas já existentes, não repetir criação com os mesmos e-mails: elas já têm perfil RH e membership ativa. Nenhuma conta foi excluída ou modificada durante a investigação.
