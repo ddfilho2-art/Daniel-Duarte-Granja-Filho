@@ -52,3 +52,32 @@ Como `logAudit` ocorre após a criação de Auth e antes do `signOut`, uma falha
 7. Executar build/type-check e testes automatizados antes de marcar a manutenção como validada.
 
 **Deploy:** nenhuma implantação da Vercel foi feita nesta análise. Permanece manual, sob controle do usuário.
+
+
+## 2026-10-10 — Investigação complementar de cadastro e idempotência RH
+
+A inspeção dos logs recentes encontrou respostas HTTP 200 de /auth/v1/signup referidas à raiz https://daniel-duarte-granja-filho.vercel.app/, além de RPC get_public_tenant_context HTTP 200. O frontend atual só deve chamar signUp quando isTenantRoute e tenant existem; o TenantContext envia p_slug e valida o slug retornado. Os logs isolados não provam a causa exata: verificar o bundle servido, a rota real e o valor/retorno de p_slug. Não inferir que a RPC encontrou um tenant apenas pelo HTTP 200.
+
+O fluxo candidato aguardava logAudit após signUp e antes de signOut; uma falha de auditoria poderia apresentar erro depois da criação da identidade. A branch de manutenção altera isso para registrar a falha sem bloquear a ida à confirmação. O estado parcial continua exigindo teste real e estratégia de recuperação explicitamente validada.
+
+No RH, o case create rejeitava qualquer e-mail já presente no Auth antes de createMember, impedindo distinguir RH ativo no mesmo tenant de conta incompatível. A branch remove essa rejeição genérica e faz createMember reconhecer vínculo RH ativo no mesmo tenant sem redefinir senha nem criar nova membership. Contas com perfil incompatível, membership inativa ou vínculo RH ativo em outro tenant permanecem bloqueadas.
+
+**Status:** implementação em branch separada; não validada por build/testes nem publicada. Não alterar contas de produção para testar.
+
+
+### Achado adicional — preservação do contexto no link de confirmação
+
+O cadastro usava `emailRedirectTo: ${window.location.origin}/verify-email`, descartando o prefixo `/empresa/<slug>` ou `/t/<slug>` do portal. A rota do React Router usa esse prefixo como `basename`; um retorno ao caminho da raiz pode perder o tenant. A branch ajusta o destino para substituir o sufixo `/cadastro` por `/verify-email`, preservando a base do portal. Isso não explica sozinho os signup iniciados com referer na raiz: esses registros ainda exigem confirmar o build ativo e a URL usada pelo usuário.
+
+### Revisão adicional da idempotência de criação RH — 2026-10-10
+
+A revisão do fluxo de criação revelou uma falha parcial possível: a membership era criada antes de concluir senha/metadados e login. Se uma etapa posterior falhasse, a repetição identificaria o RH como membro ativo e pularia as atualizações, deixando a conta incompleta sem caminho de retomada.
+
+Correção implementada na branch de manutenção:
+- Auth criado pelo fluxo RH recebe user_metadata.admin_user_creation_pending = true.
+- Se a repetição encontrar membership RH ativa no mesmo tenant, só retoma o provisionamento quando esse marcador estiver ativo.
+- O fluxo atualiza perfil e login antes de concluir a atualização de senha/metadados; a operação final remove o marcador pendente.
+- Membership ativa preexistente sem marcador continua idempotente e não tem a senha redefinida.
+- A conta candidata preexistente continua protegida contra conversão automática.
+
+**Status:** correção implementada e revisada estaticamente; build, type-check, testes automatizados e teste de integração ainda não executados. Não considerar validado até essas verificações.

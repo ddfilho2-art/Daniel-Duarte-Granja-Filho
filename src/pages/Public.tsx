@@ -1021,8 +1021,8 @@ export function Cadastro() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isTenantRoute || !tenant) {
-      setError("O cadastro de candidato deve ser feito dentro do portal de uma empresa.");
+    if (!isTenantRoute || !tenant?.id || !tenant?.slug) {
+      setError("Não foi possível identificar o portal da empresa. Acesse o link oficial da empresa e tente novamente.");
       return;
     }
 
@@ -1054,13 +1054,14 @@ export function Cadastro() {
             nome: formData.nome.trim(),
             perfil: "Candidato",
           },
-          emailRedirectTo: `${window.location.origin}/verify-email`,
+          // Preserve the company portal base path when Supabase redirects after email confirmation.
+          emailRedirectTo: `${window.location.origin}${window.location.pathname.replace(/\/cadastro\/?$/, "/verify-email")}`,
         },
       });
 
       if (authError) {
         if (authError.message?.includes("User already registered")) {
-          setError("Este e-mail já possui uma conta. Faça login para cadastrar seu currículo nesta empresa.");
+          setError("Este e-mail já possui uma conta. Entre com essa conta ou use a recuperação de senha. Para sua segurança, não criaremos outra conta nem vincularemos automaticamente um cadastro existente.");
           return;
         }
         throw authError;
@@ -1071,7 +1072,7 @@ export function Cadastro() {
       }
 
       if (authData.user.identities && authData.user.identities.length === 0) {
-        setError("Não foi possível criar uma nova conta com estes dados. Se você já possui uma conta, faça login.");
+        setError("Este e-mail já pode estar associado a uma conta. Entre com sua conta existente ou recupere a senha. Nenhum novo vínculo com a empresa foi criado.");
         return;
       }
 
@@ -1080,11 +1081,20 @@ export function Cadastro() {
       // O registro de auditoria precisa ocorrer enquanto a sessão recém-criada
       // ainda está autenticada; depois do signOut o PostgREST passa a tratar a
       // requisição como anon e a policy de logs deve rejeitá-la.
-      await logAudit(
-        "Cadastro",
-        "Candidato",
-        `Novo candidato cadastrado no tenant ${tenant.displayName}: ${formData.nome}.`,
-      );
+      try {
+        await logAudit(
+          "Cadastro",
+          "Candidato",
+          `Novo candidato cadastrado no tenant ${tenant.displayName}: ${formData.nome}.`,
+        );
+      } catch (auditError) {
+        // Audit failure must not turn a successful Auth signup into a false
+        // registration failure. Keep the failure observable for operators.
+        console.error("[CANDIDATE_SIGNUP] Audit logging failed after Auth signup", {
+          tenantId: tenant.id,
+          error: auditError instanceof Error ? auditError.message : "unknown",
+        });
+      }
 
       await supabase.auth.signOut();
 
