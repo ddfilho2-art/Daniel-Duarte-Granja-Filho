@@ -1,7 +1,5 @@
 -- Employer <-> occupational-health tenant conversations.
 -- Separate from candidate messaging and from referral-specific medical chat.
-begin;
-
 create table if not exists public.tenant_clinic_conversations (
   id uuid primary key default gen_random_uuid(),
   contract_id uuid not null references public.occupational_health_contracts(id) on delete restrict,
@@ -233,4 +231,3 @@ values('tenant-clinic-chat-attachments','tenant-clinic-chat-attachments',false,1
 on conflict (id) do update set public=false,file_size_limit=10485760,
  allowed_mime_types=array['application/pdf','image/png','image/jpeg'];
 
-commit;
