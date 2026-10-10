@@ -421,3 +421,17 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Publicar Edge Function corrigida | Não iniciado | Não implantar antes de revisão e validação; nenhuma Vercel deployada |
 
 **Status geral:** Em tratamento. A versão 11 recebeu a requisição; o CORS não é o erro atual. O envio falha no provedor com HTTP 403. A correção de rollback está apenas na branch e ainda não foi validada nem publicada.
+
+
+## Atualização após integração e publicação — 2026-10-10
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Integrar recuperação de falha de entrega | Concluído | PR #9 mergeado por squash; commit `400dc524d51e87163b21a99267e04fca9e4b2721` |
+| Publicar Edge Function com recuperação | Concluído | `email-verification` versão 12 `ACTIVE`; `verify_jwt=false`, import map ativo; código de diagnóstico e rollback presentes no conteúdo publicado |
+| Build/type-check e testes automatizados | Não validado | Ainda não executados nesta sessão |
+| Teste funcional com conta Google do usuário | Aguardando usuário | Verificar recebimento do código, comportamento diante de falha e ausência de erro 409 em tentativa posterior |
+| Confirmar restrição do Resend | Em tratamento | A publicação não remove a restrição do domínio de teste; destinatário precisa ser autorizado pelo Resend ou remetente/domínio deve ser verificado |
+| Deploy Vercel | Não iniciado | Nenhum deploy Vercel realizado; mudança atual é somente na Edge Function |
+
+**Status geral atualizado:** correção integrada e Edge Function publicada. A manutenção permanece **em tratamento / não validada** até o teste funcional do usuário. A publicação não contorna o HTTP 403 de restrição do Resend.
