@@ -52,3 +52,13 @@ Como `logAudit` ocorre após a criação de Auth e antes do `signOut`, uma falha
 7. Executar build/type-check e testes automatizados antes de marcar a manutenção como validada.
 
 **Deploy:** nenhuma implantação da Vercel foi feita nesta análise. Permanece manual, sob controle do usuário.
+
+
+## Aditivo — falha de confirmação de cadastro observada em produção (2026-10-10)
+
+- Os logs registram `POST /auth/v1/signup` com HTTP 200, seguido de `OPTIONS /functions/v1/email-verification` com HTTP 403 às 11:39:05Z. O cadastro Auth pode, portanto, existir mesmo sem o envio/validação do código de confirmação.
+- A consulta somente leitura encontrou duas contas recentes com perfil padrão `Candidato` e sem tenant/membership. Não foram apagadas nem alteradas.
+- Causa imediata comprovada para o envio: o helper ativo `_shared/http.ts` permite apenas origens listadas em `ALLOWED_ORIGINS`; o preflight 403 mostra que a origem da aplicação não está sendo aceita pela configuração ativa.
+- Configuração necessária no Supabase: adicionar `https://daniel-duarte-granja-filho.vercel.app` ao valor existente de `ALLOWED_ORIGINS`, preservando todas as origens atuais e separando-as por vírgula. Não usar `*`. A configuração do secret não pôde ser alterada pela ferramenta disponível nesta sessão.
+- Há vários `POST /auth/v1/signup` com HTTP 200 em sequência às 12:08Z, mas a consulta de contas recentes não mostrou novos registros correspondentes a essas chamadas; não interpretar o status 200 isoladamente como confirmação de que uma nova conta foi criada ou que o e-mail foi entregue.
+- **Pendente:** ajustar `ALLOWED_ORIGINS`, testar uma confirmação de candidato controlada no portal de tenant e comprovar o vínculo correto ao tenant. Não repetir o cadastro com os e-mails já tentados.
