@@ -13,6 +13,34 @@ interface VerificationResponse {
   retryAfter?: number;
 }
 
+export async function registerCandidateAccount(
+  email: string,
+  name: string,
+  password: string,
+): Promise<void> {
+  const { data, error } = await supabase.functions.invoke<VerificationResponse>(
+    "email-verification",
+    {
+      body: {
+        action: "register",
+        email: email.trim().toLowerCase(),
+        name: name.trim(),
+        password,
+      },
+    },
+  );
+
+  if (error || !data?.success || !data.challengeId || !data.challengeToken) {
+    const errorBody = error ? await readEdgeFunctionError(error) : {};
+    throw new Error(
+      data?.code || errorBody.code || "Falha ao criar a conta e enviar o código.",
+    );
+  }
+
+  sessionStorage.setItem(CHALLENGE_ID_KEY, data.challengeId);
+  sessionStorage.setItem(CHALLENGE_TOKEN_KEY, data.challengeToken);
+}
+
 export async function sendVerificationCode(
   email: string,
   _name?: string
