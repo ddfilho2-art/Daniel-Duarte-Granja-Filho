@@ -386,3 +386,24 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 
 **Limitação atual:** a correção está isolada na branch e ainda não está validada. Não marcar como concluída nem publicar até executar os testes pendentes.
 
+
+
+## Manutenção — Cadastro de candidato e código de e-mail (2026-10-10)
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Consultar Base de Conhecimento e inspecionar fluxo atual | Concluído | Confirmado `supabase.auth.signUp()` antes da solicitação de código; função personalizada era chamada depois |
+| Eliminar e-mail nativo de confirmação do Supabase | Em tratamento | Branch adiciona criação via Auth Admin `createUser` com `email_confirm: false`; build e teste pendentes |
+| Integrar cadastro frontend à ação `register` | Em tratamento | `Public.tsx` chama `registerCandidateAccount`; validar compilação e respostas de erro |
+| Preservar validação de código e segurança multi-tenant | Em tratamento | RPCs existentes e criação de membership pós-login preservadas; teste E2E pendente |
+| Tratar falha de entrega e reenvio | Em tratamento | Fluxo `EMAIL_DELIVERY_FAILED` direciona para tela de verificação; testar reenvio real |
+| Build / type-check | Não iniciado | Deve passar antes da integração |
+| Teste de cadastro e e-mail Resend | Não iniciado | Confirmar e-mail de seis dígitos e ausência do e-mail nativo do Supabase |
+| Teste de bloqueio antes da confirmação e login após confirmação | Não iniciado | Conta deve permanecer não confirmada até código válido |
+| Atualizar Base de Conhecimento | Concluído | `docs/knowledge-base/candidate-registration-tenant.md` atualizado nesta branch |
+| Deploy da Edge Function | Não iniciado | Fazer após revisão e validação da implementação |
+| Integração à main | Não iniciado | Aguardar validação e aprovação |
+| Deploy Vercel | Não iniciado | Continua manual, sob controle do usuário |
+
+**Branch de trabalho:** `fix/candidate-email-code-signup`  
+**Status geral:** Em tratamento — não validado; não fazer novos testes repetidos de e-mail enquanto o limite 429 estiver ativo.
