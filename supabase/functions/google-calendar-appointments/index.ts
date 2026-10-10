@@ -210,7 +210,7 @@ Deno.serve(async (request) => {
       const eventId = String(appointmentId).replaceAll("-", "");
       const eventBody = {
         id: eventId,
-        summary: "Agendamento de exame ocupacional — " + conversation.subject,
+        summary: "Exame ocupacional — Recruta AÍ",
         description: "Agendamento operacional registrado pelo Recruta AÍ. Consulte a conversa vinculada para detalhes administrativos. Não inclua informações clínicas neste evento.",
         start: { dateTime: start, timeZone: timezone },
         end: { dateTime: end, timeZone: timezone },
@@ -305,7 +305,7 @@ Deno.serve(async (request) => {
       await admin.from("tenant_audit_logs").insert({
         tenant_id: appointment.employer_tenant_id, actor_id: auth.user.id,
         action: "tenant_clinic.appointment.cancelled", resource_type: "tenant_clinic_appointment",
-        resource_id: appointmentId, details: { reason },
+        resource_id: appointmentId, details: { cancellation_reason_provided: true },
       });
       return jsonResponse({ success: true, appointmentId, status: "cancelled", requestId: id }, 200, cors);
     }
