@@ -484,3 +484,20 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Nenhum deploy realizado; segue manual sob controle do usuário |
 
 **Status geral:** Em tratamento / não validado. Foi corrigido o cálculo do destino do link nos layouts existentes, mas a manutenção completa ainda exige teste de navegação e desenho seguro da persistência por tenant para os demais papéis. Não declarar concluído antes de validar esses pontos.
+
+
+## Manutenção — Fluxo Empregador ↔ Saúde Ocupacional (2026-10-10)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consolidar escopo e arquitetura de alto nível | Concluído — especificação registrada | `docs/maintenance/2026-10-10-employer-clinic-workflow.md` descreve chat separado, vaga opcional, ASO protegido, calendário e critérios |
+| Diferenciar o rótulo de gestão de usuários do empregador | Em tratamento | O rótulo atual do painel do empregador ainda precisa ser ajustado para `Gestão de Usuários de RH`; a rota deve ser preservada |
+| Inspecionar integralmente migrations, RLS, vínculos de clínica e estados de vaga | Em tratamento | Não criar tabela/RPC paralela antes de confirmar o modelo atual e as políticas |
+| Implementar conversa bidirecional entre tenant empregador e tenant clínico | Não iniciado | Separada do chat candidato–RH, autorizada por tenant e testada dos dois lados |
+| Implementar anexos ASO/documento equivalente na conversa | Não iniciado | Bucket privado, autorização upload/download, URL assinada curta e trilha de auditoria |
+| Implementar agendamento Google Calendar | Não iniciado | Disponibilidade, conflito, reagendamento, cancelamento, timezone, idempotência e auditoria |
+| Gestão de usuários exclusiva por tenant clínico | Não iniciado | CRUD e ativação/desativação limitados ao tenant clínico; não reutilizar permissões de RH |
+| Testes consolidados de segurança, build, type-check e e2e | Não validado | Executar após concluir os lotes; inclui acesso cruzado entre empregadores e clínica |
+| Deploy Vercel | Não iniciado | Não realizar sem autorização explícita |
+
+**Status geral:** Em tratamento. A especificação foi registrada. Chat empresa–clínica, anexos ASO e integração Google Calendar ainda não estão implementados. Não considerar a manutenção concluída nem validada.
