@@ -110,3 +110,12 @@ O código e as migrations estão registrados no GitHub, mas **não foram executa
 - O calendário é configurado por tenant clínico; não existe um Calendar ID global compartilhado entre clínicas.
 - O endpoint de agenda valida acesso à conversa antes de tentar obter token OAuth. O título do evento no Google não inclui assunto livre da conversa nem dados de candidato; auditoria de cancelamento não armazena o motivo em texto livre.
 - A gestão de usuários da clínica aparece no portal somente para usuário que administra ao menos um tenant clínico; o backend exige `clinic_admin` no tenant informado.
+
+
+## Fechamento do lote de implementação (2026-10-10)
+
+- Foram acrescentadas migrations de agenda por tenant, proteção contra troca de Calendar ID enquanto há reservas ativas, leitura do fuso horário autorizado e ocultação dos metadados de anexos quando o encaminhamento deixa de estar acessível.
+- A interface de agenda apresenta slots de 30 minutos entre 08:00 e 18:00 no fuso configurado para a clínica; o backend consulta Google FreeBusy, reserva com chave idempotente, verifica conflitos locais, envia convite ao solicitante e registra auditoria.
+- O upload de ASO exige conversa vinculada a encaminhamento médico e revalidação de autorização tanto no upload quanto no download/listagem.
+- A configuração externa ainda é necessária: OAuth secrets no Supabase e Calendar ID/fuso em cada tenant clínico.
+- Nenhum build, type-check ou teste foi executado; todo o lote permanece **não validado** até a rodada consolidada do usuário.
