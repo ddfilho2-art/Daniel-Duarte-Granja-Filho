@@ -140,6 +140,11 @@ Deno.serve(async (request) => {
       return (data?.calendars?.[calendarId]?.busy || []) as Busy[];
     };
     const dbBusy = async (clinicTenantId: string, start: string, end: string, excludeId?: string): Promise<Busy[]> => {
+      const staleBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const { error: staleError } = await admin!.from("tenant_clinic_appointments")
+        .update({ status: "failed" }).eq("clinic_tenant_id", clinicTenantId)
+        .eq("status", "pending").lt("created_at", staleBefore);
+      if (staleError) throw new Error("stale_appointment_cleanup_failed");
       let query = admin!.from("tenant_clinic_appointments").select("starts_at,ends_at")
         .eq("clinic_tenant_id", clinicTenantId).in("status", ["pending", "confirmed"])
         .lt("starts_at", end).gt("ends_at", start);
@@ -192,6 +197,18 @@ Deno.serve(async (request) => {
         .eq("idempotency_key", idempotencyKey).maybeSingle();
       if (existing?.status === "confirmed" && existing.google_event_id) {
         return jsonResponse({ success: true, appointmentId: existing.id, status: "confirmed", startsAt: existing.starts_at, endsAt: existing.ends_at, requestId: id }, 200, cors);
+      }
+      if (existing?.status === "pending") {
+        const pendingEventId = String(existing.id).replaceAll("-", "");
+        const recovered = await google(calendarPath + "/events/" + encodeURIComponent(pendingEventId));
+        if (recovered.response.ok) {
+          await admin.from("tenant_clinic_appointments").update({ status: "confirmed", google_event_id: pendingEventId }).eq("id", existing.id);
+          return jsonResponse({ success: true, appointmentId: existing.id, status: "confirmed", startsAt: existing.starts_at, endsAt: existing.ends_at, requestId: id }, 200, cors);
+        }
+        if (Date.now() - new Date(existing.created_at).getTime() < 2 * 60 * 1000) {
+          return jsonResponse({ success: false, code: "APPOINTMENT_REQUEST_PROCESSING", requestId: id }, 409, cors);
+        }
+        await admin.from("tenant_clinic_appointments").update({ status: "failed" }).eq("id", existing.id);
       }
       const [gBusy, dBusy] = await Promise.all([
         googleBusy(start, end), dbBusy(conversation.clinic_tenant_id, start, end),
@@ -274,7 +291,24 @@ Deno.serve(async (request) => {
         }).eq("id", appointmentId);
         return jsonResponse({ success: false, code: "GOOGLE_EVENT_RESCHEDULE_FAILED", requestId: id }, 502, cors);
       }
-      await admin.from("tenant_clinic_appointments").update({ status: "confirmed", google_event_id: eventId }).eq("id", appointmentId);
+      const { error: moveSaveError } = await admin.from("tenant_clinic_appointments")
+        .update({ status: "confirmed", google_event_id: eventId }).eq("id", appointmentId);
+      if (moveSaveError) {
+        await google(calendarPath + "/events/" + encodeURIComponent(eventId), {
+          method: "PATCH",
+          body: JSON.stringify({
+            summary: "Exame ocupacional — Recruta AÍ",
+            description: "Agendamento operacional registrado pelo Recruta AÍ. Não inclua informações clínicas neste evento.",
+            start: { dateTime: previous.starts_at, timeZone: previous.timezone },
+            end: { dateTime: previous.ends_at, timeZone: previous.timezone },
+          }),
+        });
+        await admin.from("tenant_clinic_appointments").update({
+          starts_at: previous.starts_at, ends_at: previous.ends_at, timezone: previous.timezone,
+          status: previous.status, google_event_id: previous.google_event_id,
+        }).eq("id", appointmentId);
+        return jsonResponse({ success: false, code: "APPOINTMENT_MOVE_SAVE_FAILED", requestId: id }, 502, cors);
+      }
       await admin.from("tenant_audit_logs").insert({
         tenant_id: conversation.employer_tenant_id, actor_id: auth.user.id,
         action: "tenant_clinic.appointment.rescheduled", resource_type: "tenant_clinic_appointment",
