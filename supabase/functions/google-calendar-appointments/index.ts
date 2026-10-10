@@ -135,10 +135,21 @@ Deno.serve(async (request) => {
           new Date(end).getTime() - new Date(start).getTime() > 7 * 24 * 60 * 60 * 1000) {
         return jsonResponse({ success: false, code: "INVALID_AVAILABILITY_WINDOW", requestId: id }, 400, cors);
       }
+      let excludeAppointmentId: string | undefined;
+      let oldInterval: { start: string; end: string } | null = null;
+      if (body.appointmentId) {
+        if (!UUID.test(body.appointmentId)) throw new Error("invalid_appointment_id");
+        const { data: appointment } = await admin.from("tenant_clinic_appointments").select("*")
+          .eq("id", body.appointmentId).eq("conversation_id", conversationId).maybeSingle();
+        if (!appointment || appointment.status !== "confirmed") throw new Error("appointment_not_found");
+        excludeAppointmentId = appointment.id;
+        oldInterval = { start: appointment.starts_at, end: appointment.ends_at };
+      }
       const [gBusy, dBusy] = await Promise.all([
-        googleBusy(start, end), dbBusy(conversation.clinic_tenant_id, start, end),
+        googleBusy(start, end), dbBusy(conversation.clinic_tenant_id, start, end, excludeAppointmentId),
       ]);
-      return jsonResponse({ success: true, requestId: id, busy: [...gBusy, ...dBusy] }, 200, cors);
+      const filteredGoogleBusy = oldInterval ? gBusy.filter((b) => !sameInterval(b, oldInterval!.start, oldInterval!.end)) : gBusy;
+      return jsonResponse({ success: true, requestId: id, busy: [...filteredGoogleBusy, ...dBusy] }, 200, cors);
     }
 
     if (action === "book") {
