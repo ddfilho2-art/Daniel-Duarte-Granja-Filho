@@ -131,7 +131,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
 
   const downloadAttachment = async (attachment: TenantClinicAttachment) => {
     try {
-      const url = await getTenantClinicAttachmentUrl(attachment.conversation_id || selectedId, attachment.storage_path);
+      const url = await getTenantClinicAttachmentUrl(selectedId, attachment.storage_path);
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível baixar o anexo.");
