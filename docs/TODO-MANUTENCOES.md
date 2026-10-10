@@ -516,3 +516,6 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Não realizar sem autorização explícita |
 
 **Atenção:** commits no GitHub não aplicam automaticamente as migrations ao Supabase nem configuram secrets. O chat e a gestão de usuários dependem das migrations; o Google Calendar depende também dos secrets OAuth e do ID de calendário configurado para cada tenant. Não marcar como concluído/validado até a validação consolidada do usuário.
+
+
+**Reforço de segurança incluído no lote (2026-10-10):** o upload/download de ASO no chat exige vínculo a encaminhamento médico e valida autorização do encaminhamento; cada tenant clínico tem configuração própria de Calendar ID/fuso; a agenda verifica autorização antes do OAuth e não inclui assunto livre/dados pessoais no título do evento. Esses reforços também permanecem **não validados por testes**.
