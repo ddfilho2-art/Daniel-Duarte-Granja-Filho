@@ -72,3 +72,32 @@ Executar no final de cada lote completo: build, type-check, testes unitários/RL
 - A conta corporativa do Google Calendar e a configuração OAuth ainda precisam ser fornecidas/configuradas pelo operador; não guardar segredos no GitHub.
 - Nenhum deploy da Vercel deve ser feito sem autorização explícita do usuário.
 - Status desta especificação: documentação inicial criada; funcionalidades de conversa, anexos ASO e calendário ainda não implementadas nem validadas.
+
+
+## Registro de implementação — 2026-10-10
+
+### Código adicionado nesta rodada
+
+- `supabase/migrations/20261010120000_employer_clinic_conversations.sql`: conversas separadas do chat de candidatos, mensagens e metadados de anexos privados; RPCs com autorização por tenant e vínculo opcional a vaga/encaminhamento.
+- `supabase/migrations/20261010121500_tenant_clinic_attachment_listing.sql`: listagem de metadados de anexos por RPC autorizada.
+- `supabase/migrations/20261010123000_tenant_clinic_conversation_labels.sql`: nomes da empresa e da clínica na listagem.
+- `supabase/migrations/20261010130000_list_employer_clinic_contracts.sql`: lista contratos ativos para o RH sem expor diretamente a tabela de tenants.
+- `supabase/functions/tenant-clinic-chat-storage/index.ts`: upload/download de anexos com URLs assinadas, validação de tenant, PDF/PNG/JPEG e limite de 10 MB.
+- `src/lib/tenant-clinic-chat.ts` e `src/pages/TenantClinicChat.tsx`: interface de conversas nos painéis RH e clínica, seleção opcional de vaga, mensagens e anexos.
+- `supabase/migrations/20261010140000_tenant_clinic_appointments.sql` e `20261010143000_move_tenant_clinic_appointments.sql`: registros de agendamento, prevenção de conflito entre reservas locais e controle de reagendamento.
+- `supabase/migrations/20261010160000_clinic_calendar_integration_settings.sql` e `supabase/functions/google-calendar-appointments/index.ts`: configuração por tenant clínico e integração Google Calendar para disponibilidade, agendamento, reagendamento e cancelamento.
+- `supabase/migrations/20261010150000_clinic_admin_tenant_list.sql`, `supabase/functions/clinic-user-management/index.ts` e `src/pages/ClinicUserManagement.tsx`: gestão de usuários de clínica limitada a administradores do tenant, incluindo criação, ativação/inativação, alteração de e-mail e redefinição de senha.
+- Rotas adicionadas em `src/App.tsx`; o menu RH ganhou acesso a Saúde Ocupacional; o portal clínico ganhou acesso a Conversas com empresas e Gestão de Usuários. O rótulo do administrador da empresa foi alterado para `Gestão de Usuários de RH`.
+
+### Configuração externa obrigatória
+
+Configurar como secrets das Edge Functions do Supabase, sem armazená-los no GitHub:
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REFRESH_TOKEN`
+
+Cada tenant de Saúde Ocupacional precisa ter seu próprio ID de calendário e fuso horário configurados pela tela Gestão de Usuários. O calendário corporativo deve compartilhar acesso com a conta OAuth utilizada pela integração.
+
+### Status honesto
+
+O código e as migrations estão registrados no GitHub, mas **não foram executados build/type-check, testes automatizados ou validação no Supabase nesta rodada**. Não marcar como validado até aplicar migrations, configurar os secrets e executar os testes consolidados. Não houve deploy da Vercel.
