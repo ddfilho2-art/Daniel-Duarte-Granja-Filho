@@ -12,7 +12,7 @@ import {
 } from "../lib/tenant-clinic-chat";
 
 type ContractOption = { id: string; clinic_tenant_id: string; clinic_name: string };
-type JobOption = { id: string; titulo: string; status: string };
+type JobOption = { id: string; titulo: string; status: string; status_vaga?: string | null };
 type ReferralOption = { id: string; clinic_tenant_id: string; candidate_name: string; job_title: string; status: string };
 
 function zonedDateTimeToIso(date: string, time: string, timezone: string) {
@@ -95,8 +95,8 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     const loadOptions = async () => {
       const [contractResult, jobResult, referralResult] = await Promise.all([
         supabase.rpc("list_my_occupational_health_contracts"),
-        supabase.from("vagas").select("id,titulo,status")
-          .eq("tenant_id", tenant.id).in("status", ["Aberta", "aberta", "active", "ativo"]).order("titulo"),
+        supabase.from("vagas").select("id,titulo,status,status_vaga")
+          .eq("tenant_id", tenant.id).order("titulo"),
         supabase.rpc("list_my_medical_referrals"),
       ]);
       if (!active) return;
@@ -106,7 +106,10 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
         setContracts((contractResult.data || []) as ContractOption[]);
         setContractId((contractResult.data || [])[0]?.id || "");
       }
-      if (!jobResult.error) setJobs((jobResult.data || []) as JobOption[]);
+      if (!jobResult.error) setJobs(((jobResult.data || []) as JobOption[]).filter((job) =>
+        ["aberta", "active", "ativo"].includes(String(job.status || "").toLowerCase()) ||
+        String(job.status_vaga || "").toUpperCase() === "ABERTA"
+      ));
       if (!referralResult.error) setReferrals((referralResult.data || []) as ReferralOption[]);
     };
     void loadOptions();
