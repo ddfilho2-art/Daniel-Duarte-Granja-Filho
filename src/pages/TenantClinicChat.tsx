@@ -382,7 +382,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
                     <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm text-slate-700 hover:bg-slate-50" title="Anexar documento">
                       {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                       <span className="hidden sm:inline">{uploading ? "Enviando" : "Anexar"}</span>
-                      <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={uploading || selected.status !== "open" || !selected.medical_referral_id} onChange={(e) => void uploadAttachment(e) className="hidden" />
+                      <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={uploading || selected.status !== "open" || !selected.medical_referral_id} onChange={(e) => void uploadAttachment(e)} className="hidden" />
                     </label>
                     <textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={4000} rows={2} disabled={selected.status !== "open"} className="min-w-0 flex-1 resize-y rounded-lg border px-3 py-2 text-sm" placeholder="Digite uma mensagem operacional..." />
                     <button type="submit" disabled={sending || !draft.trim() || selected.status !== "open"} className="inline-flex h-10 items-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" /><span className="hidden sm:inline">Enviar</span></button>
