@@ -63,3 +63,12 @@ Branch `fix/email-delivery-failure-recovery`: a função agora captura o código
 - Build/type-check e testes automatizados não foram executados; não declarar validado ainda.
 - O usuário fará um teste controlado com uma conta Google. A restrição do domínio de teste Resend continua ativa: se esse destinatário não estiver autorizado no Resend, o envio pode continuar falhando com 403. A correção deve então remover o usuário criado nessa tentativa e registrar o código resumido do provedor.
 - Nenhum deploy Vercel foi realizado.
+
+
+## Recuperação do cadastro de teste com e-mail informado como indisponível — 2026-10-10
+
+A consulta de leitura encontrou em `auth.users` uma conta com o e-mail informado, mas sem `email_confirmed_at`, sem último login e criada durante os testes recentes; metadados indicavam perfil Candidato. Não havia registro associado em `public.profiles`, `public.candidatos`, `public.email_verification_codes`, `public.tenant_memberships` ou `public.user_roles`.
+
+Foi removida exclusivamente essa conta não confirmada e sem login. Verificação posterior confirmou zero ocorrências do e-mail em `auth.users`, `auth.identities`, `public.users` e `public.candidatos`. Nenhuma outra conta foi alterada.
+
+A causa era um registro órfão deixado por uma tentativa anterior, antes da correção de rollback ser publicada. A versão 12 da Edge Function contém a proteção para novas falhas de entrega. Ainda é necessário realizar um cadastro controlado. A restrição do domínio de teste do Resend continua independente desta correção.
