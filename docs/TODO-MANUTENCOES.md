@@ -281,4 +281,21 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Testar link em Admin tenant, RH, Master e Candidato | Aguardando validação | Exige deploy manual e verificação no navegador |
 | Regressão de autorização e isolamento multi-tenant | Aguardando validação | Mudança visual; confirmar que as rotas continuam protegidas |
 | Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
+## Manutenção — tela em branco no cadastro de candidato do tenant (2026-10-10)
+
+**URL reportada:** `/empresa/exemplostore/cadastro`.
+
+**Causa identificada por inspeção estática:** o componente `Cadastro` em `src/pages/Public.tsx` referenciava `authorizationLoading` e `isPlatformMasterAdmin` no `useEffect` e na lista de dependências, mas não os extraía de `useAuth()`. Como a lista de dependências é avaliada durante o render, essas referências não declaradas provocam `ReferenceError` e podem deixar a página em branco.
+
+**Correção aplicada na main:** incluir ambos os campos no destructuring de `useAuth()`. Commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff`.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Inspecionar resolução da rota tenant e componente Cadastro | Concluído — inspeção estática | `main.tsx`, `tenant-routing.ts`, `App.tsx` e `Public.tsx` consultados |
+| Identificar referências não declaradas no render | Concluído — inspeção estática | `authorizationLoading` e `isPlatformMasterAdmin` usados sem destructuring |
+| Corrigir dependências do contexto de autenticação | Concluído — código na main | Commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff` |
+| Build, type-check e testes automatizados | Aguardando validação | Ainda não executados nesta manutenção |
+| Testar cadastro direto em `/empresa/exemplostore/cadastro` e envio do formulário | Aguardando validação | Exige deploy manual; não criar candidatura/conta de produção sem autorização explícita |
+| Verificar cadastro público, usuário autenticado e isolamento tenant | Aguardando validação | Confirmar estados de sessão e tenant |
+| Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
 
