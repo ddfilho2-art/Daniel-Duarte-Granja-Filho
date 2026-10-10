@@ -684,7 +684,7 @@ async function updateLegacyUser(
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!nome.trim() || nome.trim().length < 3 || !emailRegex.test(normalizedEmail)) {
       return { success: false, code: "INVALID_INPUT", error: "Nome ou e-mail inválido" };
     }
@@ -1013,6 +1013,26 @@ async function handleRequest(
           };
         } else {
           const normalizedEmail = body.email.trim().toLowerCase();
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          const validPassword =
+            body.password.length >= 8 &&
+            /[A-Z]/.test(body.password) &&
+            /[a-z]/.test(body.password) &&
+            /[0-9]/.test(body.password);
+          if (
+            body.nome.trim().length < 3 ||
+            !emailRegex.test(normalizedEmail) ||
+            !body.login.trim() ||
+            !validPassword
+          ) {
+            result = {
+              success: false,
+              code: "INVALID_INPUT",
+              error: "Confira nome, e-mail, login e a política de senha antes de cadastrar.",
+            };
+            break;
+          }
+
           const { data: existingAuthUsers, error: existingAuthError } =
             await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
 
