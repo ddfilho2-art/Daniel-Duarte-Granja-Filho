@@ -153,3 +153,13 @@ A correção não remove automaticamente contas antigas que ficaram órfãs na v
 - Antes do teste funcional, corrigir a configuração/restrição de envio no Resend. Se a conta estiver no modo de teste, verificar no painel se só permite destinatário autorizado; para enviar códigos a candidatos reais, usar remetente/domínio devidamente verificado e chave com permissão de envio compatível.
 - Depois, testar uma conta de e-mail realmente nova e confirmar entrega de um código de seis dígitos, bloqueio de login antes da confirmação e login após código válido.
 - Não marcar como validado até concluir build e teste funcional.
+
+
+### Atualização de manutenção — 2026-10-10
+
+- PR #9 integrado por squash no commit `400dc524d51e87163b21a99267e04fca9e4b2721`.
+- Edge Function `email-verification` versão 12 está `ACTIVE`, com `verify_jwt=false` e import map ativo.
+- A versão publicada inclui diagnóstico limitado do código retornado pelo Resend e tenta excluir somente o usuário Auth criado pela chamada atual se a entrega inicial do código falhar.
+- O teste funcional do usuário ainda está pendente; build/type-check e testes automatizados não foram executados. Manter status não validado até analisar o resultado do teste.
+- Essa correção não elimina a restrição de teste do Resend. Para destinatários fora da lista autorizada, será necessário verificar um domínio remetente no Resend e usar um remetente desse domínio.
+- Nenhum deploy Vercel foi realizado.
