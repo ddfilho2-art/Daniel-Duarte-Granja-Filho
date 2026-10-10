@@ -201,6 +201,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
                 {conversations.map((conversation) => (
                   <button key={conversation.id} type="button" onClick={() => setSelectedId(conversation.id)} className={`block w-full border-b p-4 text-left hover:bg-slate-50 ${selectedId === conversation.id ? "bg-teal-50 border-l-4 border-l-teal-700" : ""}`}>
                     <span className="block truncate text-sm font-semibold text-slate-900">{conversation.subject}</span>
+                    <span className="mt-1 block truncate text-xs font-medium text-teal-800">{isClinic ? conversation.employer_name : conversation.clinic_name}</span>
                     {conversation.job_title_snapshot && <span className="mt-1 block truncate text-xs text-slate-500">Vaga: {conversation.job_title_snapshot}</span>}
                     <span className="mt-2 block line-clamp-2 text-xs text-slate-600">{conversation.last_message || "Conversa aberta"}</span>
                     <span className="mt-2 block text-[11px] text-slate-400">{new Date(conversation.last_message_at).toLocaleString("pt-BR")}</span>
@@ -214,6 +215,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
               : <>
                 <div className="border-b px-5 py-4">
                   <h2 className="font-semibold text-slate-900">{selected.subject}</h2>
+                  <p className="mt-1 text-xs font-medium text-teal-800">{isClinic ? selected.employer_name : selected.clinic_name}</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {selected.job_title_snapshot ? `Vaga relacionada: ${selected.job_title_snapshot} · ` : ""}Status: {selected.status === "open" ? "Aberta" : "Encerrada"}
                   </p>
