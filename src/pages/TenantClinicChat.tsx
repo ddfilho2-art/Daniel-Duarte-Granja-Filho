@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowDownToLine, LoaderCircle, MessageCircle, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
+import { ArrowDownToLine, CalendarClock, LoaderCircle, MessageCircle, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useTenant } from "../contexts/TenantContext";
 import {
-  createTenantClinicConversation, getTenantClinicAttachmentUrl, listTenantClinicAttachments,
-  listTenantClinicConversations, listTenantClinicMessages, sendTenantClinicMessage,
-  uploadTenantClinicAttachment, type TenantClinicAttachment, type TenantClinicConversation,
+  bookTenantClinicAppointment, cancelTenantClinicAppointment, createTenantClinicConversation,
+  getTenantClinicAttachmentUrl, getTenantClinicAvailability, listTenantClinicAppointments,
+  listTenantClinicAttachments, listTenantClinicConversations, listTenantClinicMessages,
+  rescheduleTenantClinicAppointment, sendTenantClinicMessage, uploadTenantClinicAttachment,
+  type TenantClinicAppointment, type TenantClinicAttachment, type TenantClinicConversation,
   type TenantClinicMessage,
 } from "../lib/tenant-clinic-chat";
 
@@ -18,6 +20,17 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
   const [selectedId, setSelectedId] = useState("");
   const [messages, setMessages] = useState<TenantClinicMessage[]>([]);
   const [attachments, setAttachments] = useState<TenantClinicAttachment[]>([]);
+  const [appointments, setAppointments] = useState<TenantClinicAppointment[]>([]);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [appointmentDate, setAppointmentDate] = useState(() => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    return new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  });
+  const [availableSlots, setAvailableSlots] = useState<{ start: string; end: string; label: string }[]>([]);
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [checkingSlots, setCheckingSlots] = useState(false);
+  const [savingAppointment, setSavingAppointment] = useState(false);
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [contractId, setContractId] = useState("");
@@ -73,13 +86,14 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
   }, [isClinic, tenant?.id]);
 
   const refreshThread = useCallback(async (id: string) => {
-    if (!id) { setMessages([]); setAttachments([]); return; }
+    if (!id) { setMessages([]); setAttachments([]); setAppointments([]); return; }
     try {
-      const [messageData, attachmentData] = await Promise.all([
-        listTenantClinicMessages(id), listTenantClinicAttachments(id),
+      const [messageData, attachmentData, appointmentData] = await Promise.all([
+        listTenantClinicMessages(id), listTenantClinicAttachments(id), listTenantClinicAppointments(id),
       ]);
       setMessages(messageData);
       setAttachments(attachmentData);
+      setAppointments(appointmentData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível carregar o histórico.");
     }
@@ -126,6 +140,62 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível anexar o documento.");
     } finally { setUploading(false); }
+  };
+
+  const checkAvailability = async () => {
+    if (!selectedId || !appointmentDate) return;
+    setCheckingSlots(true); setError(""); setAvailableSlots([]); setSelectedSlot("");
+    try {
+      const startOfDay = new Date(appointmentDate + "T08:00:00");
+      const endOfDay = new Date(appointmentDate + "T18:00:00");
+      const busy = await getTenantClinicAvailability(selectedId, startOfDay.toISOString(), endOfDay.toISOString());
+      const slots: { start: string; end: string; label: string }[] = [];
+      for (let cursor = new Date(startOfDay); cursor.getTime() + 30 * 60000 <= endOfDay.getTime(); cursor = new Date(cursor.getTime() + 30 * 60000)) {
+        const end = new Date(cursor.getTime() + 30 * 60000);
+        if (cursor.getTime() <= Date.now()) continue;
+        if (busy.some((item) => new Date(item.start).getTime() < end.getTime() && new Date(item.end).getTime() > cursor.getTime())) continue;
+        slots.push({
+          start: cursor.toISOString(), end: end.toISOString(),
+          label: cursor.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) + " – " + end.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+        });
+      }
+      setAvailableSlots(slots);
+      if (!slots.length) setError("Não há horários livres nesse dia. Escolha outra data.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível consultar a agenda.");
+    } finally { setCheckingSlots(false); }
+  };
+
+  const saveAppointment = async () => {
+    const slot = availableSlots.find((item) => item.start === selectedSlot);
+    if (!slot || !selectedId) return;
+    setSavingAppointment(true); setError("");
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+      if (reschedulingId) {
+        await rescheduleTenantClinicAppointment({ appointmentId: reschedulingId, startsAt: slot.start, endsAt: slot.end, timezone });
+      } else {
+        await bookTenantClinicAppointment({ conversationId: selectedId, startsAt: slot.start, endsAt: slot.end, timezone, idempotencyKey: crypto.randomUUID() });
+      }
+      setReschedulingId(null); setSelectedSlot(""); setAvailableSlots([]);
+      await refreshThread(selectedId);
+      await refreshConversations(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível salvar o agendamento.");
+    } finally { setSavingAppointment(false); }
+  };
+
+  const cancelAppointment = async (appointment: TenantClinicAppointment) => {
+    const reason = window.prompt("Informe o motivo do cancelamento:");
+    if (!reason || reason.trim().length < 3) return;
+    setSavingAppointment(true); setError("");
+    try {
+      await cancelTenantClinicAppointment(appointment.id, reason.trim());
+      await refreshThread(selectedId);
+      await refreshConversations(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível cancelar o agendamento.");
+    } finally { setSavingAppointment(false); }
   };
 
   const downloadAttachment = async (attachment: TenantClinicAttachment) => {
