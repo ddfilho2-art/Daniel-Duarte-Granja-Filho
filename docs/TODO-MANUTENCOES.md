@@ -347,3 +347,19 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Supabase / Vercel | Não realizado | Branch separada; deploy Vercel continua manual |
 
 **Limitação:** Auth, public.users, membership e serviço de e-mail não formam uma transação distribuída. Não declarar validado até executar os cenários de falha parcial e autorização em ambiente de teste.
+
+
+## Manutenção — remoção da dependência Turnstile na verificação de e-mail (2026-10-10)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Diagnosticar HTTP 500 | Concluído | Logs da Edge Function indicaram `missing_secret:TURNSTILE_SECRET_KEY` |
+| Remover dependência Turnstile no frontend e Edge Function | Implementado na main | Commits `1497e56e0e5ca7f0a0bf7a9b67c7827aef8c0440` e `2a173b539f34262c1edc3d660ee4bbedb5e4b148` |
+| Atualizar base de conhecimento | Concluído | `docs/knowledge-base/email-verification-turnstile-removal.md` |
+| Build, type-check e testes automatizados | Não validado | Ainda não executados nesta manutenção |
+| Testar código correto/incorreto/expirado, reenvio, limites e entradas de 5/7/8 dígitos | Pendente de validação | Executar sem alterar dados reais de usuários |
+| Testar isolamento entre tenants e cadastro com recebimento do e-mail | Pendente de validação | Confirmar no ambiente apropriado |
+| Deploy Supabase | Não realizado | Requer autorização explícita do usuário |
+| Deploy Vercel | Não realizado | Continua manual sob controle do usuário |
+
+**Risco residual:** sem CAPTCHA, a automação distribuída de solicitações fica mais fácil. Os limites por IP/e-mail foram mantidos; validar comportamento e monitorar volume de e-mails após publicação.
