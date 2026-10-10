@@ -235,3 +235,15 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Corrigir causa-raiz com menor mudança segura | Não iniciado | Depende da medição; não conceder acesso por timeout nem remover autorização |
 | Build/type-check/testes de regressão | Aguardando validação | Ainda não executados nesta manutenção |
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
+
+
+## Login — evitar redirecionamento antes da autorização (2026-10-10)
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Inspecionar Login, ProtectedRoute e AuthContext | Concluído por inspeção | Login calculava destino sem aguardar authorizationLoading |
+| Corrigir redirecionamento prematuro | Implementação na main | Commit 16802dd31fda066c235c67815284a52ecbc03736 em src/pages/Public.tsx |
+| Build/type-check/testes | Aguardando validação | Não executados nesta etapa |
+| Validar login Master e navegação entre abas | Aguardando validação | Requer deploy manual e teste em produção |
+| Regressão de autorização e isolamento tenant | Aguardando validação | Não declarar concluído antes dos testes |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
