@@ -50,11 +50,14 @@ Deno.serve(async (request) => {
 
     const { data: conversation, error: conversationError } = await admin
       .from("tenant_clinic_conversations")
-      .select("id,status,clinic_tenant_id")
+      .select("id,status,clinic_tenant_id,medical_referral_id")
       .eq("id", conversationId)
       .maybeSingle();
     if (conversationError || !conversation) return jsonResponse({ success: false, code: "CONVERSATION_NOT_FOUND", requestId: id }, 404, cors);
     if (conversation.status !== "open") return jsonResponse({ success: false, code: "CONVERSATION_CLOSED", requestId: id }, 409, cors);
+    if (!conversation.medical_referral_id) {
+      return jsonResponse({ success: false, code: "MEDICAL_REFERRAL_REQUIRED_FOR_ATTACHMENT", requestId: id }, 400, cors);
+    }
 
     const { data: isClinic, error: sideError } = await userClient.rpc("is_active_clinic_member", { p_clinic_tenant_id: conversation.clinic_tenant_id });
     if (sideError || typeof isClinic !== "boolean") {
