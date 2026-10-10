@@ -13,6 +13,7 @@ import {
 
 type ContractOption = { id: string; clinic_tenant_id: string; clinic_name: string };
 type JobOption = { id: string; titulo: string; status: string };
+type ReferralOption = { id: string; clinic_tenant_id: string; candidate_name: string; job_title: string; status: string };
 
 function zonedDateTimeToIso(date: string, time: string, timezone: string) {
   const [year, month, day] = date.split("-").map(Number);
@@ -53,8 +54,10 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [jobs, setJobs] = useState<JobOption[]>([]);
+  const [referrals, setReferrals] = useState<ReferralOption[]>([]);
   const [contractId, setContractId] = useState("");
   const [jobId, setJobId] = useState("");
+  const [referralId, setReferralId] = useState("");
   const [subject, setSubject] = useState("");
   const [firstMessage, setFirstMessage] = useState("");
   const [draft, setDraft] = useState("");
@@ -64,6 +67,8 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const selected = useMemo(() => conversations.find((item) => item.id === selectedId) || null, [conversations, selectedId]);
+  const selectedContract = useMemo(() => contracts.find((item) => item.id === contractId) || null, [contracts, contractId]);
+  const referralOptions = useMemo(() => referrals.filter((item) => item.clinic_tenant_id === selectedContract?.clinic_tenant_id), [referrals, selectedContract]);
 
   const refreshConversations = useCallback(async (keepSelection = true) => {
     setLoading(true);
@@ -88,10 +93,11 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     if (isClinic || !tenant?.id) return;
     let active = true;
     const loadOptions = async () => {
-      const [contractResult, jobResult] = await Promise.all([
+      const [contractResult, jobResult, referralResult] = await Promise.all([
         supabase.rpc("list_my_occupational_health_contracts"),
         supabase.from("vagas").select("id,titulo,status")
           .eq("tenant_id", tenant.id).in("status", ["Aberta", "aberta", "active", "ativo"]).order("titulo"),
+        supabase.rpc("list_my_medical_referrals"),
       ]);
       if (!active) return;
       if (contractResult.error) {
@@ -101,6 +107,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
         setContractId((contractResult.data || [])[0]?.id || "");
       }
       if (!jobResult.error) setJobs((jobResult.data || []) as JobOption[]);
+      if (!referralResult.error) setReferrals((referralResult.data || []) as ReferralOption[]);
     };
     void loadOptions();
     return () => { active = false; };
@@ -127,9 +134,9 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     setSending(true); setError("");
     try {
       const id = await createTenantClinicConversation({
-        contractId, subject, jobId: jobId || null, firstMessage,
+        contractId, subject, jobId: jobId || null, medicalReferralId: referralId || null, firstMessage,
       });
-      setSubject(""); setFirstMessage(""); setJobId(""); setShowCreate(false);
+      setSubject(""); setFirstMessage(""); setJobId(""); setReferralId(""); setShowCreate(false);
       await refreshConversations(false);
       setSelectedId(id);
     } catch (e) {
@@ -154,6 +161,10 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || !selectedId) return;
+    if (!selected?.medical_referral_id) {
+      setError("Para anexar ASO ou documento médico, vincule a conversa a um encaminhamento médico específico.");
+      return;
+    }
     setUploading(true); setError("");
     try {
       await uploadTenantClinicAttachment(selectedId, file);
@@ -262,7 +273,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
             </label>
             <label className="grid gap-1 text-sm font-medium text-slate-700">
               Contrato / clínica
-              <select required value={contractId} onChange={(e) => setContractId(e.target.value)} className="rounded-lg border px-3 py-2 font-normal">
+              <select required value={contractId} onChange={(e) => { setContractId(e.target.value); setReferralId(""); }} className="rounded-lg border px-3 py-2 font-normal">
                 <option value="">Selecione um contrato ativo</option>
                 {contracts.map((c) => <option key={c.id} value={c.id}>{c.clinic_name}</option>)}
               </select>
@@ -273,6 +284,13 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
               <select value={jobId} onChange={(e) => setJobId(e.target.value)} className="rounded-lg border px-3 py-2 font-normal">
                 <option value="">Sem vínculo com vaga</option>
                 {jobs.map((j) => <option key={j.id} value={j.id}>{j.titulo}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
+              Encaminhamento médico (opcional; necessário para anexar ASO)
+              <select value={referralId} onChange={(e) => setReferralId(e.target.value)} className="rounded-lg border px-3 py-2 font-normal">
+                <option value="">Sem vínculo com encaminhamento</option>
+                {referralOptions.map((referral) => <option key={referral.id} value={referral.id}>{referral.candidate_name} · {referral.job_title} · {referral.status}</option>)}
               </select>
             </label>
             <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
@@ -359,12 +377,12 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
                   </div>}
                 </div>
                 <div className="border-t p-4">
-                  <p className="mb-2 text-xs text-slate-500">Anexos: PDF, PNG ou JPEG até 10 MB. Envie apenas documentos ocupacionais necessários, como ASO; não inclua prontuários ou diagnósticos.</p>
+                  <p className="mb-2 text-xs text-slate-500">Anexos: PDF, PNG ou JPEG até 10 MB. Para anexar ASO ou equivalente, a conversa precisa estar vinculada a um encaminhamento médico específico. Não inclua prontuários ou diagnósticos.</p>
                   <form onSubmit={sendMessage} className="flex items-end gap-2">
                     <label className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-lg border px-3 text-sm text-slate-700 hover:bg-slate-50" title="Anexar documento">
                       {uploading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
                       <span className="hidden sm:inline">{uploading ? "Enviando" : "Anexar"}</span>
-                      <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={uploading || selected.status !== "open"} onChange={(e) => void uploadAttachment(e)} className="hidden" />
+                      <input type="file" accept="application/pdf,image/png,image/jpeg" disabled={uploading || selected.status !== "open" || !selected.medical_referral_id} onChange={(e) => void uploadAttachment(e) className="hidden" />
                     </label>
                     <textarea value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={4000} rows={2} disabled={selected.status !== "open"} className="min-w-0 flex-1 resize-y rounded-lg border px-3 py-2 text-sm" placeholder="Digite uma mensagem operacional..." />
                     <button type="submit" disabled={sending || !draft.trim() || selected.status !== "open"} className="inline-flex h-10 items-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white disabled:opacity-50"><Send className="h-4 w-4" /><span className="hidden sm:inline">Enviar</span></button>
