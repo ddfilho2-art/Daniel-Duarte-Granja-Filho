@@ -5,12 +5,17 @@ const DEFAULT_HEADERS = {
 } as const;
 
 function configuredOrigins(): Set<string> {
-  return new Set(
+  const origins = new Set(
     (Deno.env.get("ALLOWED_ORIGINS") ?? "")
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),
   );
+
+  // Production frontend origin must remain allowed even if ALLOWED_ORIGINS
+  // was not configured for this Edge Function deployment.
+  origins.add("https://daniel-duarte-granja-filho.vercel.app");
+  return origins;
 }
 
 export function corsHeaders(request: Request): Record<string, string> | null {
