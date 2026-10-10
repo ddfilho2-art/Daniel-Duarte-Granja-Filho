@@ -91,7 +91,7 @@ Deno.serve(async (request) => {
       return { response, data };
     };
     const calendarPath = "/calendars/" + encodeURIComponent(calendarId);
-    const getConversation = async (conversationId: string) => {
+    const getConversation = async (conversationId: string, requireOpen = true) => {
       if (!UUID.test(conversationId)) throw new Error("invalid_conversation_id");
       const { data: allowed, error: accessError } = await userClient.rpc(
         "can_access_tenant_clinic_conversation", { p_conversation_id: conversationId },
@@ -101,7 +101,7 @@ Deno.serve(async (request) => {
         .select("id,subject,status,clinic_tenant_id,employer_tenant_id")
         .eq("id", conversationId).maybeSingle();
       if (error || !data) throw new Error("conversation_not_found");
-      if (data.status !== "open") throw new Error("conversation_closed");
+      if (requireOpen && data.status !== "open") throw new Error("conversation_closed");
       return data;
     };
     const googleBusy = async (start: string, end: string): Promise<Busy[]> => {
@@ -238,7 +238,7 @@ Deno.serve(async (request) => {
       if (!UUID.test(appointmentId) || reason.length < 3 || reason.length > 1000) throw new Error("invalid_cancellation");
       const { data: appointment, error: appointmentError } = await admin.from("tenant_clinic_appointments").select("*").eq("id", appointmentId).maybeSingle();
       if (appointmentError || !appointment) throw new Error("appointment_not_found");
-      await getConversation(appointment.conversation_id);
+      await getConversation(appointment.conversation_id, false);
       if (appointment.status === "cancelled") return jsonResponse({ success: true, appointmentId, status: "cancelled", requestId: id }, 200, cors);
       if (appointment.google_event_id) {
         const deleted = await google(calendarPath + "/events/" + encodeURIComponent(appointment.google_event_id) + "?sendUpdates=all", { method: "DELETE" });
