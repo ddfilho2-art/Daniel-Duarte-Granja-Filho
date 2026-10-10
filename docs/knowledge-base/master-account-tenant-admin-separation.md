@@ -103,3 +103,15 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - **Correção:** commit d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86 adiciona authorizationLoading à condição de retorno antecipado e isPlatformMasterAdmin às dependências. Alteração restrita à navegação frontend; não modifica autorização de backend, RPCs, RLS ou controles multi-tenant.
 - **Status:** defeito estático corrigido no código. Build, type-check, testes automatizados, teste funcional em navegador e regressão por perfil **não validados**. Deploy Vercel não iniciado e continua manual.
 - **Orientação reutilizável:** se a resolução de rota depende de estado de autorização, o efeito precisa tanto aguardar o carregamento terminar quanto declarar esse estado decisório nas dependências. Não tratar o perfil legado Admin, sozinho, como prova de privilégio Master.
+## Validação funcional do fluxo de login (2026-10-10)
+
+Após o deploy manual do commit `d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86`, o usuário confirmou que o login, a navegação e o carregamento funcionaram no navegador original, no perfil regular do Chrome e no Edge InPrivate. Essa evidência valida o comportamento funcional observado nesses cenários. Build, type-check e testes automatizados continuam sem confirmação; não os marcar como aprovados.
+
+## Incidente relacionado — link “Meu Perfil” oculto no tenant (2026-10-10)
+
+- **Sintoma:** o link “Meu Perfil” não aparecia ao entrar como administrador de um tenant, apesar do requisito de disponibilizá-lo para cada usuário autenticado.
+- **Causa estática identificada:** `src/components/layouts/DashboardLayouts.tsx` só renderizava o link quando `profile?.perfil !== "Candidato"`. A UI usava o perfil legado para ocultar navegação pessoal, embora o acesso ao tenant também seja determinado por membership/roles.
+- **Correção em main:** commit `a48ae30367a6f5d14a5c5cc122e58ee7f54853ad` removeu a condição e passou a exibir o link para todos os usuários que usam o layout compartilhado.
+- **Limites:** nenhuma autorização de backend foi alterada. O link/rota ainda precisa ser verificado após deploy manual nos painéis Admin tenant, RH, Master e Candidato. O portal de Saúde Ocupacional usa uma tela própria, não o layout compartilhado; não afirmar que este commit adiciona o link àquela tela.
+- **Status:** correção implementada no código; build, testes automatizados e validação visual pendentes. Deploy Vercel continua manual.
+
