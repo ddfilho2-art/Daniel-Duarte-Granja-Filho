@@ -28,7 +28,7 @@ import { logCandidaturaEvento } from "../lib/events";
 import { useAuth } from "../contexts/AuthContext";
 import { useVagas } from "../lib/useVagas";
 import { safeFetch } from "../lib/api";
-import { sendVerificationCode } from "../lib/email-verification";
+import { registerCandidateAccount } from "../lib/email-verification";
 import { useTenant } from "../contexts/TenantContext";
 import { resolveAuthorizedHomePath } from "../lib/tenant-access";
 import { loadCurrentCandidate } from "../lib/current-candidate";
@@ -1046,80 +1046,47 @@ export function Cadastro() {
     setSuccessMsg("");
 
     try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email.trim().toLowerCase(),
-        password: formData.senha,
-        options: {
-          data: {
-            nome: formData.nome.trim(),
-            perfil: "Candidato",
-          },
-          // Preserve the company portal base path when Supabase redirects after email confirmation.
-          emailRedirectTo: `${window.location.origin}${window.location.pathname.replace(/\/cadastro\/?$/, "/verify-email")}`,
-        },
-      });
+      const email = formData.email.trim().toLowerCase();
+      const name = formData.nome.trim();
 
-      if (authError) {
-        if (authError.message?.includes("User already registered")) {
-          setError("Este e-mail já possui uma conta. Entre com essa conta ou use a recuperação de senha. Para sua segurança, não criaremos outra conta nem vincularemos automaticamente um cadastro existente.");
-          return;
-        }
-        throw authError;
-      }
+      await registerCandidateAccount(email, name, formData.senha);
 
-      if (!authData.user) {
-        throw new Error("Não foi possível criar a conta.");
-      }
-
-      if (authData.user.identities && authData.user.identities.length === 0) {
-        setError("Este e-mail já pode estar associado a uma conta. Entre com sua conta existente ou recupere a senha. Nenhum novo vínculo com a empresa foi criado.");
-        return;
-      }
-
-      // A trigger do Auth cria o registro em public.users. A ficha de candidato
-      // é criada depois do login, já dentro do tenant correto.
-      // O registro de auditoria precisa ocorrer enquanto a sessão recém-criada
-      // ainda está autenticada; depois do signOut o PostgREST passa a tratar a
-      // requisição como anon e a policy de logs deve rejeitá-la.
       try {
         await logAudit(
           "Cadastro",
           "Candidato",
-          `Novo candidato cadastrado no tenant ${tenant.displayName}: ${formData.nome}.`,
+          "Novo candidato cadastrado no tenant " + tenant.displayName + ": " + name + ".",
         );
       } catch (auditError) {
-        // Audit failure must not turn a successful Auth signup into a false
-        // registration failure. Keep the failure observable for operators.
-        console.error("[CANDIDATE_SIGNUP] Audit logging failed after Auth signup", {
+        console.error("[CANDIDATE_SIGNUP] Audit logging failed", {
           tenantId: tenant.id,
           error: auditError instanceof Error ? auditError.message : "unknown",
         });
       }
 
-      await supabase.auth.signOut();
-
-      sessionStorage.setItem("pending_verify_email", formData.email.trim().toLowerCase());
-      sessionStorage.setItem("pending_verify_name", formData.nome.trim());
-
-      try {
-        await sendVerificationCode(
-          formData.email.trim().toLowerCase(),
-          formData.nome.trim(),
-        );
-      } catch (verificationError) {
-        console.warn(
-          "Falha ao enviar código de confirmação. Usuário poderá reenviar na tela de verificação.",
-          verificationError,
-        );
-      }
+      sessionStorage.setItem("pending_verify_email", email);
+      sessionStorage.setItem("pending_verify_name", name);
 
       navigate("/verify-email", {
         replace: true,
-        state: { email: formData.email.trim().toLowerCase(), name: formData.nome.trim() },
+        state: { email, name },
       });
     } catch (err: any) {
+      const code = String(err?.message || "");
       console.error("Erro no cadastro:", err);
-      setError(err.message || "Erro ao realizar cadastro.");
+      if (code === "EMAIL_ALREADY_REGISTERED") {
+        setError("Este e-mail já possui uma conta. Entre com essa conta ou use a recuperação de senha.");
+      } else if (code === "INVALID_REGISTRATION_INPUT") {
+        setError("Confira seu nome e a senha. A senha deve ter pelo menos 8 caracteres e conter maiúscula, minúscula e número.");
+      } else if (code === "EMAIL_DELIVERY_FAILED") {
+        const email = formData.email.trim().toLowerCase();
+        const name = formData.nome.trim();
+        sessionStorage.setItem("pending_verify_email", email);
+        sessionStorage.setItem("pending_verify_name", name);
+        navigate("/verify-email", { replace: true, state: { email, name, deliveryPending: true } });
+      } else {
+        setError(code || "Erro ao realizar cadastro.");
+      }
     } finally {
       setLoading(false);
     }
