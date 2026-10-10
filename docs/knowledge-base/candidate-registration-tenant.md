@@ -163,3 +163,10 @@ A correção não remove automaticamente contas antigas que ficaram órfãs na v
 - O teste funcional do usuário ainda está pendente; build/type-check e testes automatizados não foram executados. Manter status não validado até analisar o resultado do teste.
 - Essa correção não elimina a restrição de teste do Resend. Para destinatários fora da lista autorizada, será necessário verificar um domínio remetente no Resend e usar um remetente desse domínio.
 - Nenhum deploy Vercel foi realizado.
+
+
+### Recuperação de e-mail bloqueado por cadastro de teste órfão — 2026-10-10
+
+Se o frontend informar `EMAIL_ALREADY_REGISTERED`, consultar primeiro `auth.users` e verificar confirmação, último login e vínculos antes de remover qualquer conta. Neste incidente, o e-mail informado correspondia a uma conta de teste recém-criada, não confirmada, sem login e sem perfil/candidato/membership/role relacionado. A conta específica foi removida e a ausência foi confirmada em Auth e tabelas públicas. Não apagar usuários apenas com base na mensagem do frontend.
+
+A Edge Function `email-verification` versão 12 tenta fazer rollback apenas da conta criada na requisição corrente quando a entrega inicial falha. Após publicação, repetir um teste controlado e conferir logs de rollback se ocorrer erro. A restrição de teste do Resend pode continuar impedindo o envio para destinatários não autorizados.
