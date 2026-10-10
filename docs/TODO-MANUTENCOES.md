@@ -247,3 +247,20 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Validar login Master e navegação entre abas | Aguardando validação | Requer deploy manual e teste em produção |
 | Regressão de autorização e isolamento tenant | Aguardando validação | Não declarar concluído antes dos testes |
 | Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
+
+
+## Manutenção — 2026-10-10 — Loop de login e redirecionamento antes da autorização
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consultar TODO, plano por perfil, Base de Conhecimento e código atual | Concluído | Documentos e fluxo atual de Login/AuthContext/authService consultados na main; AGENTS.md não existe na raiz |
+| Confirmar se a correção mínima já estava aplicada | Concluído | A condição de espera do Login ainda não verificava authorizationLoading; o efeito já o tinha nas dependências |
+| Aguardar autorização antes de resolver destino | Concluído — código na main | Commit d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86 adiciona authorizationLoading à condição de espera |
+| Reagir à decisão de Master no efeito | Concluído — código na main | isPlatformMasterAdmin incluído nas dependências do efeito de Login |
+| Build de produção e type-check | Não validado | Ainda não executados neste ambiente |
+| Testes automatizados de autenticação/navegação | Não validado | Nenhum teste foi executado nesta manutenção |
+| Testes funcionais Master, administrador de tenant, candidato, credenciais inválidas, logout e navegação repetida | Não validado | Requer ambiente de navegador e contas de teste; não presumir validação de produção |
+| Revisão de segurança/RLS e regressão multi-tenant | Em tratamento | Alteração limitada ao efeito de redirecionamento; testes funcionais de regressão ainda pendentes |
+| Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
+
+**Diagnóstico atual:** defeito concreto de redirecionamento prematuro confirmado por inspeção estática e corrigido no código. A relação desse defeito com todos os sintomas (botão aparentemente inoperante, loop e loading interminável) ainda não está confirmada por teste funcional. Manter a manutenção em tratamento até build e testes funcionais.
