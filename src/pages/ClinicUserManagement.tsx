@@ -98,7 +98,9 @@ export function ClinicUserManagement() {
     const { error: rpcError } = await supabase.rpc("save_my_clinic_calendar_integration", {
       p_tenant_id: tenantId, p_calendar_id: calendarId.trim(), p_timezone: calendarTimezone.trim(),
     });
-    if (rpcError) setError("Não foi possível salvar o calendário. Confira o ID do calendário e o fuso horário.");
+    if (rpcError?.message?.includes("calendar_has_active_appointments")) {
+      setError("Não é possível trocar o ID do calendário enquanto existem agendamentos ativos. Cancele ou conclua os agendamentos antes de mudar o calendário.");
+    } else if (rpcError) setError("Não foi possível salvar o calendário. Confira o ID do calendário e o fuso horário.");
     else setNotice("Calendário da clínica salvo. A integração também exige credenciais OAuth configuradas nos secrets do Supabase.");
     setCalendarSaving(false);
   };
