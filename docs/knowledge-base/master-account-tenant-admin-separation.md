@@ -94,3 +94,12 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - Mudança: commit 16802dd31fda066c235c67815284a52ecbc03736 adiciona o estado de autorização à condição de espera e às dependências do efeito.
 - Segurança: não foram alteradas RPCs, RLS ou permissões; a rota continua protegida pelo ProtectedRoute.
 - Status: hipótese de redirecionamento prematuro mitigada por código, aguardando build e teste de produção. Não declarar a causa-raiz definitivamente confirmada até validar login e navegação.
+
+
+## Incidente — efeito Login não aguardava o término da autorização (2026-10-10)
+
+- **Sintoma investigado:** login Master pode navegar para o destino antes de a autorização global terminar; o usuário também relatou cliques inicialmente sem resposta e loading persistente. Esses sintomas mais amplos ainda não foram reproduzidos nesta manutenção.
+- **Evidência concreta:** na main, src/pages/Public.tsx já tinha authorizationLoading nas dependências do efeito Login, mas a condição de espera não o verificava. O destino depende de isPlatformMasterAdmin, que também estava ausente das dependências do efeito.
+- **Correção:** commit d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86 adiciona authorizationLoading à condição de retorno antecipado e isPlatformMasterAdmin às dependências. Alteração restrita à navegação frontend; não modifica autorização de backend, RPCs, RLS ou controles multi-tenant.
+- **Status:** defeito estático corrigido no código. Build, type-check, testes automatizados, teste funcional em navegador e regressão por perfil **não validados**. Deploy Vercel não iniciado e continua manual.
+- **Orientação reutilizável:** se a resolução de rota depende de estado de autorização, o efeito precisa tanto aguardar o carregamento terminar quanto declarar esse estado decisório nas dependências. Não tratar o perfil legado Admin, sozinho, como prova de privilégio Master.
