@@ -63,6 +63,25 @@ Deno.serve(async (request) => {
 
     const body = await readJsonBody<RequestBody>(request);
     const action = body.action;
+    let preConversationId = String(body.conversationId || "");
+    if (action === "reschedule" || action === "cancel") {
+      const appointmentId = String(body.appointmentId || "");
+      if (!UUID.test(appointmentId)) return jsonResponse({ success: false, code: "INVALID_APPOINTMENT_ID", requestId: id }, 400, cors);
+      const { data: appointment } = await admin.from("tenant_clinic_appointments")
+        .select("conversation_id").eq("id", appointmentId).maybeSingle();
+      if (!appointment) return jsonResponse({ success: false, code: "APPOINTMENT_NOT_FOUND", requestId: id }, 404, cors);
+      preConversationId = appointment.conversation_id;
+    }
+    if (!UUID.test(preConversationId)) return jsonResponse({ success: false, code: "INVALID_CONVERSATION_ID", requestId: id }, 400, cors);
+    const { data: preAuthorized, error: preAuthorizationError } = await userClient.rpc(
+      "can_access_tenant_clinic_conversation", { p_conversation_id: preConversationId },
+    );
+    if (preAuthorizationError || !preAuthorized) return jsonResponse({ success: false, code: "CONVERSATION_ACCESS_DENIED", requestId: id }, 403, cors);
+    const { data: preConversation } = await admin.from("tenant_clinic_conversations")
+      .select("status").eq("id", preConversationId).maybeSingle();
+    if (!preConversation) return jsonResponse({ success: false, code: "CONVERSATION_NOT_FOUND", requestId: id }, 404, cors);
+    if (action !== "cancel" && preConversation.status !== "open") return jsonResponse({ success: false, code: "CONVERSATION_CLOSED", requestId: id }, 409, cors);
+
     let calendarId = "";
     let calendarPath = "";
     const clientId = env("GOOGLE_CLIENT_ID");
