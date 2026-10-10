@@ -503,6 +503,7 @@ async function createMember(
     let authUser = authList.users.find(
       (candidate) => candidate.email?.toLowerCase() === normalizedEmail
     );
+    let createdAuthUserInThisRequest = false;
 
     if (!authUser) {
       const { data: createdAuth, error: createAuthError } =
@@ -516,6 +517,7 @@ async function createMember(
       }
 
       authUser = createdAuth.user;
+      createdAuthUserInThisRequest = true;
     }
 
     const userId = authUser.id;
@@ -527,7 +529,15 @@ async function createMember(
       .maybeSingle();
     if (existingProfileError) throw existingProfileError;
 
-    if (existingProfile && existingProfile.perfil !== "RH") {
+    // The Auth user creation trigger may have already inserted a default
+    // "Candidato" row in public.users for the brand-new Auth user. It is safe
+    // to promote that trigger-created row only when this request itself created
+    // the Auth account. Never convert a pre-existing candidate/other profile.
+    if (
+      existingProfile &&
+      existingProfile.perfil !== "RH" &&
+      !createdAuthUserInThisRequest
+    ) {
       return {
         success: false,
         code: "PROFILE_CONFLICT",
