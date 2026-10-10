@@ -63,6 +63,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   INVALID_STATUS: "Status inválido.",
   LOGIN_ALREADY_EXISTS: "Este login já está em uso.",
   EMAIL_ALREADY_EXISTS: "Este e-mail já está em uso.",
+  EMAIL_CHECK_FAILED: "Não foi possível verificar se o e-mail já está em uso. Tente novamente.",
+  AUTH_USER_NOT_FOUND: "Não foi possível localizar a conta de autenticação deste usuário. Solicite suporte.",
+  EMAIL_SYNC_REQUIRED: "A autenticação foi atualizada, mas o perfil não foi sincronizado. Não repita a operação; solicite suporte.",
+
   PROFILE_CONFLICT:
     "Este e-mail já pertence a uma conta incompatível ou vinculada a outra empresa. Use uma conta RH autorizada ou solicite suporte.",
   MEMBERSHIP_NOT_ACTIVE:
