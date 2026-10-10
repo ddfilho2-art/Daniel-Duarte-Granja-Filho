@@ -94,6 +94,12 @@ export function ClinicUserManagement() {
   const saveCalendar = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!tenantId) return;
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: calendarTimezone.trim() }).format(new Date());
+    } catch {
+      setError("Informe um fuso horário IANA válido, por exemplo America/Sao_Paulo.");
+      return;
+    }
     setCalendarSaving(true); setError(""); setNotice("");
     const { error: rpcError } = await supabase.rpc("save_my_clinic_calendar_integration", {
       p_tenant_id: tenantId, p_calendar_id: calendarId.trim(), p_timezone: calendarTimezone.trim(),
