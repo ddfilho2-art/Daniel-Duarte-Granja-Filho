@@ -59,3 +59,11 @@ O trigger de criação de usuário gera uma linha padrão em `public.users` com 
 **Limites da validação:** o commit foi gravado no GitHub, mas ainda não houve execução de testes, publicação da Edge Function nem teste funcional após deploy. Portanto, o ajuste está **implementado no código da branch, não validado**. O HTTP 401 também pode ocorrer no gateway antes de a função executar; conferir logs de invocação e o corpo/status retornado após publicar antes de atribuir causa definitiva.
 
 **Problema correlato, separado:** a investigação anterior identificou uma requisição `OPTIONS` de `email-verification` respondendo 403 por política de CORS. Esta alteração não corrige CORS nem o fluxo de confirmação de candidatos. Não liberar origens indiscriminadamente; confirmar a origem exata e a configuração `ALLOWED_ORIGINS` em uma manutenção própria.
+
+
+### Publicação do ajuste de 401 — 2026-10-10
+
+- **Concluído:** Edge Function `admin-users` publicada no projeto Supabase `dmzagrakkduddofkqjhg`, versão **13**, status `ACTIVE`, mantendo `verify_jwt=true`.
+- **Concluído:** leitura posterior da função ativa confirmou a presença de `auth.getUser(token)` e do evento estruturado `admin_users_identity_validation_failed`.
+- **Pendente:** teste funcional com uma sessão real de administrador RH/tenant após a publicação. Não foi criada conta de teste nem alterada qualquer conta existente.
+- **Pendente:** investigar separadamente o CORS 403 do `email-verification`; esta publicação não o altera.
