@@ -63,7 +63,8 @@ Deno.serve(async (request) => {
 
     const body = await readJsonBody<RequestBody>(request);
     const action = body.action;
-    const calendarId = env("GOOGLE_CALENDAR_ID");
+    let calendarId = "";
+    let calendarPath = "";
     const clientId = env("GOOGLE_CLIENT_ID");
     const clientSecret = env("GOOGLE_CLIENT_SECRET");
     const refreshToken = env("GOOGLE_REFRESH_TOKEN");
@@ -90,7 +91,6 @@ Deno.serve(async (request) => {
       try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON response */ }
       return { response, data };
     };
-    const calendarPath = "/calendars/" + encodeURIComponent(calendarId);
     const getConversation = async (conversationId: string, requireOpen = true) => {
       if (!UUID.test(conversationId)) throw new Error("invalid_conversation_id");
       const { data: allowed, error: accessError } = await userClient.rpc(
@@ -103,6 +103,14 @@ Deno.serve(async (request) => {
       if (error || !data) throw new Error("conversation_not_found");
       if (requireOpen && data.status !== "open") throw new Error("conversation_closed");
       return data;
+    };
+    const setCalendarForTenant = async (clinicTenantId: string) => {
+      const { data: config, error } = await admin!.from("tenant_clinic_calendar_integrations")
+        .select("calendar_id,timezone,enabled").eq("clinic_tenant_id", clinicTenantId).maybeSingle();
+      if (error || !config || !config.enabled || !config.calendar_id) throw new Error("clinic_calendar_not_configured");
+      calendarId = config.calendar_id;
+      calendarPath = "/calendars/" + encodeURIComponent(calendarId);
+      return config;
     };
     const googleBusy = async (start: string, end: string): Promise<Busy[]> => {
       const { response, data } = await google("/freeBusy", {
@@ -130,6 +138,7 @@ Deno.serve(async (request) => {
     if (action === "availability") {
       const conversationId = String(body.conversationId || "");
       const conversation = await getConversation(conversationId);
+      await setCalendarForTenant(conversation.clinic_tenant_id);
       const start = iso(body.timeMin), end = iso(body.timeMax);
       if (new Date(end).getTime() <= new Date(start).getTime() ||
           new Date(end).getTime() - new Date(start).getTime() > 7 * 24 * 60 * 60 * 1000) {
@@ -155,6 +164,7 @@ Deno.serve(async (request) => {
     if (action === "book") {
       const conversationId = String(body.conversationId || "");
       const conversation = await getConversation(conversationId);
+      await setCalendarForTenant(conversation.clinic_tenant_id);
       const start = iso(body.startsAt), end = iso(body.endsAt), timezone = String(body.timezone || "");
       validateTimezone(timezone); checkWindow(start, end);
       const idempotencyKey = String(body.idempotencyKey || "");
@@ -211,6 +221,7 @@ Deno.serve(async (request) => {
       const { data: old, error: oldError } = await admin.from("tenant_clinic_appointments").select("*").eq("id", appointmentId).maybeSingle();
       if (oldError || !old) throw new Error("appointment_not_found");
       const conversation = await getConversation(old.conversation_id);
+      await setCalendarForTenant(conversation.clinic_tenant_id);
       const start = iso(body.startsAt), end = iso(body.endsAt), timezone = String(body.timezone || "");
       validateTimezone(timezone); checkWindow(start, end);
       const [gBusy, dBusy] = await Promise.all([
@@ -249,7 +260,8 @@ Deno.serve(async (request) => {
       if (!UUID.test(appointmentId) || reason.length < 3 || reason.length > 1000) throw new Error("invalid_cancellation");
       const { data: appointment, error: appointmentError } = await admin.from("tenant_clinic_appointments").select("*").eq("id", appointmentId).maybeSingle();
       if (appointmentError || !appointment) throw new Error("appointment_not_found");
-      await getConversation(appointment.conversation_id, false);
+      const conversation = await getConversation(appointment.conversation_id, false);
+      await setCalendarForTenant(conversation.clinic_tenant_id);
       if (appointment.status === "cancelled") return jsonResponse({ success: true, appointmentId, status: "cancelled", requestId: id }, 200, cors);
       if (appointment.google_event_id) {
         const deleted = await google(calendarPath + "/events/" + encodeURIComponent(appointment.google_event_id) + "?sendUpdates=all", { method: "DELETE" });
