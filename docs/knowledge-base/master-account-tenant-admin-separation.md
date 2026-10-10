@@ -86,3 +86,11 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - Commit `62f44baa985fc7e1c1ab52d7207209c6b496ea5c` adiciona logs start/finish e duração das duas RPCs em `src/contexts/AuthContext.tsx`. Nenhuma regra de autorização foi enfraquecida e nenhum deploy Vercel foi realizado.
 - Próximo passo: depois do deploy manual, coletar `phase: start/finish` para identificar a chamada pendente ou com erro. Se ambas finalizarem, investigar os redirecionamentos do `ProtectedRoute`.
 - Status: instrumentação commitada; causa-raiz, build, testes funcionais e regressão aguardam validação.
+
+
+## Login — evitar navegação antes da autorização global
+
+- Evidência: logs de produção enviados em 2026-10-10 mostraram as RPCs is_platform_master_admin e get_current_clinic_access finalizando rapidamente sem erro. Na inspeção de src/pages/Public.tsx, o efeito do componente Login não aguardava authorizationLoading antes de chamar resolveAuthorizedHomePath. Para perfil legado Admin, isso pode calcular /admin antes de confirmar o papel global Master e provocar navegação intermediária.
+- Mudança: commit 16802dd31fda066c235c67815284a52ecbc03736 adiciona o estado de autorização à condição de espera e às dependências do efeito.
+- Segurança: não foram alteradas RPCs, RLS ou permissões; a rota continua protegida pelo ProtectedRoute.
+- Status: hipótese de redirecionamento prematuro mitigada por código, aguardando build e teste de produção. Não declarar a causa-raiz definitivamente confirmada até validar login e navegação.
