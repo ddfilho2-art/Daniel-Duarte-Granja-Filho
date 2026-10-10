@@ -86,6 +86,7 @@ Deno.serve(async(req)=>{
    if(authUpdate)throw new Error("AUTH_EMAIL_UPDATE_FAILED");
    const {error:profileUpdate}=await admin.from("users").update({email,login:email.split("@")[0],login_lower:email.split("@")[0].toLowerCase(),updated_at:new Date().toISOString()}).eq("id",uid);
    if(profileUpdate)throw new Error("PROFILE_EMAIL_UPDATE_FAILED");
+   await admin.from("tenant_audit_logs").insert({tenant_id:tenantId,actor_id:auth.user.id,action:"clinic.user.email_updated",resource_type:"tenant_membership",resource_id:uid,details:{}});
    return jsonResponse({success:true},200,cors);
   }
   return jsonResponse({success:false,code:"INVALID_ACTION",requestId:request},400,cors);
