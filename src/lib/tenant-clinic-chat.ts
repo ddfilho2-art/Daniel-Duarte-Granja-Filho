@@ -70,3 +70,56 @@ export async function getTenantClinicAttachmentUrl(conversationId: string, stora
   if (error || !data?.success || !data.downloadUrl) throw new Error("Download não autorizado.");
   return String(data.downloadUrl);
 }
+
+export type TenantClinicAppointment = {
+  id: string;
+  conversation_id: string;
+  starts_at: string;
+  ends_at: string;
+  timezone: string;
+  status: "pending" | "confirmed" | "cancelled" | "failed";
+  google_event_id: string | null;
+  created_by: string;
+  created_at: string;
+  cancellation_reason: string | null;
+};
+export type BusyInterval = { start: string; end: string };
+
+async function calendarAction(body: Record<string, unknown>) {
+  const { data, error } = await supabase.functions.invoke("google-calendar-appointments", { body });
+  if (error || !data?.success) {
+    const code = String(data?.code || error?.message || "CALENDAR_OPERATION_FAILED");
+    if (code.includes("APPOINTMENT_SLOT_CONFLICT")) throw new Error("Esse horário acabou de ficar indisponível. Consulte os horários novamente.");
+    if (code.includes("GOOGLE_") || code.includes("missing_secret")) throw new Error("A integração com Google Calendar ainda não está configurada ou não conseguiu concluir a operação.");
+    throw new Error("Não foi possível concluir a operação de agenda.");
+  }
+  return data;
+}
+export async function getTenantClinicAvailability(conversationId: string, timeMin: string, timeMax: string) {
+  const data = await calendarAction({ action: "availability", conversationId, timeMin, timeMax });
+  return (data.busy || []) as BusyInterval[];
+}
+export async function listTenantClinicAppointments(conversationId: string) {
+  const { data, error } = await supabase.rpc("list_tenant_clinic_appointments", { p_conversation_id: conversationId });
+  if (error) throw new Error("Não foi possível carregar os agendamentos desta conversa.");
+  return (data || []) as TenantClinicAppointment[];
+}
+export async function bookTenantClinicAppointment(input: {
+  conversationId: string; startsAt: string; endsAt: string; timezone: string; idempotencyKey: string;
+}) {
+  return calendarAction({
+    action: "book", conversationId: input.conversationId, startsAt: input.startsAt,
+    endsAt: input.endsAt, timezone: input.timezone, idempotencyKey: input.idempotencyKey,
+  });
+}
+export async function rescheduleTenantClinicAppointment(input: {
+  appointmentId: string; startsAt: string; endsAt: string; timezone: string;
+}) {
+  return calendarAction({
+    action: "reschedule", appointmentId: input.appointmentId, startsAt: input.startsAt,
+    endsAt: input.endsAt, timezone: input.timezone,
+  });
+}
+export async function cancelTenantClinicAppointment(appointmentId: string, reason: string) {
+  return calendarAction({ action: "cancel", appointmentId, reason });
+}
