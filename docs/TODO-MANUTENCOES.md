@@ -519,3 +519,10 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 
 
 **Reforço de segurança incluído no lote (2026-10-10):** o upload/download de ASO no chat exige vínculo a encaminhamento médico e valida autorização do encaminhamento; cada tenant clínico tem configuração própria de Calendar ID/fuso; a agenda verifica autorização antes do OAuth e não inclui assunto livre/dados pessoais no título do evento. Esses reforços também permanecem **não validados por testes**.
+
+
+### Última atualização do lote (2026-10-10)
+
+- Implementados no código os controles de anexos ASO vinculados a encaminhamento, gestão de usuários por tenant clínico e configuração/agenda Google Calendar por clínica.
+- Migrations adicionais: `20261010163000_get_clinic_calendar_timezone.sql`, `20261010170000_guard_calendar_change_with_active_appointments.sql` e `20261010171000_hide_attachments_for_inaccessible_referrals.sql`.
+- **Status geral permanece: em tratamento / não validado.** Nenhum teste automatizado, build ou type-check foi executado; a validação consolidada fica para o usuário. O OAuth ainda exige secrets no Supabase.
