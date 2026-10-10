@@ -44,3 +44,18 @@ O trigger de criação de usuário gera uma linha padrão em `public.users` com 
 6. Executar build/type-check e testes automatizados; não marcá-los como aprovados sem execução real.
 
 **Deploy Vercel:** permanece manual, sob controle do usuário. A Edge Function Supabase é implantada separadamente.
+
+
+## Aditivo — HTTP 401 ao consultar/criar usuários RH (2026-10-10)
+
+**Nova evidência:** a tentativa recente reportada pelo usuário retorna HTTP 401 na chamada a `/functions/v1/admin-users`. Este sintoma é diferente do HTTP 400 por `PROFILE_CONFLICT` descrito acima e não deve ser tratado como se fosse a mesma falha.
+
+**Ajuste de código nesta branch de manutenção:**
+- `supabase/functions/admin-users/index.ts`: a validação de identidade agora chama explicitamente `userClient.auth.getUser(token)`, em vez de depender apenas do cabeçalho global do cliente. Isso remove a ambiguidade de fornecer o token à operação de validação.
+- A falha de validação gera log estruturado com status/código de Auth, sem registrar o token, e retorna `401 UNAUTHORIZED` para credencial inválida ou `503 IDENTITY_VALIDATION_UNAVAILABLE` para falha transitória de validação.
+- Commit: `20ac9cc57cd0de48b8b5b227a26cf11726e2f754`.
+- Branch: `maintenance/auth-email-flow-2026-10-10`.
+
+**Limites da validação:** o commit foi gravado no GitHub, mas ainda não houve execução de testes, publicação da Edge Function nem teste funcional após deploy. Portanto, o ajuste está **implementado no código da branch, não validado**. O HTTP 401 também pode ocorrer no gateway antes de a função executar; conferir logs de invocação e o corpo/status retornado após publicar antes de atribuir causa definitiva.
+
+**Problema correlato, separado:** a investigação anterior identificou uma requisição `OPTIONS` de `email-verification` respondendo 403 por política de CORS. Esta alteração não corrige CORS nem o fluxo de confirmação de candidatos. Não liberar origens indiscriminadamente; confirmar a origem exata e a configuração `ALLOWED_ORIGINS` em uma manutenção própria.
