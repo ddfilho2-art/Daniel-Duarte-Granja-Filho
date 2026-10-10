@@ -258,12 +258,12 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Aguardar autorização antes de resolver destino | Concluído — código na main | Commit d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86 adiciona authorizationLoading à condição de espera |
 | Reagir à decisão de Master no efeito | Concluído — código na main | isPlatformMasterAdmin incluído nas dependências do efeito de Login |
 | Build de produção e type-check | Não validado | Ainda não executados neste ambiente |
-| Testes automatizados de autenticação/navegação | Não validado | Nenhum teste foi executado nesta manutenção |
-| Testes funcionais Master, administrador de tenant, candidato, credenciais inválidas, logout e navegação repetida | Não validado | Requer ambiente de navegador e contas de teste; não presumir validação de produção |
-| Revisão de segurança/RLS e regressão multi-tenant | Em tratamento | Alteração limitada ao efeito de redirecionamento; testes funcionais de regressão ainda pendentes |
-| Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
+| Testes automatizados de autenticação/navegação | Não validado | Nenhum teste automatizado foi executado nesta manutenção |
+| Testes funcionais de login e navegação | Concluído — validação manual | Usuário confirmou funcionamento no navegador original, perfil regular do Chrome e Edge InPrivate |
+| Regressão funcional de autorização e isolamento multi-tenant | Concluído — validação manual básica | Fluxo de acesso e navegação confirmados pelo usuário; testes formais de segurança/RLS continuam pendentes |
+| Deploy Vercel | Concluído — confirmação do usuário | Deploy manual realizado antes da validação funcional |
 
-**Diagnóstico atual:** defeito concreto de redirecionamento prematuro confirmado por inspeção estática e corrigido no código. A relação desse defeito com todos os sintomas (botão aparentemente inoperante, loop e loading interminável) ainda não está confirmada por teste funcional. Manter a manutenção em tratamento até build e testes funcionais.
+**Diagnóstico atual:** o ajuste de redirecionamento prematuro foi validado funcionalmente nos ambientes informados pelo usuário. Build, type-check e testes automatizados permanecem não validados; não registrar essas verificações como aprovadas.
 ## Manutenção — Meu Perfil ausente no painel do administrador de tenant (2026-10-10)
 
 **Sintoma relatado:** ao entrar no portal de uma empresa como administrador do tenant, o link “Meu Perfil”, que deveria aparecer para cada pessoa autenticada, não era exibido.
