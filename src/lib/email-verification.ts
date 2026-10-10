@@ -15,17 +15,15 @@ interface VerificationResponse {
 
 export async function sendVerificationCode(
   email: string,
-  _name?: string,
-  captchaToken?: string,
+  _name?: string
 ): Promise<void> {
   const { data, error } = await supabase.functions.invoke<VerificationResponse>(
     "email-verification",
     {
       body: {
         action: "request",
-        email: email.trim().toLowerCase(),
-        captchaToken,
-      },
+        email: email.trim().toLowerCase()
+},
     },
   );
 
