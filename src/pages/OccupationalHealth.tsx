@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { Link } from "react-router-dom";
 import {
   uploadMedicalAttachment,
   getMedicalAttachmentUrl,
@@ -360,7 +361,10 @@ export function OccupationalHealthPortal() {
             <h1 className="text-3xl font-bold text-slate-900">Encaminhamentos médicos</h1>
             <p className="mt-2 text-sm text-slate-600">Acesse somente os candidatos formalmente encaminhados à sua clínica.</p>
           </div>
-          <button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Atualizar</button>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/saude-ocupacional/conversas" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Conversas com empresas</Link>
+            <button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Atualizar</button>
+          </div>
         </header>
 
         <section className="mb-8 grid gap-4 sm:grid-cols-3">
