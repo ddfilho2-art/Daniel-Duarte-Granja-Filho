@@ -213,7 +213,7 @@ Deno.serve(async (request) => {
           }
           throw createUserError;
         }
-        createdUserId = createdUser.user?.id ?? null;
+        createdUserId = createdUser?.user?.id ?? null;
         if (!createdUserId) throw new Error("candidate_signup_user_id_missing");
       }
 
