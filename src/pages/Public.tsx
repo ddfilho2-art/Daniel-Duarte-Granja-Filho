@@ -1273,6 +1273,7 @@ export function Login() {
       authLoading ||
       profileLoading ||
       tenantMembershipLoading ||
+      authorizationLoading ||
       !user ||
       !profile
     ) {
@@ -1311,6 +1312,7 @@ export function Login() {
     clinicRoles,
     hasTenantAccess,
     canAdministerTenant,
+    isPlatformMasterAdmin,
     isTenantRoute,
     navigate,
   ]);
