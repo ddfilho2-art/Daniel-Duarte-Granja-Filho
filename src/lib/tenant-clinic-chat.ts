@@ -5,7 +5,7 @@ const MAX_BYTES = 10 * 1024 * 1024;
 const MIME_TYPES = new Set(["application/pdf", "image/png", "image/jpeg"]);
 
 export type TenantClinicConversation = {
-  id: string; employer_tenant_id: string; clinic_tenant_id: string; subject: string;
+  id: string; employer_tenant_id: string; clinic_tenant_id: string; employer_name: string; clinic_name: string; subject: string;
   job_id: string | null; job_title_snapshot: string | null; medical_referral_id: string | null;
   status: "open" | "closed"; created_by: string; created_at: string; updated_at: string;
   last_message_at: string; last_message: string | null; last_sender_side: "employer" | "clinic" | null;
@@ -20,7 +20,7 @@ export type TenantClinicAttachment = {
 };
 
 export async function listTenantClinicConversations() {
-  const { data, error } = await supabase.rpc("list_tenant_clinic_conversations");
+  const { data, error } = await supabase.rpc("list_tenant_clinic_conversations_v2");
   if (error) throw new Error("Não foi possível carregar as conversas com a Saúde Ocupacional.");
   return (data || []) as TenantClinicConversation[];
 }
