@@ -1033,8 +1033,6 @@ async function handleRequest(
           };
         } else {
           const normalizedEmail = body.email.trim().toLowerCase();
-          const { data: existingAuthUsers, error: existingAuthError } =
-            await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
 
           // createMember owns the authoritative profile/membership checks.
           // A blanket Auth-email rejection here prevented safe retries.
