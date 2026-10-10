@@ -257,3 +257,11 @@ cookies ou o currículo.
 - Cada tenant clínico configura seu próprio `calendar_id` e `timezone` por RPC/tela administrativa. OAuth é comum à conta de integração e deve ter acesso ao calendário configurado. Secrets necessários: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`.
 - A gestão de usuários da clínica exige papel `clinic_admin` naquele tenant e altera apenas memberships com papel `clinic_staff`. O administrador da empresa continua com o rótulo `Gestão de Usuários de RH`.
 - Código e migrations registrados não equivalem a validação: build, type-check, aplicação das migrations, testes de isolamento e e2e ainda estão pendentes.
+
+
+### Reforço de privacidade do ASO e calendário (2026-10-10)
+
+- Anexo de ASO/documento médico no chat entre tenants só é permitido quando a conversa tem `medical_referral_id` válido e o usuário passa novamente por `can_access_medical_referral` no upload/download. Conversa genérica sem encaminhamento não pode receber anexo médico.
+- A seleção do encaminhamento no frontend é apenas conveniência; a RPC `create_tenant_clinic_conversation` revalida empresa, clínica e contrato.
+- Calendar ID e fuso são configurados por tenant clínico. Não compartilhar um calendário entre clínicas por meio de um secret global.
+- A função de agenda deve validar o acesso à conversa antes de renovar o token OAuth; eventos Google não devem conter assunto livre, nome de candidato ou informação clínica.
