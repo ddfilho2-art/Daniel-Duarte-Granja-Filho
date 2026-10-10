@@ -363,6 +363,7 @@ export function OccupationalHealthPortal() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/saude-ocupacional/conversas" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Conversas com empresas</Link>
+            <Link to="/saude-ocupacional/usuarios" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Gestão de Usuários</Link>
             <button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Atualizar</button>
           </div>
         </header>
