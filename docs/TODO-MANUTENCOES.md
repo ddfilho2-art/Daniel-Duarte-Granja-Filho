@@ -435,3 +435,15 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Nenhum deploy Vercel realizado; mudança atual é somente na Edge Function |
 
 **Status geral atualizado:** correção integrada e Edge Function publicada. A manutenção permanece **em tratamento / não validada** até o teste funcional do usuário. A publicação não contorna o HTTP 403 de restrição do Resend.
+
+
+## Recuperação do e-mail de teste informado como já cadastrado — 2026-10-10
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Investigar o e-mail em Auth e tabelas públicas | Concluído | Encontrada conta Auth não confirmada, sem último login, sem perfil/candidato/membership/role associado; identidade do provedor era `email` |
+| Remover conta órfã do teste anterior | Concluído | Excluída somente a linha cujo ID era `8b586ce0-d5d8-42bf-9351-63747843d2ff`, e-mail exato, sem confirmação e sem login; verificação posterior retornou zero em Auth users, identities, public.users e candidatos |
+| Corrigir causa de falhas futuras de envio | Concluído — Edge Function publicada | Versão 12 tenta remover apenas o usuário criado na mesma tentativa se o primeiro envio falhar |
+| Repetir cadastro controlado | Aguardando usuário | Fazer uma única tentativa e compartilhar o resultado; Resend ainda pode rejeitar destinatários não autorizados no domínio de teste |
+
+**Status:** registro órfão de teste removido e ausência confirmada. Teste completo de cadastro ainda pendente.
