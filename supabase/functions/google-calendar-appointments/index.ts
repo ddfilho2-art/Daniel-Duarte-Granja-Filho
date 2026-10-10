@@ -127,6 +127,7 @@ Deno.serve(async (request) => {
       const { data: config, error } = await admin!.from("tenant_clinic_calendar_integrations")
         .select("calendar_id,timezone,enabled").eq("clinic_tenant_id", clinicTenantId).maybeSingle();
       if (error || !config || !config.enabled || !config.calendar_id) throw new Error("clinic_calendar_not_configured");
+      validateTimezone(String(config.timezone || ""));
       calendarId = config.calendar_id;
       calendarPath = "/calendars/" + encodeURIComponent(calendarId);
       return config;
