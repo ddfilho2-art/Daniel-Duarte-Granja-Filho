@@ -39,6 +39,7 @@ const OccupationalHealthPortal = lazyNamed(
   "OccupationalHealthPortal",
 );
 const TenantClinicChat = lazyNamed(() => import("./pages/TenantClinicChat"), "TenantClinicChat");
+const ClinicUserManagement = lazyNamed(() => import("./pages/ClinicUserManagement"), "ClinicUserManagement");
 
 const MasterDashboard = lazyNamed(() => import("./pages/Master"), "MasterDashboard");
 const MasterTenantList = lazyNamed(() => import("./pages/Master"), "MasterTenantList");
@@ -330,6 +331,15 @@ const App = () => {
               element={
                 <ProtectedRoute allowedProfiles={["Clinica"]}>
                   <TenantClinicChat isClinic />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/saude-ocupacional/usuarios"
+              element={
+                <ProtectedRoute allowedProfiles={["Clinica"]}>
+                  <ClinicUserManagement />
                 </ProtectedRoute>
               }
             />
