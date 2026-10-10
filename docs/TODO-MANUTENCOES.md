@@ -223,3 +223,15 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
 
 **Status:** correção anterior substituída por ajuste para evitar sincronizações duplicadas. Não declarar resolvido até teste funcional.
+
+
+## Investigação em andamento — autorização sem conclusão (2026-10-10)
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Registrar evidência de produção | Concluído | Console mostra sessão presente e início de ambas as RPCs; não mostra conclusão/erro/duração |
+| Instrumentar duração/resultado das RPCs | Concluído — código na main | Commit 62f44baa985fc7e1c1ab52d7207209c6b496ea5c; logs start/finish para is_platform_master_admin e get_current_clinic_access |
+| Confirmar qual etapa fica pendente | Aguardando validação | Requer deploy manual Vercel e captura dos novos logs |
+| Corrigir causa-raiz com menor mudança segura | Não iniciado | Depende da medição; não conceder acesso por timeout nem remover autorização |
+| Build/type-check/testes de regressão | Aguardando validação | Ainda não executados nesta manutenção |
+| Deploy Vercel | Não iniciado | Manual e sob controle do usuário |
