@@ -9,7 +9,7 @@ import {
 } from "shared/http.ts";
 
 type VerificationRequest =
-  | { action: "request"; email?: string; captchaToken?: string }
+  | { action: "request"; email?: string }
   | {
       action: "verify";
       email?: string;
@@ -45,31 +45,6 @@ function escapeHtml(value: string): string {
     };
     return entities[character];
   });
-}
-
-async function verifyCaptcha(token: string | undefined, ip: string): Promise<boolean> {
-  const secret = Deno.env.get("TURNSTILE_SECRET_KEY")?.trim();
-  const environment = Deno.env.get("ENVIRONMENT")?.trim().toLowerCase();
-
-  if (!secret) {
-    if (environment === "local" || environment === "development") return true;
-    throw new Error("missing_secret:TURNSTILE_SECRET_KEY");
-  }
-  if (!token) return false;
-
-  const response = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ secret, response: token, remoteip: ip }),
-      signal: AbortSignal.timeout(8_000),
-    },
-  );
-
-  if (!response.ok) return false;
-  const result = (await response.json()) as { success?: boolean };
-  return result.success === true;
 }
 
 async function sendCode(email: string, name: string, code: string): Promise<void> {
@@ -170,14 +145,6 @@ Deno.serve(async (request) => {
           },
           429,
           { ...cors, "Retry-After": String(ipLimit.retry_after) },
-        );
-      }
-
-      if (!(await verifyCaptcha(body.captchaToken, ip))) {
-        return jsonResponse(
-          { success: false, code: "CAPTCHA_FAILED", requestId: currentRequestId },
-          400,
-          cors,
         );
       }
 
