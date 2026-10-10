@@ -51,15 +51,16 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     try {
       const data = await listTenantClinicConversations();
       setConversations(data);
-      if (!keepSelection || !data.some((item) => item.id === selectedId)) {
-        setSelectedId(data[0]?.id || "");
-      }
+      setSelectedId((current) => {
+        if (keepSelection && data.some((item) => item.id === current)) return current;
+        return data[0]?.id || "";
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Não foi possível carregar as conversas.");
     } finally {
       setLoading(false);
     }
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => { void refreshConversations(false); }, [refreshConversations]);
 
