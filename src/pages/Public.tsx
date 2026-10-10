@@ -1076,6 +1076,8 @@ export function Cadastro() {
       console.error("Erro no cadastro:", err);
       if (code === "EMAIL_ALREADY_REGISTERED") {
         setError("Este e-mail já possui uma conta. Entre com essa conta ou use a recuperação de senha.");
+      } else if (code === "RATE_LIMITED") {
+        setError("Muitas solicitações de código. Aguarde alguns minutos antes de tentar novamente.");
       } else if (code === "INVALID_REGISTRATION_INPUT") {
         setError("Confira seu nome e a senha. A senha deve ter pelo menos 8 caracteres e conter maiúscula, minúscula e número.");
       } else if (code === "EMAIL_DELIVERY_FAILED") {
