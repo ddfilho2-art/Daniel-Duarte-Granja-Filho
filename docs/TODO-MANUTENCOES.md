@@ -285,18 +285,23 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 
 **URL reportada:** `/empresa/exemplostore/cadastro`.
 
-**Causa identificada por inspeção estática:** o componente `Cadastro` em `src/pages/Public.tsx` referenciava `authorizationLoading` e `isPlatformMasterAdmin` no `useEffect` e na lista de dependências, mas não os extraía de `useAuth()`. Como a lista de dependências é avaliada durante o render, essas referências não declaradas provocam `ReferenceError` e podem deixar a página em branco.
+**Causa identificada por inspeção estática:** o componente `Cadastro` em `src/pages/Public.tsx` referenciava `authorizationLoading` e `isPlatformMasterAdmin` no `useEffect` e na lista de dependências, mas não os extraía de `useAuth()`. Essas referências não declaradas podem causar `ReferenceError` durante o render, antes de o formulário aparecer.
 
-**Correção aplicada na main:** incluir ambos os campos no destructuring de `useAuth()`. Commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff`.
+**Correção presente na main:** commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff` inclui os dois campos no destructuring de `useAuth()`.
+
+**Análise adicional:** o `TenantProvider` resolve o tenant antes de renderizar as rotas. Consulta específica dos logs do Supabase entre 2026-10-06 e 2026-10-10 não encontrou chamadas a `/auth/v1/signup`, o que é compatível com a falha acontecer ao abrir a página, antes do envio. Não há evidência de que a causa seja a mesma do cadastro de RH. O envio de cadastro continua sem validação funcional; o handler cria o Auth user antes de executar `logAudit`, então uma falha posterior pode deixar uma conta parcial. Detalhes e plano de teste em `docs/knowledge-base/candidate-registration-tenant.md`.
 
 | Etapa | Status | Evidência / critério |
 |---|---|---|
-| Inspecionar resolução da rota tenant e componente Cadastro | Concluído — inspeção estática | `main.tsx`, `tenant-routing.ts`, `App.tsx` e `Public.tsx` consultados |
+| Inspecionar resolução de rota tenant e componente Cadastro | Concluído — inspeção estática | `main.tsx`, `tenant-routing.ts`, `TenantContext.tsx`, `App.tsx` e `Public.tsx` consultados |
 | Identificar referências não declaradas no render | Concluído — inspeção estática | `authorizationLoading` e `isPlatformMasterAdmin` usados sem destructuring |
-| Corrigir dependências do contexto de autenticação | Concluído — código na main | Commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff` |
-| Build, type-check e testes automatizados | Aguardando validação | Ainda não executados nesta manutenção |
-| Testar cadastro direto em `/empresa/exemplostore/cadastro` e envio do formulário | Aguardando validação | Exige deploy manual; não criar candidatura/conta de produção sem autorização explícita |
-| Verificar cadastro público, usuário autenticado e isolamento tenant | Aguardando validação | Confirmar estados de sessão e tenant |
+| Corrigir referências do contexto de autenticação | Concluído — código na main | Commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff` |
+| Consultar logs específicos de signup | Concluído — diagnóstico limitado | Nenhuma chamada `/auth/v1/signup` encontrada no período consultado; isso não valida o envio |
+| Build, type-check e testes automatizados | Não validado | Ainda não executados nesta manutenção |
+| Confirmar deploy manual que contém a correção | Aguardando confirmação | Não foi feito deploy da Vercel nesta análise |
+| Abrir cadastro direto no tenant sem login | Aguardando validação | Confirmar formulário sem tela em branco |
+| Testar envio controlado e falha parcial de cadastro | Aguardando validação | Usar e-mail de teste controlado; correlacionar Auth, auditoria e email-verification |
+| Validar tenant inexistente, verificação de e-mail e retorno ao login | Aguardando validação | Confirmar mensagens e navegação no contexto do tenant |
 | Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
 
 ## Manutenção — cadastro de usuário RH pelo administrador do tenant (2026-10-10)
