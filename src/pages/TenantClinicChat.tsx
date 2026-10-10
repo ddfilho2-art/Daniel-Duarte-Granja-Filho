@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDownToLine, LoaderCircle, MessageCircle, Paperclip, Plus, RefreshCw, Send, X } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useTenant } from "../contexts/TenantContext";
@@ -58,7 +58,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
         supabase.from("occupational_health_contracts")
           .select("id,clinic_tenant_id").eq("employer_tenant_id", tenant.id).eq("status", "active"),
         supabase.from("vagas").select("id,titulo,status")
-          .in("status", ["Aberta", "aberta", "active", "ativo"]).order("titulo"),
+          .eq("tenant_id", tenant.id).in("status", ["Aberta", "aberta", "active", "ativo"]).order("titulo"),
       ]);
       if (!active) return;
       if (contractResult.error) {
