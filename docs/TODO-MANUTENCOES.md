@@ -526,3 +526,23 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 - Implementados no código os controles de anexos ASO vinculados a encaminhamento, gestão de usuários por tenant clínico e configuração/agenda Google Calendar por clínica.
 - Migrations adicionais: `20261010163000_get_clinic_calendar_timezone.sql`, `20261010170000_guard_calendar_change_with_active_appointments.sql` e `20261010171000_hide_attachments_for_inaccessible_referrals.sql`.
 - **Status geral permanece: em tratamento / não validado.** Nenhum teste automatizado, build ou type-check foi executado; a validação consolidada fica para o usuário. O OAuth ainda exige secrets no Supabase.
+
+
+## Manutenção — Requisição com múltiplas posições por cargo (2026-10-10)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consolidar necessidade de negócio | Concluído | Uma vaga por cargo com quantitativo; cada candidatura segue individualmente |
+| Pesquisar referência de mercado | Concluído | Modelo de requisição + posições individuais documentado com referência ATS |
+| Registrar especificação funcional | Concluído | `docs/maintenance/2026-10-10-multiple-openings-per-requisition.md` |
+| Auditar uso atual de `quantidade_vagas` e `quantidade_contratada` | Em tratamento | Campos aparecem no contrato de `useVagas.ts`; falta mapear todas as telas, RPCs, relatórios e transições |
+| Mapear contratação individual e estados de candidatura | Não iniciado | Identificar o ponto único de transição para contratado e possíveis efeitos colaterais |
+| Desenhar migration compatível e transacional | Não iniciado | Preservar dados existentes, isolamento por tenant e contagem correta |
+| Ajustar telas de criação/edição/listagem/detalhe e indicadores | Não iniciado | Quantitativo por cargo, preenchidas/restantes, ajuste auditável e status sem misturar candidaturas |
+| Ajustar integrações com Saúde Ocupacional | Não iniciado | Encaminhamento individual por candidatura/candidato, sem bloquear os demais candidatos da mesma vaga |
+| Testes concorrentes, tenant isolation, IA/radar e regressão | Não iniciado | Confirmar que duas contratações simultâneas não excedem o headcount |
+| Build, type-check e E2E | Não validado | Executar antes de marcar manutenção validada |
+| Atualizar base de conhecimento | Em tratamento | Acrescentar resultados da auditoria e soluções conforme a implementação avançar |
+| Deploy Vercel | Não iniciado | Manual; não executar sem autorização explícita |
+
+**Status geral:** especificação registrada; implementação ainda não concluída nem validada. O tipo `Vaga` em `src/lib/useVagas.ts` já declara `quantidade_vagas` e `quantidade_contratada`, mas isso, por si só, não comprova que a criação, o funil individual, a ocupação de posições e os relatórios estejam integrados. Antes de alterar o esquema, auditar o uso real desses campos para evitar criar um modelo duplicado.
