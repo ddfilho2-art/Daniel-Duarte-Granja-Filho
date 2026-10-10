@@ -988,6 +988,7 @@ export function Cadastro() {
       authLoading ||
       profileLoading ||
       tenantMembershipLoading ||
+      authorizationLoading ||
       !user ||
       !profile
     ) {
@@ -1256,6 +1257,7 @@ export function Login() {
     authLoading,
     profileLoading,
     tenantMembershipLoading,
+    authorizationLoading,
     tenantRoles,
     clinicRoles,
     hasTenantAccess,
@@ -1304,6 +1306,7 @@ export function Login() {
     authLoading,
     profileLoading,
     tenantMembershipLoading,
+    authorizationLoading,
     tenantRoles,
     clinicRoles,
     hasTenantAccess,
