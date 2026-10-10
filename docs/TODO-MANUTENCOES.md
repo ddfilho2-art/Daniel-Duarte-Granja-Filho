@@ -328,3 +328,22 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Recuperar ou descartar a conta residual da tentativa | Aguardando decisão | Não excluir nem promover sem decisão explícita |
 | Deploy Vercel | Não iniciado | Continua manual e separado do deploy da Edge Function |
 
+
+
+## Manutenção — HTTP 401 na Edge Function admin-users (2026-10-10)
+
+**Sintoma reportado:** chamada a `/functions/v1/admin-users` retorna HTTP 401 durante a operação de usuários RH.
+
+**Ajuste implementado na branch `maintenance/auth-email-flow-2026-10-10`:** passar explicitamente o bearer token a `userClient.auth.getUser(token)`, com logging estruturado sem dados secretos e diferenciação entre credencial inválida (401) e falha transitória de validação (503). Commit `20ac9cc57cd0de48b8b5b227a26cf11726e2f754`.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Reinspecionar a versão atual de `admin-users` | Concluído | Identificado `auth.getUser()` sem argumento explícito, embora o token seja extraído do bearer |
+| Corrigir validação para passar o token explicitamente | Concluído — código na branch | Commit `20ac9cc57cd0de48b8b5b227a26cf11726e2f754`; ainda não validado em execução |
+| Registrar diagnóstico e limites na base de conhecimento | Concluído — código na branch | `docs/knowledge-base/admin-users-rh-creation.md` |
+| Executar build/type-check/testes | Aguardando validação | Não declarar aprovado sem execução real |
+| Publicar Edge Function `admin-users` no Supabase | Não iniciado | Publicação separada do deploy Vercel; sob controle do usuário |
+| Repetir criação/listagem de usuário RH e verificar status/logs | Aguardando validação | Confirmar se 401 ocorre no gateway ou dentro da função |
+| Investigar 403 CORS de `email-verification` | Não iniciado | Questão separada; validar origem e `ALLOWED_ORIGINS`, sem wildcard |
+| Unificar e testar fluxo de confirmação de candidato | Não iniciado | Não alterar o fluxo sem definir se a confirmação será por link Supabase ou código de seis dígitos |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário; não executar automaticamente |
