@@ -23,10 +23,13 @@ function cors(req: Request) {
       .map((x) => x.trim())
       .filter(Boolean),
   );
+  // Keep the canonical production frontend allowed even when this function's
+  // ALLOWED_ORIGINS secret is missing or incomplete.
+  allowed.add("https://daniel-duarte-granja-filho.vercel.app");
   if (!origin) {
     return {
       ...headers,
-      "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
+      "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info, idempotency-key, x-tenant-id",
       "Access-Control-Allow-Methods": "POST, OPTIONS",
     };
   }
