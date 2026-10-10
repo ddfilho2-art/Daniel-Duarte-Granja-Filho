@@ -393,17 +393,17 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Etapa | Status | Critério / evidência |
 |---|---|---|
 | Consultar Base de Conhecimento e inspecionar fluxo atual | Concluído | Confirmado `supabase.auth.signUp()` antes da solicitação de código; função personalizada era chamada depois |
-| Eliminar e-mail nativo de confirmação do Supabase | Em tratamento | Branch adiciona criação via Auth Admin `createUser` com `email_confirm: false`; build e teste pendentes |
-| Integrar cadastro frontend à ação `register` | Em tratamento | `Public.tsx` chama `registerCandidateAccount`; validar compilação e respostas de erro |
-| Preservar validação de código e segurança multi-tenant | Em tratamento | RPCs existentes e criação de membership pós-login preservadas; teste E2E pendente |
-| Tratar falha de entrega e reenvio | Em tratamento | Fluxo `EMAIL_DELIVERY_FAILED` direciona para tela de verificação; testar reenvio real |
-| Build / type-check | Não iniciado | Deve passar antes da integração |
-| Teste de cadastro e e-mail Resend | Não iniciado | Confirmar e-mail de seis dígitos e ausência do e-mail nativo do Supabase |
-| Teste de bloqueio antes da confirmação e login após confirmação | Não iniciado | Conta deve permanecer não confirmada até código válido |
-| Atualizar Base de Conhecimento | Concluído | `docs/knowledge-base/candidate-registration-tenant.md` atualizado nesta branch |
-| Deploy da Edge Function | Não iniciado | Fazer após revisão e validação da implementação |
-| Integração à main | Não iniciado | Aguardar validação e aprovação |
+| Eliminar e-mail nativo de confirmação do Supabase | Concluído — código na main | `Public.tsx` agora usa `registerCandidateAccount`; a conta é criada via Auth Admin sem disparar confirmação nativa |
+| Integrar cadastro frontend à ação `register` | Concluído — código na main | `Public.tsx` chama `registerCandidateAccount`; confirmação de deploy Vercel pendente |
+| Preservar validação de código e segurança multi-tenant | Em tratamento | RPCs existentes preservadas; teste E2E de cadastro/tenant ainda pendente |
+| Tratar falha de entrega e reenvio | Implementado — código na main | `EMAIL_DELIVERY_FAILED` direciona para tela de verificação; reenvio real ainda pendente |
+| Build / type-check | Não validado | Não executados nesta sessão; precisam passar antes de declarar a manutenção validada |
+| Teste de cadastro e e-mail Resend | Aguardando validação | Confirmar e-mail de seis dígitos e ausência do e-mail nativo; considerar limite 429 anterior |
+| Teste de bloqueio antes da confirmação e login após confirmação | Aguardando validação | Conta deve permanecer não confirmada até código válido |
+| Atualizar Base de Conhecimento | Concluído | Atualizada com causa e implementação; acrescentar evidências pós-deploy após testes |
+| Deploy da Edge Function | Concluído | `email-verification` versão 10 ACTIVE, `verify_jwt=false`, import map ativo; releitura da função confirmou ação `register` |
+| Integração à main | Concluído | PR #8 mergeado; commit `d7e259c9fff3ffac6ddfafa6a967ae601a14a71d` |
 | Deploy Vercel | Não iniciado | Continua manual, sob controle do usuário |
 
-**Branch de trabalho:** `fix/candidate-email-code-signup`  
-**Status geral:** Em tratamento — não validado; não fazer novos testes repetidos de e-mail enquanto o limite 429 estiver ativo.
+**Branch de trabalho:** `fix/candidate-email-code-signup` (integrada)  
+**Status geral:** Em tratamento — ainda não validado por build e teste funcional. Não repetir envios de e-mail até respeitar o limite 429.
