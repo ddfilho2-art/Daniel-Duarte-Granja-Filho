@@ -264,3 +264,21 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
 
 **Diagnóstico atual:** defeito concreto de redirecionamento prematuro confirmado por inspeção estática e corrigido no código. A relação desse defeito com todos os sintomas (botão aparentemente inoperante, loop e loading interminável) ainda não está confirmada por teste funcional. Manter a manutenção em tratamento até build e testes funcionais.
+## Manutenção — Meu Perfil ausente no painel do administrador de tenant (2026-10-10)
+
+**Sintoma relatado:** ao entrar no portal de uma empresa como administrador do tenant, o link “Meu Perfil”, que deveria aparecer para cada pessoa autenticada, não era exibido.
+
+**Causa identificada por inspeção estática:** em `src/components/layouts/DashboardLayouts.tsx`, o link era renderizado somente quando `profile?.perfil !== "Candidato"`. Isso contradiz o requisito de disponibilizar o perfil a todas as pessoas e pode ocultar a opção quando o perfil legado não corresponde ao papel efetivo atribuído pela membership do tenant.
+
+**Correção aplicada na main:** commit `a48ae30367a6f5d14a5c5cc122e58ee7f54853ad` remove a condição de ocultação e mantém o destino calculado pela área atual (`/admin/perfil`, `/rh/perfil`, `/master/perfil` ou `/candidato/perfil`). A rota de candidato já encaminha para o currículo. Nenhuma permissão de backend ou regra de autorização foi alterada.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Inspecionar layout compartilhado e rotas de perfil | Concluído — inspeção estática | `DashboardLayouts.tsx` e rotas em `App.tsx` consultados |
+| Identificar a condição que escondia o link | Concluído — inspeção estática | Link condicionado ao valor legado `profile.perfil` |
+| Remover ocultação do link | Concluído — código na main | Commit `a48ae30367a6f5d14a5c5cc122e58ee7f54853ad` |
+| Build, type-check e testes automatizados | Aguardando validação | Ainda não executados nesta manutenção |
+| Testar link em Admin tenant, RH, Master e Candidato | Aguardando validação | Exige deploy manual e verificação no navegador |
+| Regressão de autorização e isolamento multi-tenant | Aguardando validação | Mudança visual; confirmar que as rotas continuam protegidas |
+| Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
+
