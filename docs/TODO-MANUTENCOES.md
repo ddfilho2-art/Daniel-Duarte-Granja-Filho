@@ -447,3 +447,15 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Repetir cadastro controlado | Aguardando usuário | Fazer uma única tentativa e compartilhar o resultado; Resend ainda pode rejeitar destinatários não autorizados no domínio de teste |
 
 **Status:** registro órfão de teste removido e ausência confirmada. Teste completo de cadastro ainda pendente.
+
+
+## Manutenção — 2026-10-10 — CORS da importação de currículo por IA
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Inspecionar a função ativa e o código da main | Concluído | `candidate-resume-import` usava somente `ALLOWED_ORIGINS`; ao faltar a origem, o preflight retornava 403 sem `Access-Control-Allow-Origin` |
+| Corrigir allowlist CORS | Concluído no código | Origem canônica de produção adicionada como fallback; `x-tenant-id` e `idempotency-key` incluídos nos cabeçalhos permitidos |
+| Atualizar `main` | Concluído | Commit `40e059caf4fd813c30346b110d6ea731377be6e9` |
+| Publicar Edge Function no Supabase | Concluído | `candidate-resume-import` versão 8, ACTIVE, `verify_jwt=true` |
+| Validar importação real de PDF/TXT | Aguardando validação | Repetir importação no portal e confirmar preflight, resposta da IA e preenchimento prévio |
+| Deploy Vercel | Não necessário para esta correção | O ajuste está na Edge Function; nenhum deploy Vercel foi feito |
