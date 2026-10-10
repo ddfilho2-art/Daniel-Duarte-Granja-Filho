@@ -246,3 +246,14 @@ cookies ou o currículo.
 - Agendamento Google Calendar precisa de backend, OAuth/segredos protegidos, timezone explícito, prevenção de conflitos e operações idempotentes. Não considerar reserva concluída se o Google não confirmar a criação/atualização do evento.
 - Os estados clínicos atuais são `referred`, `scheduled`, `attended`, `result_reported`, `completed`; resultados: `pending`, `fit`, `unfit`, `inconclusive`. Não inventar estados paralelos.
 - Especificação: `docs/maintenance/2026-10-10-employer-clinic-workflow.md`. Implementação e validação permanecem pendentes até concluir migrations, políticas, UI, testes e configuração do calendário.
+
+
+## Implementação Empresa ↔ Saúde Ocupacional — 2026-10-10
+
+- O novo canal é separado de `mensagens`/ `candidatura_id` do chat candidato–RH: `tenant_clinic_conversations`, `tenant_clinic_messages` e `tenant_clinic_attachments`.
+- Mensagens/anexos usam RPCs autorizadas por tenant e URLs assinadas; bucket `tenant-clinic-chat-attachments` é privado. Tipos aceitos: PDF, PNG e JPEG; máximo 10 MB.
+- Vagas são opcionais e a criação valida que a vaga pertence ao tenant empregador e está aberta/ativa. Encaminhamento médico opcional deve pertencer ao mesmo contrato/empresa/clínica.
+- Agendamentos usam `tenant_clinic_appointments`; integração consulta free/busy do Google Calendar e persiste estado confirmado somente após criação do evento. Reagendamento tem verificação de conflito; cancelamento tenta remover o evento no Google antes de persistir cancelamento.
+- Cada tenant clínico configura seu próprio `calendar_id` e `timezone` por RPC/tela administrativa. OAuth é comum à conta de integração e deve ter acesso ao calendário configurado. Secrets necessários: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`.
+- A gestão de usuários da clínica exige papel `clinic_admin` naquele tenant e altera apenas memberships com papel `clinic_staff`. O administrador da empresa continua com o rótulo `Gestão de Usuários de RH`.
+- Código e migrations registrados não equivalem a validação: build, type-check, aplicação das migrations, testes de isolamento e e2e ainda estão pendentes.
