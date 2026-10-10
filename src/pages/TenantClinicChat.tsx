@@ -288,8 +288,34 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
                   <p className="mt-1 text-xs text-slate-500">
                     {selected.job_title_snapshot ? `Vaga relacionada: ${selected.job_title_snapshot} · ` : ""}Status: {selected.status === "open" ? "Aberta" : "Encerrada"}
                   </p>
-                </div>
+                                  <button type="button" onClick={() => setShowSchedule((value) => !value)} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-teal-200 px-3 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">
+                    <CalendarClock className="h-4 w-4" /> {showSchedule ? "Ocultar agenda" : "Consultar / agendar horário"}
+                  </button>
+</div> 
+                {showSchedule && <div className="border-b bg-teal-50/50 p-4">
+                  <p className="mb-2 text-sm font-semibold text-slate-800">Agenda da Saúde Ocupacional</p>
+                  <p className="mb-3 text-xs text-slate-600">A consulta considera a agenda do Google Calendar e os agendamentos já registrados. Horário local: {Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo"}.</p>
+                  <div className="flex flex-wrap items-end gap-2">
+                    <label className="grid gap-1 text-xs font-medium text-slate-700">Data
+                      <input type="date" value={appointmentDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => { setAppointmentDate(e.target.value); setAvailableSlots([]); setSelectedSlot(""); }} className="rounded-lg border bg-white px-3 py-2 text-sm" />
+                    </label>
+                    <button type="button" onClick={() => void checkAvailability()} disabled={checkingSlots || !appointmentDate || selected.status !== "open"} className="rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50">{checkingSlots ? "Consultando..." : "Ver horários livres"}</button>
+                    {reschedulingId && <button type="button" onClick={() => { setReschedulingId(null); setAvailableSlots([]); setSelectedSlot(""); }} className="rounded-lg border bg-white px-3 py-2 text-sm">Cancelar reagendamento</button>}
+                  </div>
+                  {availableSlots.length > 0 && <div className="mt-3 flex flex-wrap gap-2">
+                    {availableSlots.map((slot) => <button type="button" key={slot.start} onClick={() => setSelectedSlot(slot.start)} className={"rounded-lg border px-3 py-2 text-sm " + (selectedSlot === slot.start ? "border-teal-700 bg-teal-700 text-white" : "border-slate-300 bg-white text-slate-700")}>{slot.label}</button>)}
+                  </div>}
+                  {availableSlots.length > 0 && <div className="mt-3"><button type="button" onClick={() => void saveAppointment()} disabled={!selectedSlot || savingAppointment} className="rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{savingAppointment ? "Salvando..." : reschedulingId ? "Confirmar reagendamento" : "Confirmar agendamento"}</button></div>}
+                </div>}
+
                 <div className="flex-1 space-y-3 overflow-y-auto bg-slate-50 p-4">
+                  {appointments.length > 0 && <div className="mb-4 rounded-lg border bg-white p-3">
+                    <p className="mb-2 text-xs font-semibold text-slate-700">Agendamentos</p>
+                    <div className="space-y-2">{appointments.map((appointment) => <div key={appointment.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-0 last:pb-0">
+                      <div><p className="text-sm font-medium text-slate-800">{new Date(appointment.starts_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })} – {new Date(appointment.ends_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p><p className="text-xs text-slate-500">Status: {appointment.status === "confirmed" ? "Confirmado" : appointment.status === "pending" ? "Processando" : appointment.status === "cancelled" ? "Cancelado" : "Falhou"}</p></div>
+                      {appointment.status === "confirmed" && <div className="flex gap-2"><button type="button" onClick={() => { setReschedulingId(appointment.id); setShowSchedule(true); setSelectedSlot(""); setAvailableSlots([]); }} disabled={savingAppointment} className="text-xs font-semibold text-teal-700 hover:underline">Reagendar</button><button type="button" onClick={() => void cancelAppointment(appointment)} disabled={savingAppointment} className="text-xs font-semibold text-red-700 hover:underline">Cancelar</button></div>}
+                    </div>)}</div>
+                  </div>}
                   {messages.length === 0 && <p className="py-8 text-center text-sm text-slate-500">Ainda não há mensagens nesta conversa.</p>}
                   {messages.map((message) => {
                     const own = (isClinic && message.sender_side === "clinic") || (!isClinic && message.sender_side === "employer");
