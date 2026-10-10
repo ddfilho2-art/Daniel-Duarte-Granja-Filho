@@ -299,3 +299,27 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Verificar cadastro público, usuário autenticado e isolamento tenant | Aguardando validação | Confirmar estados de sessão e tenant |
 | Deploy Vercel | Não iniciado | Deploy manual permanece sob controle do usuário |
 
+## Manutenção — cadastro de usuário RH pelo administrador do tenant (2026-10-10)
+
+**Diagnóstico confirmado nos logs e no banco:** a Edge Function autenticava o administrador e criava o Auth user, mas o trigger criava automaticamente uma linha padrão `Candidato` em `public.users`. `createMember` confundia essa linha recém-criada com um perfil preexistente e retornava `PROFILE_CONFLICT`/HTTP 400. A consulta de produção confirmou que a conta residual criada pela tentativa estava sem membership. Não foi feita alteração manual nem exclusão dessa conta.
+
+**Correções na main:**
+- `supabase/functions/admin-users/index.ts`: permitir atualizar o perfil padrão para RH somente quando o Auth user tiver sido criado pela mesma requisição; manter a recusa para contas preexistentes com outro perfil. Commit `84b8d796ffe4f0bcda2a184169225e76e7d7de2e`.
+- `src/lib/admin-users.ts`: mensagem específica para conflito de perfil. Commit `c50e68d13746cd102d81b34fe9ac9dae12b64114`.
+- Base de conhecimento: `docs/knowledge-base/admin-users-rh-creation.md`.
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Inspecionar base de conhecimento e histórico de `admin-users` | Concluído | Regras de tenant, autenticação e fluxo de criação revisados |
+| Correlacionar HTTP 400 com logs do Supabase | Concluído | Auth create retornou 200; consulta do perfil encontrou a linha padrão Candidato; função retornou 400 |
+| Confirmar o estado residual da tentativa | Concluído — somente leitura | Perfil legado Candidato, sem membership; não houve mutação manual |
+| Corrigir a condição de conflito de perfil | Concluído — código na main | Só permite a promoção da linha padrão quando a mesma requisição criou o Auth user |
+| Melhorar mensagem de conflito preexistente | Concluído — código na main | `PROFILE_CONFLICT` mapeado para orientação compreensível |
+| Deploy da Edge Function Supabase | Aguardando | Confirmar versão ativa após publicação |
+| Build/type-check e testes automatizados | Não validado | Ainda não executados |
+| Teste real de criação RH com e-mail novo | Aguardando validação | Não criar conta de teste em produção sem necessidade/controle |
+| Teste negativo com e-mail já vinculado a perfil Candidato | Aguardando validação | Deve continuar bloqueado |
+| Teste de isolamento multi-tenant | Aguardando validação | Confirmar tenant autorizado e membership correta |
+| Recuperar ou descartar a conta residual da tentativa | Aguardando decisão | Não excluir nem promover sem decisão explícita |
+| Deploy Vercel | Não iniciado | Continua manual e separado do deploy da Edge Function |
+
