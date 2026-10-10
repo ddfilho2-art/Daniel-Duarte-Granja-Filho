@@ -469,3 +469,18 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Publicar função | Concluído | `candidate-resume-import` versão 9, ACTIVE, `verify_jwt=true` |
 | Validar OPTIONS real e POST com currículo | Aguardando validação do navegador | O ambiente de manutenção não conseguiu executar a chamada HTTP externa; usuário deve repetir o teste |
 | Deploy Vercel | Não necessário | Nenhuma alteração de frontend; nenhum deploy Vercel realizado |
+
+
+## Manutenção — Meu Perfil em rotas de tenant (2026-10-10)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Identificar o redirecionamento ao clicar em Meu Perfil | Concluído — diagnóstico | O link era calculado usando o primeiro segmento de `location.pathname`; isso não é uma fonte confiável de papel/rota e não cobre perfis sem rota equivalente |
+| Corrigir o destino do link nos painéis existentes | Concluído no código | Commit `ccb54eaa8555072d32ea156d73bde0f6ef5c9ae4`; o destino é definido pelo painel ativo. Candidato vai para `/candidato/curriculo`, cujo carregamento já consulta `candidatos` por `tenant_id` + `user_id` |
+| Confirmar navegação em tenant real e ausência de retorno à home | Aguardando usuário | Após deploy manual da Vercel, testar a partir do painel de candidato, RH, admin da empresa e admin da plataforma; confirmar que a URL mantém o prefixo do tenant |
+| Disponibilizar Meu Perfil no portal de saúde ocupacional | Não iniciado | O portal clínico atualmente não usa o `DashboardLayout` e não oferece a mesma ligação de perfil |
+| Definir e implementar persistência de perfil por tenant para todos os papéis | Não iniciado | `PerfilAdmin` e `HRProfile` atualizam `public.users` globalmente; não migrar esses campos para um escopo tenant sem definir tabela/RLS e compatibilidade. O currículo de candidato já é tenant-scoped via `public.candidatos` |
+| Build/type-check e testes de navegação/isolamento | Não validado | Ainda não executados nesta manutenção |
+| Deploy Vercel | Não iniciado | Nenhum deploy realizado; segue manual sob controle do usuário |
+
+**Status geral:** Em tratamento / não validado. Foi corrigido o cálculo do destino do link nos layouts existentes, mas a manutenção completa ainda exige teste de navegação e desenho seguro da persistência por tenant para os demais papéis. Não declarar concluído antes de validar esses pontos.
