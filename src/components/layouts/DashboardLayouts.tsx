@@ -181,6 +181,17 @@ function DashboardLayout({
     (profile as unknown as Record<string, string | undefined>)?.foto_url ??
     (profile as any)?.resume_data?.foto;
 
+  // O destino do perfil é determinado pelo painel/role, não pela URL atual.
+  // Para candidatos, o currículo é o perfil profissional e seus dados já são
+  // carregados por tenant; os demais painéis têm suas rotas de perfil próprias.
+  const profilePath = React.useMemo(() => {
+    if (menuItems.some((item) => item.to === "/candidato")) return "/candidato/curriculo";
+    if (menuItems.some((item) => item.to === "/rh")) return "/rh/perfil";
+    if (menuItems.some((item) => item.to === "/admin")) return "/admin/perfil";
+    if (menuItems.some((item) => item.to === "/master")) return "/master/perfil";
+    return "/perfil";
+  }, [menuItems]);
+
   const currentMenuItem = React.useMemo(
     () =>
       [...menuItems].reverse().find((item) => {
@@ -235,7 +246,7 @@ function DashboardLayout({
                 {userName}
               </span>
               <Link
-                to={`/${location.pathname.split("/")[1] || "rh"}/perfil`}
+                to={profilePath}
                 className="tenant-sidebar-muted text-xs hover:underline"
               >
                 Meu Perfil
