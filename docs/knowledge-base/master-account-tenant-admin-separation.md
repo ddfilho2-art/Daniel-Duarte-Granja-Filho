@@ -114,4 +114,12 @@ Após o deploy manual do commit `d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86`, o us
 - **Correção em main:** commit `a48ae30367a6f5d14a5c5cc122e58ee7f54853ad` removeu a condição e passou a exibir o link para todos os usuários que usam o layout compartilhado.
 - **Limites:** nenhuma autorização de backend foi alterada. O link/rota ainda precisa ser verificado após deploy manual nos painéis Admin tenant, RH, Master e Candidato. O portal de Saúde Ocupacional usa uma tela própria, não o layout compartilhado; não afirmar que este commit adiciona o link àquela tela.
 - **Status:** correção implementada no código; build, testes automatizados e validação visual pendentes. Deploy Vercel continua manual.
+## Erro de tela branca no cadastro público do tenant (2026-10-10)
+
+- **Sintoma relatado:** clicar em “Cadastrar” no portal de candidato leva a uma tela branca em `/empresa/exemplostore/cadastro`.
+- **Causa estática identificada:** o componente `Cadastro` em `src/pages/Public.tsx` usa `authorizationLoading` no guard do `useEffect` e usa `isPlatformMasterAdmin` na lista de dependências, mas ambos estavam ausentes do destructuring de `useAuth()`. A avaliação das dependências ocorre no render e pode causar `ReferenceError`.
+- **Correção em main:** ambos os campos foram incluídos no destructuring de `useAuth()`. Commit `b80b79023bd44e2fbf7a1d830ab04974e397dbff`.
+- **Validação:** causa e correção confirmadas por inspeção estática; build/type-check/testes automatizados e validação no navegador ainda pendentes. O endereço de produção não pôde ser inspecionado diretamente pela ferramenta de navegação nesta sessão.
+- **Próximos testes:** após deploy manual, abrir a rota diretamente e pelo botão, confirmar que o formulário renderiza para visitante, testar validações de senha e confirmar o fluxo de sucesso sem reutilizar dados reais nem criar contas de teste sem autorização.
+- **Deploy:** não realizado pelo assistente; permanece manual sob controle do usuário.
 
