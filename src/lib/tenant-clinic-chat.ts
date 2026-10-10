@@ -95,8 +95,8 @@ async function calendarAction(body: Record<string, unknown>) {
   }
   return data;
 }
-export async function getTenantClinicAvailability(conversationId: string, timeMin: string, timeMax: string) {
-  const data = await calendarAction({ action: "availability", conversationId, timeMin, timeMax });
+export async function getTenantClinicAvailability(conversationId: string, timeMin: string, timeMax: string, appointmentId?: string | null) {
+  const data = await calendarAction({ action: "availability", conversationId, timeMin, timeMax, appointmentId: appointmentId || undefined });
   return (data.busy || []) as BusyInterval[];
 }
 export async function listTenantClinicAppointments(conversationId: string) {
