@@ -71,7 +71,15 @@ async function sendCode(email: string, name: string, code: string): Promise<void
   });
 
   if (!response.ok) {
-    throw new Error(`email_provider_error:${response.status}`);
+    let providerCode = "unknown";
+    try {
+      const payload = await response.clone().json();
+      if (typeof payload?.name === "string") providerCode = payload.name.slice(0, 80);
+      else if (typeof payload?.code === "string") providerCode = payload.code.slice(0, 80);
+    } catch {
+      // Keep the diagnostic bounded and never log the provider response body.
+    }
+    throw new Error(`email_provider_error:${response.status}:${providerCode}`);
   }
 }
 
@@ -186,8 +194,9 @@ Deno.serve(async (request) => {
       // Use Auth Admin API: unlike auth.signUp(), createUser does not send
       // Supabase's native confirmation-link email. The account stays unconfirmed
       // until the custom six-digit code is verified.
+      let createdUserId: string | null = null;
       if (isRegistration) {
-        const { error: createUserError } = await admin.auth.admin.createUser({
+        const { data: createdUser, error: createUserError } = await admin.auth.admin.createUser({
           email,
           password: registrationPassword,
           email_confirm: false,
@@ -204,6 +213,8 @@ Deno.serve(async (request) => {
           }
           throw createUserError;
         }
+        createdUserId = createdUser.user?.id ?? null;
+        if (!createdUserId) throw new Error("candidate_signup_user_id_missing");
       }
 
       const code = secureCode();
@@ -237,7 +248,24 @@ Deno.serve(async (request) => {
             );
           }
           if (isRegistration) {
-            console.error("candidate_signup_email_delivery_failed", currentRequestId);
+            console.error(
+              "candidate_signup_email_delivery_failed",
+              JSON.stringify({
+                requestId: currentRequestId,
+                error: error instanceof Error ? error.message : "unknown_delivery_error",
+              }),
+            );
+            if (createdUserId) {
+              const { error: rollbackError } = await admin.auth.admin.deleteUser(createdUserId);
+              if (rollbackError) {
+                console.error(
+                  "candidate_signup_auth_rollback_failed",
+                  JSON.stringify({ requestId: currentRequestId, code: rollbackError.code ?? "unknown" }),
+                );
+              } else {
+                console.info("candidate_signup_auth_rollback_completed", currentRequestId);
+              }
+            }
             return jsonResponse(
               { success: false, code: "EMAIL_DELIVERY_FAILED", requestId: currentRequestId },
               502,
