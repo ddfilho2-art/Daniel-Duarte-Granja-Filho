@@ -95,6 +95,12 @@ async function calendarAction(body: Record<string, unknown>) {
   }
   return data;
 }
+export async function getTenantClinicCalendarTimezone(conversationId: string) {
+  const { data, error } = await supabase.rpc("get_tenant_clinic_calendar_timezone", { p_conversation_id: conversationId });
+  if (error || !data) throw new Error("Não foi possível carregar o fuso horário da clínica.");
+  return String(data);
+}
+
 export async function getTenantClinicAvailability(conversationId: string, timeMin: string, timeMax: string, appointmentId?: string | null) {
   const data = await calendarAction({ action: "availability", conversationId, timeMin, timeMax, appointmentId: appointmentId || undefined });
   return { busy: (data.busy || []) as BusyInterval[], timezone: String(data.timezone || "America/Sao_Paulo") };
