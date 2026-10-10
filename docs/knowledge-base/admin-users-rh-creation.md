@@ -44,3 +44,38 @@ O trigger de criação de usuário gera uma linha padrão em `public.users` com 
 6. Executar build/type-check e testes automatizados; não marcá-los como aprovados sem execução real.
 
 **Deploy Vercel:** permanece manual, sob controle do usuário. A Edge Function Supabase é implantada separadamente.
+
+---
+
+## Manutenção relacionada — atualização de e-mail de usuário RH (2026-10-10)
+
+**Status:** correção implementada na branch `maintenance/correcao-email-rh`; ainda não validada por build, type-check ou teste funcional. Não houve deploy nem alteração de dados de produção.
+
+### Sintoma
+
+Ao editar o e-mail de um colaborador RH existente, a chamada `admin-users` retornava HTTP 400. O status HTTP, isoladamente, não confirma a causa: a função retorna 400 para erros de validação e de negócio. Não foram usados logs de produção nem alterados usuários para tentar reproduzir o problema.
+
+### Achados no código
+
+- A expressão regular de validação do e-mail estava escapada incorretamente, podendo rejeitar endereços válidos.
+- O fluxo atualizava primeiro `public.users` e depois o Supabase Auth. Se a segunda operação falhasse, os dois registros poderiam ficar com e-mails diferentes.
+- O cliente mostrava mensagem genérica para erros de atualização, dificultando a identificação do próximo passo.
+
+### Alterações na branch
+
+- Corrigida a expressão regular e normalizados nome/e-mail antes da validação.
+- Mantida a verificação de vínculo RH no tenant e do perfil `RH`; a operação não altera ID, papel, status ou membership.
+- Adicionada verificação de e-mail duplicado em `public.users`, excluindo o próprio usuário.
+- O Auth é atualizado antes do perfil. Falhas de Auth retornam códigos seguros; se o Auth for atualizado e a sincronização de `public.users` falhar, a função retorna `EMAIL_SYNC_REQUIRED` para evitar sugerir uma repetição cega.
+- Adicionadas mensagens de interface para falha na verificação de duplicidade, usuário Auth não localizado e sincronização parcial.
+
+### Riscos e validação pendente
+
+1. Executar lint, type-check e build no ambiente do repositório.
+2. Testar atualização para e-mail válido, e-mail duplicado, e-mail inválido e falha de Auth.
+3. Confirmar que o mesmo ID, perfil RH, status e membership permanecem inalterados.
+4. Validar o comportamento de confirmação de alteração de e-mail conforme as configurações do Supabase Auth. Não habilitar confirmação automática nem publicar a Edge Function como parte desta manutenção.
+5. Verificar o caso de falha parcial entre Auth e `public.users` antes de considerar a manutenção validada.
+
+**Deploy:** não realizado. Vercel e Supabase permanecem sob controle manual do usuário.
+

@@ -708,64 +708,119 @@ async function updateLegacyUser(
   nome: string,
   email: string
 ): Promise<AdminUserResponse> {
+  const normalizedName = typeof nome === "string" ? nome.trim() : "";
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!userId?.trim() || normalizedName.length < 3 || !emailRegex.test(normalizedEmail)) {
+    return { success: false, code: "INVALID_INPUT", error: "Nome ou e-mail inválido." };
+  }
+
   try {
     const { data: membership, error: membershipError } = await adminClient
       .from("tenant_memberships")
       .select("user_id, roles")
       .eq("tenant_id", tenantId)
       .eq("user_id", userId)
+      .contains("roles", ["hr"])
       .maybeSingle();
 
-    if (membershipError) throw membershipError;
-    if (!membership || !membership.roles?.includes("hr")) {
-      return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado neste tenant" };
+    if (membershipError) {
+      console.error("admin-users update: membership lookup failed", { code: membershipError.code });
+      return { success: false, code: "INTERNAL_ERROR", error: "Não foi possível validar o vínculo do usuário." };
+    }
+    if (!membership) {
+      return { success: false, code: "USER_NOT_FOUND", error: "Usuário RH não encontrado neste tenant." };
     }
 
     const { data: targetProfile, error: targetProfileError } = await adminClient
       .from("users")
-      .select("perfil")
+      .select("id, perfil")
       .eq("id", userId)
       .maybeSingle();
-    if (targetProfileError) throw targetProfileError;
-    if (!targetProfile || targetProfile.perfil !== "RH") {
+
+    if (targetProfileError) {
+      console.error("admin-users update: profile lookup failed", { code: targetProfileError.code });
+      return { success: false, code: "INTERNAL_ERROR", error: "Não foi possível consultar o perfil do usuário." };
+    }
+    if (!targetProfile) {
+      return { success: false, code: "USER_NOT_FOUND", error: "Usuário não encontrado." };
+    }
+    if (targetProfile.perfil !== "RH") {
       return { success: false, code: "INVALID_PROFILE", error: "Somente usuários RH podem ser alterados." };
     }
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
-    if (!nome.trim() || nome.trim().length < 3 || !emailRegex.test(normalizedEmail)) {
-      return { success: false, code: "INVALID_INPUT", error: "Nome ou e-mail inválido" };
+    const { data: duplicateProfile, error: duplicateProfileError } = await adminClient
+      .from("users")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .neq("id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateProfileError) {
+      console.error("admin-users update: email uniqueness lookup failed", { code: duplicateProfileError.code });
+      return { success: false, code: "EMAIL_CHECK_FAILED", error: "Não foi possível validar se o e-mail já está em uso." };
+    }
+    if (duplicateProfile) {
+      return { success: false, code: "EMAIL_ALREADY_EXISTS", error: "Este e-mail já está em uso." };
     }
 
-    const { data, error } = await adminClient
+    const { data: authLookup, error: authLookupError } = await adminClient.auth.admin.getUserById(userId);
+    if (authLookupError || !authLookup?.user) {
+      console.error("admin-users update: Auth user lookup failed", { code: authLookupError?.code });
+      return { success: false, code: "AUTH_USER_NOT_FOUND", error: "Não foi possível localizar a conta de autenticação deste usuário." };
+    }
+
+    if (authLookup.user.email?.toLowerCase() !== normalizedEmail) {
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
+        userId,
+        { email: normalizedEmail }
+      );
+
+      if (authUpdateError) {
+        const authErrorText = [authUpdateError.code, authUpdateError.message].filter(Boolean).join(" ").toLowerCase();
+        if (/already|registered|duplicate|exists|unique/.test(authErrorText)) {
+          return { success: false, code: "EMAIL_ALREADY_EXISTS", error: "Este e-mail já está em uso." };
+        }
+        console.error("admin-users update: Auth email update failed", { code: authUpdateError.code });
+        return { success: false, code: "AUTH_UPDATE_FAILED", error: "Não foi possível atualizar o e-mail da conta de autenticação." };
+      }
+    }
+
+    const { data: updatedProfile, error: profileUpdateError } = await adminClient
       .from("users")
       .update({
-        nome: nome.trim(),
+        nome: normalizedName,
         email: normalizedEmail,
         updated_at: new Date().toISOString(),
       })
       .eq("id", userId)
+      .eq("perfil", "RH")
       .select("id, nome, email, login, perfil, status")
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
+    if (profileUpdateError || !updatedProfile) {
+      console.error("admin-users update: profile email sync failed", { code: profileUpdateError?.code });
+      return {
+        success: false,
+        code: "EMAIL_SYNC_REQUIRED",
+        error: "A conta de autenticação foi atualizada, mas não foi possível sincronizar o perfil. Solicite suporte antes de repetir a operação.",
+      };
+    }
 
-    const { error: authError } = await adminClient.auth.admin.updateUserById(
-      userId,
-      { email: normalizedEmail }
-    );
-    if (authError) throw authError;
-
-    return { success: true, data, code: "USER_UPDATED" };
+    return { success: true, data: updatedProfile, code: "USER_UPDATED" };
   } catch (error) {
+    console.error("admin-users update: unexpected failure", {
+      errorType: error instanceof Error ? error.name : "unknown",
+    });
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: "Não foi possível concluir a atualização do usuário.",
       code: "INTERNAL_ERROR",
     };
   }
 }
-
 async function resetUserPassword(
   tenantId: string,
   userId: string,
