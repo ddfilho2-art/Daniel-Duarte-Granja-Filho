@@ -459,3 +459,13 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Publicar Edge Function no Supabase | Concluído | `candidate-resume-import` versão 8, ACTIVE, `verify_jwt=true` |
 | Validar importação real de PDF/TXT | Aguardando validação | Repetir importação no portal e confirmar preflight, resposta da IA e preenchimento prévio |
 | Deploy Vercel | Não necessário para esta correção | O ajuste está na Edge Function; nenhum deploy Vercel foi feito |
+
+
+### Correção complementar — preflight x-tenant-id (2026-10-10)
+| Etapa | Status | Evidência |
+|---|---|---|
+| Identificar por que a primeira correção não resolveu | Concluído | A lista de cabeçalhos da ramificação com Origin ainda não incluía `x-tenant-id`; somente a ramificação sem Origin havia sido alterada |
+| Corrigir lista CORS da origem real | Concluído | A resposta para origem permitida agora aceita `idempotency-key` e `x-tenant-id` |
+| Publicar função | Concluído | `candidate-resume-import` versão 9, ACTIVE, `verify_jwt=true` |
+| Validar OPTIONS real e POST com currículo | Aguardando validação do navegador | O ambiente de manutenção não conseguiu executar a chamada HTTP externa; usuário deve repetir o teste |
+| Deploy Vercel | Não necessário | Nenhuma alteração de frontend; nenhum deploy Vercel realizado |
