@@ -199,3 +199,21 @@ O usuário relatou que a correção com contador de sincronização piorou o tem
 | Build/type-check/testes | Aguardando validação |
 | Teste login Master, aba e rotas de empresa | Aguardando validação |
 | Deploy Vercel | Não iniciado — manual |
+
+
+## Manutenção — 2026-10-10 — Aguardar autorização antes do redirecionamento de Login
+
+**Estado inicial inspecionado na main:** a correção anterior (commit 16802dd31fda066c235c67815284a52ecbc03736) já incluía authorizationLoading nas dependências do efeito Login, mas a condição de retorno antecipado ainda não o verificava. Além disso, isPlatformMasterAdmin participava da resolução do destino, porém não constava nas dependências do efeito.
+
+**Alteração aplicada:** commit d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86 em src/pages/Public.tsx. O efeito agora aguarda authorizationLoading=false antes de calcular a rota de destino e declara isPlatformMasterAdmin nas dependências. Nenhuma regra de backend, RPC, RLS, membership ou privilégio foi alterada.
+
+**Interpretação:** a falha de guarda é confirmada por inspeção estática e foi corrigida. Ainda não está comprovado que ela seja a causa única de todos os sintomas reportados. Não declarar conclusão antes dos testes.
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Inspecionar código e documentação atual | Concluído | Public.tsx, AuthContext.tsx, authService.ts, TODO e KB consultados |
+| Corrigir guarda de autorização e dependências | Concluído — código | Commit d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86 |
+| Build/type-check/testes automatizados | Não validado | Não executados nesta sessão |
+| Teste funcional no navegador | Não validado | Não houve login real nesta sessão |
+| Regressão Master/tenant/candidato e logout | Não validado | Pendente de ambiente autenticado e dados de teste |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
