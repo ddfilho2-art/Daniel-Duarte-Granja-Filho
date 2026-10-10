@@ -401,9 +401,9 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Teste de cadastro e e-mail Resend | Aguardando validação | Confirmar e-mail de seis dígitos e ausência do e-mail nativo; considerar limite 429 anterior |
 | Teste de bloqueio antes da confirmação e login após confirmação | Aguardando validação | Conta deve permanecer não confirmada até código válido |
 | Atualizar Base de Conhecimento | Concluído | Atualizada com causa e implementação; acrescentar evidências pós-deploy após testes |
-| Deploy da Edge Function | Concluído | `email-verification` versão 10 ACTIVE, `verify_jwt=false`, import map ativo; releitura da função confirmou ação `register` |
+| Deploy da Edge Function | Concluído | `email-verification` versão 11 ACTIVE, `verify_jwt=false`, import map ativo; CORS atualizado para incluir a origem de produção |
 | Integração à main | Concluído | PR #8 mergeado; commit `d7e259c9fff3ffac6ddfafa6a967ae601a14a71d` |
 | Deploy Vercel | Não iniciado | Continua manual, sob controle do usuário |
 
 **Branch de trabalho:** `fix/candidate-email-code-signup` (integrada)  
-**Status geral:** Em tratamento — ainda não validado por build e teste funcional. Não repetir envios de e-mail até respeitar o limite 429.
+**Status geral:** Em tratamento — ainda não validado por build e teste funcional. Não repetir envios de e-mail até respeitar o limite 429.\n\n## Correção emergencial — CORS da Edge Function (2026-10-10)\n\n| Etapa | Status | Evidência |\n|---|---|---|\n| Identificar origem bloqueada | Concluído | Preflight de `https://daniel-duarte-granja-filho.vercel.app` sem `Access-Control-Allow-Origin` |\n| Ajustar allowlist CORS | Concluído | `supabase/functions/_shared/http.ts` inclui a origem exata de produção e preserva origens adicionais de `ALLOWED_ORIGINS` |\n| Publicar Edge Function | Concluído | `email-verification` versão 11, `ACTIVE`; import map e `verify_jwt=false` preservados |\n| Validar preflight HTTP em produção | Pendente | Ambiente de execução desta sessão não conseguiu resolver o host Supabase; pedir nova tentativa de cadastro após a publicação e verificar resposta OPTIONS |\n\n**Status:** correção publicada; verificação HTTP de ponta a ponta ainda pendente. Deploy da Vercel não foi executado.\n
