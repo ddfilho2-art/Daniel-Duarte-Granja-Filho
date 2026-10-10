@@ -217,3 +217,22 @@ O usuário relatou que a correção com contador de sincronização piorou o tem
 | Teste funcional no navegador | Não validado | Não houve login real nesta sessão |
 | Regressão Master/tenant/candidato e logout | Não validado | Pendente de ambiente autenticado e dados de teste |
 | Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
+## Incidente adicional — link Meu Perfil ausente (2026-10-10)
+
+**Relato:** o usuário confirmou que o fluxo de login voltou a funcionar após o deploy do commit `d8e29989a21cd1cd0a1a71ec95ca7f48b6c53d86`, testado no perfil normal do Chrome, no Edge InPrivate e no navegador original.
+
+**Status da manutenção de autenticação:** validação funcional manual concluída pelo usuário. Build, type-check e testes automatizados não foram executados/confirmados; não marcar esses itens como aprovados.
+
+**Novo defeito:** no portal do tenant, ao entrar como administrador, o link “Meu Perfil” não aparecia. Inspeção estática de `src/components/layouts/DashboardLayouts.tsx` identificou que o link era ocultado quando `profile?.perfil === "Candidato"`, embora o requisito informado seja exibir a opção a todos os usuários do painel. O papel efetivo do tenant é baseado também na membership; portanto, o perfil legado não deve decidir se a navegação pessoal aparece.
+
+**Correção na main:** commit `a48ae30367a6f5d14a5c5cc122e58ee7f54853ad` removeu a condição de ocultação. O link continua direcionando para a rota `/perfil` da área atual; para candidatos, a rota existente redireciona para o currículo. Não foram alteradas permissões, RPCs ou RLS.
+
+| Etapa | Status | Evidência |
+|---|---|---|
+| Confirmar relato e revisar menu compartilhado | Concluído | Código atual inspecionado |
+| Identificar causa estática | Concluído | Condição baseada em perfil legado escondia o link |
+| Remover condição | Concluído — código na main | Commit `a48ae30367a6f5d14a5c5cc122e58ee7f54853ad` |
+| Build/type-check/testes automatizados | Aguardando validação | Ainda não executados |
+| Teste visual do link por tipo de usuário | Aguardando validação | Admin tenant, RH, Master e candidato |
+| Deploy Vercel | Não iniciado | Manual, sob controle do usuário |
+
