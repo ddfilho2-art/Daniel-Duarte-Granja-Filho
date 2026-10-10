@@ -138,7 +138,7 @@ Deno.serve(async (request) => {
     if (action === "availability") {
       const conversationId = String(body.conversationId || "");
       const conversation = await getConversation(conversationId);
-      await setCalendarForTenant(conversation.clinic_tenant_id);
+      const calendarConfig = await setCalendarForTenant(conversation.clinic_tenant_id);
       const start = iso(body.timeMin), end = iso(body.timeMax);
       if (new Date(end).getTime() <= new Date(start).getTime() ||
           new Date(end).getTime() - new Date(start).getTime() > 7 * 24 * 60 * 60 * 1000) {
@@ -158,14 +158,14 @@ Deno.serve(async (request) => {
         googleBusy(start, end), dbBusy(conversation.clinic_tenant_id, start, end, excludeAppointmentId),
       ]);
       const filteredGoogleBusy = oldInterval ? gBusy.filter((b) => !sameInterval(b, oldInterval!.start, oldInterval!.end)) : gBusy;
-      return jsonResponse({ success: true, requestId: id, busy: [...filteredGoogleBusy, ...dBusy] }, 200, cors);
+      return jsonResponse({ success: true, requestId: id, busy: [...filteredGoogleBusy, ...dBusy], timezone: calendarConfig.timezone }, 200, cors);
     }
 
     if (action === "book") {
       const conversationId = String(body.conversationId || "");
       const conversation = await getConversation(conversationId);
-      await setCalendarForTenant(conversation.clinic_tenant_id);
-      const start = iso(body.startsAt), end = iso(body.endsAt), timezone = String(body.timezone || "");
+      const calendarConfig = await setCalendarForTenant(conversation.clinic_tenant_id);
+      const start = iso(body.startsAt), end = iso(body.endsAt), timezone = String(calendarConfig.timezone || body.timezone || "");
       validateTimezone(timezone); checkWindow(start, end);
       const idempotencyKey = String(body.idempotencyKey || "");
       if (idempotencyKey.length < 8 || idempotencyKey.length > 160) throw new Error("invalid_idempotency_key");
@@ -221,8 +221,8 @@ Deno.serve(async (request) => {
       const { data: old, error: oldError } = await admin.from("tenant_clinic_appointments").select("*").eq("id", appointmentId).maybeSingle();
       if (oldError || !old) throw new Error("appointment_not_found");
       const conversation = await getConversation(old.conversation_id);
-      await setCalendarForTenant(conversation.clinic_tenant_id);
-      const start = iso(body.startsAt), end = iso(body.endsAt), timezone = String(body.timezone || "");
+      const calendarConfig = await setCalendarForTenant(conversation.clinic_tenant_id);
+      const start = iso(body.startsAt), end = iso(body.endsAt), timezone = String(calendarConfig.timezone || body.timezone || "");
       validateTimezone(timezone); checkWindow(start, end);
       const [gBusy, dBusy] = await Promise.all([
         googleBusy(start, end), dbBusy(conversation.clinic_tenant_id, start, end, appointmentId),
