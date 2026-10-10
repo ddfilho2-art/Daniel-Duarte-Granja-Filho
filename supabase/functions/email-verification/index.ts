@@ -10,6 +10,7 @@ import {
 
 type VerificationRequest =
   | { action: "request"; email?: string }
+  | { action: "register"; email?: string; name?: string; password?: string }
   | {
       action: "verify";
       email?: string;
@@ -127,7 +128,22 @@ Deno.serve(async (request) => {
       return data as { allowed: boolean; retry_after: number };
     };
 
-    if (body.action === "request") {
+    if (body.action === "request" || body.action === "register") {
+      const isRegistration = body.action === "register";
+      const registrationName = String(body.action === "register" ? body.name || "" : "").trim();
+      const registrationPassword = String(body.action === "register" ? body.password || "" : "");
+      if (isRegistration && (
+        registrationName.length < 1 || registrationName.length > 100 ||
+        registrationPassword.length < 8 || !/[A-Z]/.test(registrationPassword) ||
+        !/[a-z]/.test(registrationPassword) || !/[0-9]/.test(registrationPassword)
+      )) {
+        return jsonResponse(
+          { success: false, code: "INVALID_REGISTRATION_INPUT", requestId: currentRequestId },
+          400,
+          cors,
+        );
+      }
+
       const ipLimit = await rateLimit(
         "email-verification:request-ip",
         requesterHash,
@@ -167,6 +183,29 @@ Deno.serve(async (request) => {
         );
       }
 
+      // Use Auth Admin API: unlike auth.signUp(), createUser does not send
+      // Supabase's native confirmation-link email. The account stays unconfirmed
+      // until the custom six-digit code is verified.
+      if (isRegistration) {
+        const { error: createUserError } = await admin.auth.admin.createUser({
+          email,
+          password: registrationPassword,
+          email_confirm: false,
+          user_metadata: { nome: registrationName, perfil: "Candidato" },
+        });
+        if (createUserError) {
+          const message = createUserError.message.toLowerCase();
+          if (message.includes("already registered") || message.includes("already been registered") || message.includes("email_exists") || message.includes("already exists")) {
+            return jsonResponse(
+              { success: false, code: "EMAIL_ALREADY_REGISTERED", requestId: currentRequestId },
+              409,
+              cors,
+            );
+          }
+          throw createUserError;
+        }
+      }
+
       const code = secureCode();
       const challengeToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
       const codeHash = await sha256(`${pepper}:${email}:${code}`);
@@ -195,6 +234,14 @@ Deno.serve(async (request) => {
             console.error(
               "email_verification_invalidation_failed",
               invalidateError.code,
+            );
+          }
+          if (isRegistration) {
+            console.error("candidate_signup_email_delivery_failed", currentRequestId);
+            return jsonResponse(
+              { success: false, code: "EMAIL_DELIVERY_FAILED", requestId: currentRequestId },
+              502,
+              cors,
             );
           }
           throw error;
