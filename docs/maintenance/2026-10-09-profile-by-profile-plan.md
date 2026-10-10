@@ -181,3 +181,21 @@ O usuário relatou que a correção com contador de sincronização piorou o tem
 | Build/type-check e testes | Aguardando validação |
 | Teste Master/tenant, navegação, logout e acesso negado | Aguardando validação |
 | Deploy Vercel | Não iniciado — manual |
+
+
+## Correção pontual — Login aguardando autorização (2026-10-10)
+
+**Evidência:** as duas RPCs (is_platform_master_admin e get_current_clinic_access) retornaram rapidamente sem erro, mas o console também mostrou navegação excessiva. Na inspeção de src/pages/Public.tsx, o efeito de Login calculava destino sem verificar authorizationLoading, apesar de o destino do perfil Admin depender da autorização global Master.
+
+**Mudança:** commit 16802dd31fda066c235c67815284a52ecbc03736 adiciona authorizationLoading às dependências do contexto usado por Login e faz o efeito aguardar o fim da autorização antes de redirecionar. Não modifica permissões de backend, RLS nem regras de tenant.
+
+**Limitação:** é uma causa provável para o redirecionamento prematuro; o ciclo de navegação ainda precisa ser confirmado por teste real. Build/type-check e regressão ainda não foram executados. Deploy Vercel permanece manual.
+
+| Etapa | Status |
+|---|---|
+| Diagnóstico de RPCs | Concluído — ambas responderam sem erro nos logs enviados |
+| Inspeção do efeito Login | Concluído |
+| Correção pontual | Commitada na main |
+| Build/type-check/testes | Aguardando validação |
+| Teste login Master, aba e rotas de empresa | Aguardando validação |
+| Deploy Vercel | Não iniciado — manual |
