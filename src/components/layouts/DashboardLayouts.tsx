@@ -234,14 +234,12 @@ function DashboardLayout({
               <span className="text-sm font-medium">
                 {userName}
               </span>
-              {profile?.perfil !== "Candidato" && (
-                <Link
-                  to={`/${location.pathname.split("/")[1] || "rh"}/perfil`}
-                  className="tenant-sidebar-muted text-xs hover:underline"
-                >
-                  Meu Perfil
-                </Link>
-              )}
+              <Link
+                to={`/${location.pathname.split("/")[1] || "rh"}/perfil`}
+                className="tenant-sidebar-muted text-xs hover:underline"
+              >
+                Meu Perfil
+              </Link>
             </div>
           </div>
         </div>
