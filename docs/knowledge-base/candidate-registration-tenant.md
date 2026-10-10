@@ -234,3 +234,15 @@ cookies ou o currículo.
 - Os links do React Router precisam preservar o `basename` do portal (`/empresa/<slug>` ou `/t/<slug>`) para manter o tenant ativo.
 - A alteração de navegação está no commit `ccb54eaa8555072d32ea156d73bde0f6ef5c9ae4`; ainda requer teste em navegador após deploy manual.
 - Limite conhecido: as telas `HRProfile` e `PerfilAdmin` atualizam `public.users` globalmente. Não assumir que esses campos são isolados por tenant. Qualquer migração para dados de perfil profissionais por tenant exige modelo e RLS explícitos e teste de isolamento entre dois tenants. O portal de saúde ocupacional ainda não oferece o mesmo link de perfil.
+
+
+## Manutenção — Empresa ↔ Saúde Ocupacional (2026-10-10)
+
+- Manter separado o chat candidato–RH (`mensagens` com `candidatura_id`) do canal entre tenants empregador e Saúde Ocupacional.
+- A sequência de recrutamento já configura `Proposta` antes de `Entrega de documentação`, `Exame Médico` e `Contrato`; preservar os rótulos e estados existentes.
+- A mensageria entre tenants deve validar `employer_tenant_id` e `clinic_tenant_id` no backend/RLS. Slug/tenant ID enviado pelo frontend não é prova de autorização.
+- Para ASO/anexos médicos, seguir o padrão de `storage-authorize` + URLs assinadas e validação de `can_access_medical_referral`; não enviar documento sensível pelo fluxo genérico `uploadFiles` sem autorização específica.
+- A conversa pode apontar opcionalmente para uma vaga do tenant empregador e, quando pertinente, para um encaminhamento médico validado. Nunca aceitar vínculo de vaga/encaminhamento de outro tenant.
+- Agendamento Google Calendar precisa de backend, OAuth/segredos protegidos, timezone explícito, prevenção de conflitos e operações idempotentes. Não considerar reserva concluída se o Google não confirmar a criação/atualização do evento.
+- Os estados clínicos atuais são `referred`, `scheduled`, `attended`, `result_reported`, `completed`; resultados: `pending`, `fit`, `unfit`, `inconclusive`. Não inventar estados paralelos.
+- Especificação: `docs/maintenance/2026-10-10-employer-clinic-workflow.md`. Implementação e validação permanecem pendentes até concluir migrations, políticas, UI, testes e configuração do calendário.
