@@ -81,3 +81,38 @@ Correção implementada na branch de manutenção:
 - A conta candidata preexistente continua protegida contra conversão automática.
 
 **Status:** correção implementada e revisada estaticamente; build, type-check, testes automatizados e teste de integração ainda não executados. Não considerar validado até essas verificações.
+
+
+## 2026-10-10 — Cadastro por código de seis dígitos sem e-mail nativo do Supabase
+
+### Causa confirmada
+
+O handler anterior chamava `supabase.auth.signUp()`, que dispara o e-mail de confirmação nativo quando a confirmação de e-mail está habilitada. Em seguida, o frontend tentava solicitar o código personalizado à Edge Function `email-verification`. Assim, o usuário recebia o link padrão mesmo quando a solicitação do código personalizado falhava.
+
+### Correção proposta nesta branch
+
+- `supabase/functions/email-verification/index.ts`: adiciona ação `register`, cria o usuário via Auth Admin `createUser` com `email_confirm: false` e metadados `nome`/`perfil: Candidato`; esse método não dispara o e-mail nativo de confirmação.
+- A mesma função aplica os limites por IP/e-mail e emite o desafio de seis dígitos usando as RPCs existentes. A conta só é confirmada depois da validação do código.
+- `src/lib/email-verification.ts`: adiciona `registerCandidateAccount`, que solicita o cadastro e guarda `challengeId`/`challengeToken` em `sessionStorage`.
+- `src/pages/Public.tsx`: deixa de chamar `supabase.auth.signUp()` no cadastro de candidato e passa a chamar a ação `register`.
+- `src/pages/VerifyEmail.tsx`: explica o caminho de recuperação quando a conta é criada mas o envio inicial falha; o candidato pode solicitar novo código.
+- O envio falho retorna `EMAIL_DELIVERY_FAILED`, sem marcar a conta como confirmada. O frontend encaminha para a tela de verificação e permite reenviar.
+
+### Segurança e limites
+
+- A senha é validada no servidor quanto a tamanho mínimo de 8 caracteres e presença de maiúscula, minúscula e número; o frontend mantém sua validação atual.
+- A senha nunca é enviada por e-mail nem armazenada no `sessionStorage`; é enviada apenas no corpo HTTPS para a Edge Function e entregue ao Auth Admin.
+- A conta permanece com e-mail não confirmado até a verificação do código.
+- Não usar `inviteUserByEmail`, pois esse fluxo envia e-mail de convite. Usar `createUser` sem `email_confirm: true` para preservar o código personalizado.
+- Cadastro repetido para e-mail já registrado retorna `EMAIL_ALREADY_REGISTERED`; não redefinir senha nem criar vínculo automático com tenant existente.
+
+### Validação pendente
+
+- Executar build e type-check e corrigir qualquer regressão antes de integrar.
+- Publicar a nova versão de `email-verification` após revisar a branch.
+- Fazer deploy manual da Vercel somente após integração autorizada.
+- Testar cadastro novo e confirmar que chega somente o e-mail do Resend com seis dígitos; validar código correto/incorreto/expirado, reenvio e limites 429.
+- Confirmar que o usuário não consegue entrar antes de validar o código e que, após validar, consegue entrar e registrar-se apenas no tenant correto.
+- Testar e-mail já cadastrado e falha do Resend; verificar logs sem expor senha, código ou token.
+
+**Status:** implementação em branch separada; ainda não validada por build/E2E nem publicada. Não marcar como validada até concluir os testes funcionais.
