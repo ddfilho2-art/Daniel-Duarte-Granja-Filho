@@ -24,6 +24,7 @@ import {
   Repeat,
   Building2,
   Palette,
+  CalendarClock,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useUI } from "../../contexts/UIContext";
@@ -475,6 +476,7 @@ export function HRLayout() {
       label: "Mensagens",
       badge: badges.mensagens,
     },
+    { to: "/rh/saude-ocupacional", icon: CalendarClock, label: "Saúde Ocupacional" },
     { to: "/rh/provas", icon: CheckSquare, label: "Provas" },
     { to: "/rh/talentos", icon: FileCheck, label: "Banco de Talentos" },
     { to: "/rh/relatorios", icon: BarChart, label: "Relatórios" },
