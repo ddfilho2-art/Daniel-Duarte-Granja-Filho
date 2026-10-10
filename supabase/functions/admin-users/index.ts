@@ -529,10 +529,9 @@ async function createMember(
       .maybeSingle();
     if (existingProfileError) throw existingProfileError;
 
-    // The Auth user creation trigger may have already inserted a default
-    // "Candidato" row in public.users for the brand-new Auth user. It is safe
-    // to promote that trigger-created row only when this request itself created
-    // the Auth account. Never convert a pre-existing candidate/other profile.
+    // Promote the trigger-created default profile only for an Auth identity
+    // created in this request. Existing identities with missing/other profiles
+    // require explicit recovery and must not be silently converted.
     if (
       existingProfile &&
       existingProfile.perfil !== "RH" &&
@@ -543,6 +542,48 @@ async function createMember(
         code: "PROFILE_CONFLICT",
         error: "A conta já existe com outro perfil e não pode ser convertida em RH por um administrador da empresa.",
       };
+    }
+    if (!existingProfile && !createdAuthUserInThisRequest) {
+      return {
+        success: false,
+        code: "PROFILE_CONFLICT",
+        error: "A conta de autenticação já existe, mas não possui um perfil RH recuperável automaticamente.",
+      };
+    }
+
+    if (existingProfile?.perfil === "RH") {
+      const { data: memberships, error: membershipsError } = await adminClient
+        .from("tenant_memberships")
+        .select("tenant_id, user_id, roles, status, activated_at, created_at")
+        .eq("user_id", userId);
+      if (membershipsError) throw membershipsError;
+
+      const sameTenant = (memberships || []).find((membership) => membership.tenant_id === tenantId);
+      if (sameTenant) {
+        if (sameTenant.status !== "active" || !sameTenant.roles?.includes("hr")) {
+          return {
+            success: false,
+            code: "MEMBERSHIP_NOT_ACTIVE",
+            error: "Esta conta RH já possui um vínculo não ativo nesta empresa. A reativação precisa ser feita pelo fluxo administrativo apropriado.",
+          };
+        }
+        return {
+          success: true,
+          data: { ...sameTenant, alreadyMember: true },
+          message: "Este usuário RH já está ativo nesta empresa.",
+        };
+      }
+
+      const activeOtherTenant = (memberships || []).some(
+        (membership) => membership.status === "active" && membership.roles?.includes("hr"),
+      );
+      if (activeOtherTenant) {
+        return {
+          success: false,
+          code: "PROFILE_CONFLICT",
+          error: "Esta conta RH já está vinculada a outra empresa e não pode ser adicionada automaticamente a mais um tenant.",
+        };
+      }
     }
 
     const { error: profileUpsertError } = await adminClient
@@ -995,30 +1036,14 @@ async function handleRequest(
           const { data: existingAuthUsers, error: existingAuthError } =
             await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
 
-          if (existingAuthError) {
-            result = {
-              success: false,
-              code: "INTERNAL_ERROR",
-              error: existingAuthError.message,
-            };
-          } else if (
-            existingAuthUsers.users.some(
-              (candidate) => candidate.email?.toLowerCase() === normalizedEmail
-            )
-          ) {
-            result = {
-              success: false,
-              code: "EMAIL_ALREADY_EXISTS",
-              error: "Este e-mail já está em uso.",
-            };
-          } else {
-            result = await createMember(tenantId, normalizedEmail, ["hr"]);
-          }
+          // createMember owns the authoritative profile/membership checks.
+          // A blanket Auth-email rejection here prevented safe retries.
+          result = await createMember(tenantId, normalizedEmail, ["hr"]);
 
           if (result.success && result.data && typeof result.data === "object") {
             const created = result.data as Record<string, unknown>;
             const createdId = String(created.user_id || created.id || "");
-            if (createdId) {
+            if (createdId && created.alreadyMember !== true) {
               const updateResult = await updateLegacyUser(
                 tenantId,
                 createdId,

@@ -64,7 +64,9 @@ const ERROR_MESSAGES: Record<string, string> = {
   LOGIN_ALREADY_EXISTS: "Este login já está em uso.",
   EMAIL_ALREADY_EXISTS: "Este e-mail já está em uso.",
   PROFILE_CONFLICT:
-    "Este e-mail já pertence a uma conta com outro perfil. Use um e-mail ainda não cadastrado.",
+    "Este e-mail já pertence a uma conta incompatível ou vinculada a outra empresa. Use uma conta RH autorizada ou solicite suporte.",
+  MEMBERSHIP_NOT_ACTIVE:
+    "Esta conta RH já possui um vínculo inativo nesta empresa. Solicite a reativação pelo fluxo administrativo.",
   USER_NOT_FOUND: "Usuário não encontrado.",
   INVALID_PROFILE: "Esta operação é permitida apenas para usuários RH.",
   AUTH_CREATE_FAILED: "Não foi possível criar a conta de autenticação.",

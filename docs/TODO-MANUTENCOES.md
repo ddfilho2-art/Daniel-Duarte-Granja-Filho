@@ -328,3 +328,21 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Recuperar ou descartar a conta residual da tentativa | Aguardando decisão | Não excluir nem promover sem decisão explícita |
 | Deploy Vercel | Não iniciado | Continua manual e separado do deploy da Edge Function |
 
+
+
+## Manutenção — cadastro de candidato e criação de RH (2026-10-10)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Consultar base de conhecimento, TODO e código atual | Concluído | Public.tsx, TenantContext.tsx, admin-users/index.ts e admin-users.ts consultados |
+| Candidato: mensagem explícita para conta existente | Implementado na branch | Sem criar outra conta nem vincular por e-mail |
+| Candidato: impedir envio sem id e slug do tenant | Implementado na branch | Guarda anterior ao signUp; requer teste de portal e rota raiz |
+| Candidato: falha de auditoria não simular falha do signup | Implementado na branch | logAudit registra erro sem interromper a confirmação; revisar observabilidade |
+| RH: remover bloqueio genérico por e-mail Auth existente | Implementado na branch | Perfil e membership decidem a operação |
+| RH: repetição ativa no mesmo tenant sem duplicar ou redefinir senha | Implementado na branch | Retorna alreadyMember e pula atualizações posteriores |
+| RH: preservar perfis incompatíveis e impedir RH ativo em outro tenant | Implementado na branch | Códigos específicos e verificações no backend |
+| Testes automatizados, build e type-check | Não validado | package.json não declara runner unitário; executar lint/build e testes antes de aceitar |
+| Testes reais de signup, confirmação e criação RH | Pendente de teste real | Requer navegador e contas de teste controladas; não criar/excluir contas de produção automaticamente |
+| Deploy Supabase / Vercel | Não realizado | Branch separada; deploy Vercel continua manual |
+
+**Limitação:** Auth, public.users, membership e serviço de e-mail não formam uma transação distribuída. Não declarar validado até executar os cenários de falha parcial e autorização em ambiente de teste.
