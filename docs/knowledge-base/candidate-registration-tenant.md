@@ -68,3 +68,16 @@ No RH, o case create rejeitava qualquer e-mail já presente no Auth antes de cre
 ### Achado adicional — preservação do contexto no link de confirmação
 
 O cadastro usava `emailRedirectTo: ${window.location.origin}/verify-email`, descartando o prefixo `/empresa/<slug>` ou `/t/<slug>` do portal. A rota do React Router usa esse prefixo como `basename`; um retorno ao caminho da raiz pode perder o tenant. A branch ajusta o destino para substituir o sufixo `/cadastro` por `/verify-email`, preservando a base do portal. Isso não explica sozinho os signup iniciados com referer na raiz: esses registros ainda exigem confirmar o build ativo e a URL usada pelo usuário.
+
+### Revisão adicional da idempotência de criação RH — 2026-10-10
+
+A revisão do fluxo de criação revelou uma falha parcial possível: a membership era criada antes de concluir senha/metadados e login. Se uma etapa posterior falhasse, a repetição identificaria o RH como membro ativo e pularia as atualizações, deixando a conta incompleta sem caminho de retomada.
+
+Correção implementada na branch de manutenção:
+- Auth criado pelo fluxo RH recebe user_metadata.admin_user_creation_pending = true.
+- Se a repetição encontrar membership RH ativa no mesmo tenant, só retoma o provisionamento quando esse marcador estiver ativo.
+- O fluxo atualiza perfil e login antes de concluir a atualização de senha/metadados; a operação final remove o marcador pendente.
+- Membership ativa preexistente sem marcador continua idempotente e não tem a senha redefinida.
+- A conta candidata preexistente continua protegida contra conversão automática.
+
+**Status:** correção implementada e revisada estaticamente; build, type-check, testes automatizados e teste de integração ainda não executados. Não considerar validado até essas verificações.
