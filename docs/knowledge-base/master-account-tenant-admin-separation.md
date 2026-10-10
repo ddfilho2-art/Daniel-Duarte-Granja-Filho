@@ -77,3 +77,12 @@ No perfil Administrador da Plataforma, a ação “Administradores” da tabela 
 - **Correção atual em `main`:** commit `29dff80d19a0b3a246ffbda37315c0f646ea43e5`. Foi adicionado `lastProfileSyncUserIdRef` para evitar recarregar perfil e reabrir o bloqueio de autorização quando o mesmo usuário já foi sincronizado; o contador de sincronização foi removido. A primeira sincronização e a autorização inicial continuam obrigatórias.
 - **Validação:** inspeção e commit confirmados; build, type-check e teste de navegador ainda não executados. Deploy Vercel não realizado.
 - **Status:** correção anterior substituída; validar login Master, renovação de sessão, navegação e acesso negado antes de considerar concluído.
+
+
+## Diagnóstico de autorização — instrumentação de RPC (2026-10-10)
+
+- O console de produção compartilhado pelo usuário confirma sessão Supabase presente e chamadas iniciadas para `is_platform_master_admin` e `get_current_clinic_access`, mas não mostra retorno, erro ou duração.
+- Não tratar isso como causa-raiz confirmada: o transporte pode estar pendente, ou a tela pode estar presa em outro ponto do fluxo.
+- Commit `62f44baa985fc7e1c1ab52d7207209c6b496ea5c` adiciona logs start/finish e duração das duas RPCs em `src/contexts/AuthContext.tsx`. Nenhuma regra de autorização foi enfraquecida e nenhum deploy Vercel foi realizado.
+- Próximo passo: depois do deploy manual, coletar `phase: start/finish` para identificar a chamada pendente ou com erro. Se ambas finalizarem, investigar os redirecionamentos do `ProtectedRoute`.
+- Status: instrumentação commitada; causa-raiz, build, testes funcionais e regressão aguardam validação.
