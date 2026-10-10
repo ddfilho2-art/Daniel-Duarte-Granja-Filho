@@ -546,3 +546,15 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Deploy Vercel | Não iniciado | Manual; não executar sem autorização explícita |
 
 **Status geral:** especificação registrada; implementação ainda não concluída nem validada. O tipo `Vaga` em `src/lib/useVagas.ts` já declara `quantidade_vagas` e `quantidade_contratada`, mas isso, por si só, não comprova que a criação, o funil individual, a ocupação de posições e os relatórios estejam integrados. Antes de alterar o esquema, auditar o uso real desses campos para evitar criar um modelo duplicado.
+
+
+## Plano consolidado de evolução — Recruta AÍ (2026-10-10)
+
+Plano de acompanhamento central: [`docs/PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md`](PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md).
+
+- Regra adicionada: candidato inapto no exame admissional não ocupa posição contratada; a vaga permanece aberta enquanto houver saldo e não for encerrada por outra razão autorizada.
+- Requisito adicionado: relatórios macro e por empresa de exames admissionais e complementares, com catálogo configurável, preço por contrato, status de realização, ciclo de cobrança e prevenção de faturamento duplicado.
+- Referência normativa: NR-7 oficial do Ministério do Trabalho e Emprego. Exames complementares dependem dos riscos ocupacionais, PCMSO e indicação médica; a lista de exemplos no plano não deve ser interpretada como exigência universal.
+- Auditoria preliminar em andamento: `src/lib/useVagas.ts`, `src/pages/HR.tsx`, `src/pages/OccupationalHealth.tsx` e migration inicial de agenda. Campos de quantitativo existem no contrato de tipos, mas a integração completa ainda não foi comprovada.
+- **Status geral: em progresso / não validado.** A especificação e o plano foram registrados; a auditoria integral e qualquer implementação permanecem pendentes. Nenhum teste/build foi executado e nenhum deploy foi feito.
+- Todos os status e percentuais detalhados devem ser atualizados no plano central acima. Deploy Vercel continua manual e requer autorização explícita.
