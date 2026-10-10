@@ -58,6 +58,12 @@ Deno.serve(async (request) => {
     if (!conversation.medical_referral_id) {
       return jsonResponse({ success: false, code: "MEDICAL_REFERRAL_REQUIRED_FOR_ATTACHMENT", requestId: id }, 400, cors);
     }
+    const { data: referralAccess, error: referralAccessError } = await userClient.rpc(
+      "can_access_medical_referral", { p_referral_id: conversation.medical_referral_id },
+    );
+    if (referralAccessError || !referralAccess) {
+      return jsonResponse({ success: false, code: "MEDICAL_REFERRAL_ACCESS_DENIED", requestId: id }, 403, cors);
+    }
 
     const { data: isClinic, error: sideError } = await userClient.rpc("is_active_clinic_member", { p_clinic_tenant_id: conversation.clinic_tenant_id });
     if (sideError || typeof isClinic !== "boolean") {
