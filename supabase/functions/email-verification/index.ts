@@ -130,8 +130,8 @@ Deno.serve(async (request) => {
 
     if (body.action === "request" || body.action === "register") {
       const isRegistration = body.action === "register";
-      const registrationName = String(isRegistration ? body.name || "" : "").trim();
-      const registrationPassword = String(isRegistration ? body.password || "" : "");
+      const registrationName = String(body.action === "register" ? body.name || "" : "").trim();
+      const registrationPassword = String(body.action === "register" ? body.password || "" : "");
       if (isRegistration && (
         registrationName.length < 1 || registrationName.length > 100 ||
         registrationPassword.length < 8 || !/[A-Z]/.test(registrationPassword) ||
