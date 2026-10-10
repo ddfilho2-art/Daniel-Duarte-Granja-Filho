@@ -162,3 +162,22 @@ Implementada a redefinição de senha pelo Master e a alteração da própria se
 ## Reavaliação — piora da latência no login Master (2026-10-09)
 
 O usuário relatou que a correção com contador de sincronização piorou o tempo do primeiro login do Administrador da Plataforma. Foi removida a estratégia `authorizationSyncVersion`, que disparava nova consulta de autorização após sincronizações repetidas. Commit atual: `29dff80d19a0b3a246ffbda37315c0f646ea43e5`. Agora, `lastProfileSyncUserIdRef` evita recarregar o perfil quando o evento de sessão pertence ao mesmo usuário já sincronizado. A verificação inicial de autorização permanece intacta. Build e teste de navegador ainda pendentes; não houve deploy Vercel.
+
+
+## Investigação adicional — sessão reconhecida, autorização sem log de conclusão (2026-10-10)
+
+**Evidência do usuário:** eventos SIGNED_IN/INITIAL_SESSION/SESSION_PRESENT, sessão presente e chamadas iniciadas para `is_platform_master_admin` e `get_current_clinic_access`. O console não contém logs de conclusão, duração ou erro; portanto, ainda não é possível afirmar qual chamada está pendente nem atribuir a causa-raiz.
+
+**Mudança diagnóstica na main:** commit `62f44baa985fc7e1c1ab52d7207209c6b496ea5c` instrumenta início/fim e duração das duas RPCs, registrando somente nome da RPC, duração, sucesso e código/mensagem de erro. Não registra tokens nem cabeçalhos de autorização. Nenhuma regra de autorização foi alterada.
+
+**Próximo passo:** após deploy manual, reproduzir uma vez e verificar se cada RPC emite `phase: finish`. Se houver início sem conclusão, investigar transporte/requisição pendente; se concluir com erro, corrigir a causa específica; se ambas concluírem, seguir para o fluxo de redirecionamento em `ProtectedRoute`.
+
+| Etapa | Status |
+|---|---|
+| Analisar logs compartilhados | Concluído — evidência parcial |
+| Instrumentar tempo de RPC | Concluído — commitado |
+| Confirmar causa-raiz | Aguardando validação |
+| Implementar correção funcional | Não iniciado |
+| Build/type-check e testes | Aguardando validação |
+| Teste Master/tenant, navegação, logout e acesso negado | Aguardando validação |
+| Deploy Vercel | Não iniciado — manual |
