@@ -225,3 +225,12 @@ a partir do ambiente de manutenção não pôde resolver o host do Supabase, por
 mas a resposta HTTP ao vivo ainda não foi inspecionada. Se o erro persistir, capturar no DevTools a requisição OPTIONS
 e conferir exatamente `Access-Control-Allow-Origin` e `Access-Control-Allow-Headers`; não compartilhar tokens,
 cookies ou o currículo.
+
+
+## Regra complementar — navegação para Meu Perfil (2026-10-10)
+
+- O destino do link de perfil deve ser definido pelo painel/role ativo, não por parsing do primeiro segmento da URL atual.
+- Para candidato, usar `/candidato/curriculo`: a página carrega `public.candidatos` filtrando simultaneamente `tenant_id` e `user_id`. Não substituir por um perfil global para dados profissionais do candidato.
+- Os links do React Router precisam preservar o `basename` do portal (`/empresa/<slug>` ou `/t/<slug>`) para manter o tenant ativo.
+- A alteração de navegação está no commit `ccb54eaa8555072d32ea156d73bde0f6ef5c9ae4`; ainda requer teste em navegador após deploy manual.
+- Limite conhecido: as telas `HRProfile` e `PerfilAdmin` atualizam `public.users` globalmente. Não assumir que esses campos são isolados por tenant. Qualquer migração para dados de perfil profissionais por tenant exige modelo e RLS explícitos e teste de isolamento entre dois tenants. O portal de saúde ocupacional ainda não oferece o mesmo link de perfil.
