@@ -148,7 +148,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
     try {
       const startOfDay = new Date(appointmentDate + "T08:00:00");
       const endOfDay = new Date(appointmentDate + "T18:00:00");
-      const busy = await getTenantClinicAvailability(selectedId, startOfDay.toISOString(), endOfDay.toISOString());
+      const busy = await getTenantClinicAvailability(selectedId, startOfDay.toISOString(), endOfDay.toISOString(), reschedulingId);
       const slots: { start: string; end: string; label: string }[] = [];
       for (let cursor = new Date(startOfDay); cursor.getTime() + 30 * 60000 <= endOfDay.getTime(); cursor = new Date(cursor.getTime() + 30 * 60000)) {
         const end = new Date(cursor.getTime() + 30 * 60000);
