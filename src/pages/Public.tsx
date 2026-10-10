@@ -969,8 +969,10 @@ export function Cadastro() {
     authLoading,
     profileLoading,
     tenantMembershipLoading,
+    authorizationLoading,
     tenantRoles,
     canAdministerTenant,
+    isPlatformMasterAdmin,
   } = useAuth();
   const { isTenantRoute, tenant } = useTenant();
 
