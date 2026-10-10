@@ -109,7 +109,7 @@ O handler anterior chamava `supabase.auth.signUp()`, que dispara o e-mail de con
 ### Publicação realizada
 
 - PR #8 integrado à `main` no commit `d7e259c9fff3ffac6ddfafa6a967ae601a14a71d`.
-- Edge Function `email-verification` versão 10 está `ACTIVE`; a releitura confirmou a ação `register` e o import map.
+- Edge Function `email-verification` versão 11 está `ACTIVE`; a releitura confirmou a ação `register`, o import map e a origem de produção adicionada ao CORS.
 - Deploy Vercel não realizado; permanece manual sob controle do usuário.
 
 ### Validação pendente
@@ -120,4 +120,4 @@ O handler anterior chamava `supabase.auth.signUp()`, que dispara o e-mail de con
 - Confirmar que o usuário não consegue entrar antes de validar o código e que, após validar, consegue entrar e registrar-se apenas no tenant correto.
 - Testar e-mail já cadastrado e falha do Resend; verificar logs sem expor senha, código ou token.
 
-**Status:** código integrado à `main` e Edge Function publicada; ainda não validada por build/E2E nem por teste real de e-mail. Não marcar como validada até concluir os testes funcionais.
+**Status:** código integrado à `main` e Edge Function publicada; ainda não validada por build/E2E nem por teste real de e-mail. Não marcar como validada até concluir os testes funcionais.\n\n### Incidente CORS — 2026-10-10\n\n**Sintoma:** preflight do navegador para `/functions/v1/email-verification` bloqueado por ausência de `Access-Control-Allow-Origin` para `https://daniel-duarte-granja-filho.vercel.app`.\n\n**Causa:** `corsHeaders()` dependia apenas da variável `ALLOWED_ORIGINS`; a origem de produção não era aceita.\n\n**Correção:** `configuredOrigins()` mantém os valores configurados e adiciona a origem exata de produção. Não usar `Access-Control-Allow-Origin: *`. A versão 11 da Edge Function foi publicada e a configuração foi relida.\n\n**Validação pendente:** confirmar OPTIONS via navegador e fazer um cadastro controlado. O teste de rede externo não pôde ser executado neste ambiente por falha de resolução DNS do host Supabase.
