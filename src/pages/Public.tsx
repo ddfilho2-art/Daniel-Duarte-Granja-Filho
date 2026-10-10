@@ -1054,7 +1054,8 @@ export function Cadastro() {
             nome: formData.nome.trim(),
             perfil: "Candidato",
           },
-          emailRedirectTo: `${window.location.origin}/verify-email`,
+          // Preserve the company portal base path when Supabase redirects after email confirmation.
+          emailRedirectTo: `${window.location.origin}${window.location.pathname.replace(/\/cadastro\/?$/, "/verify-email")}`,
         },
       });
 

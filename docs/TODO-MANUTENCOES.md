@@ -337,6 +337,7 @@ A primeira tentativa de publicação falhou ao resolver o caminho do import map.
 | Consultar base de conhecimento, TODO e código atual | Concluído | Public.tsx, TenantContext.tsx, admin-users/index.ts e admin-users.ts consultados |
 | Candidato: mensagem explícita para conta existente | Implementado na branch | Sem criar outra conta nem vincular por e-mail |
 | Candidato: impedir envio sem id e slug do tenant | Implementado na branch | Guarda anterior ao signUp; requer teste de portal e rota raiz |
+| Candidato: preservar base do tenant no redirect de confirmação | Implementado na branch | emailRedirectTo substitui /cadastro por /verify-email mantendo /empresa/<slug> ou /t/<slug>; requer teste real do link |
 | Candidato: falha de auditoria não simular falha do signup | Implementado na branch | logAudit registra erro sem interromper a confirmação; revisar observabilidade |
 | RH: remover bloqueio genérico por e-mail Auth existente | Implementado na branch | Perfil e membership decidem a operação |
 | RH: repetição ativa no mesmo tenant sem duplicar ou redefinir senha | Implementado na branch | Retorna alreadyMember e pula atualizações posteriores |

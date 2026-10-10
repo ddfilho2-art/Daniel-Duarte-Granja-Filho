@@ -63,3 +63,8 @@ O fluxo candidato aguardava logAudit após signUp e antes de signOut; uma falha 
 No RH, o case create rejeitava qualquer e-mail já presente no Auth antes de createMember, impedindo distinguir RH ativo no mesmo tenant de conta incompatível. A branch remove essa rejeição genérica e faz createMember reconhecer vínculo RH ativo no mesmo tenant sem redefinir senha nem criar nova membership. Contas com perfil incompatível, membership inativa ou vínculo RH ativo em outro tenant permanecem bloqueadas.
 
 **Status:** implementação em branch separada; não validada por build/testes nem publicada. Não alterar contas de produção para testar.
+
+
+### Achado adicional — preservação do contexto no link de confirmação
+
+O cadastro usava `emailRedirectTo: ${window.location.origin}/verify-email`, descartando o prefixo `/empresa/<slug>` ou `/t/<slug>` do portal. A rota do React Router usa esse prefixo como `basename`; um retorno ao caminho da raiz pode perder o tenant. A branch ajusta o destino para substituir o sufixo `/cadastro` por `/verify-email`, preservando a base do portal. Isso não explica sozinho os signup iniciados com referer na raiz: esses registros ainda exigem confirmar o build ativo e a URL usada pelo usuário.
