@@ -89,7 +89,7 @@ Correção implementada na branch de manutenção:
 
 O handler anterior chamava `supabase.auth.signUp()`, que dispara o e-mail de confirmação nativo quando a confirmação de e-mail está habilitada. Em seguida, o frontend tentava solicitar o código personalizado à Edge Function `email-verification`. Assim, o usuário recebia o link padrão mesmo quando a solicitação do código personalizado falhava.
 
-### Correção proposta nesta branch
+### Correção integrada à main e publicada no Supabase
 
 - `supabase/functions/email-verification/index.ts`: adiciona ação `register`, cria o usuário via Auth Admin `createUser` com `email_confirm: false` e metadados `nome`/`perfil: Candidato`; esse método não dispara o e-mail nativo de confirmação.
 - A mesma função aplica os limites por IP/e-mail e emite o desafio de seis dígitos usando as RPCs existentes. A conta só é confirmada depois da validação do código.
@@ -106,13 +106,18 @@ O handler anterior chamava `supabase.auth.signUp()`, que dispara o e-mail de con
 - Não usar `inviteUserByEmail`, pois esse fluxo envia e-mail de convite. Usar `createUser` sem `email_confirm: true` para preservar o código personalizado.
 - Cadastro repetido para e-mail já registrado retorna `EMAIL_ALREADY_REGISTERED`; não redefinir senha nem criar vínculo automático com tenant existente.
 
+### Publicação realizada
+
+- PR #8 integrado à `main` no commit `d7e259c9fff3ffac6ddfafa6a967ae601a14a71d`.
+- Edge Function `email-verification` versão 10 está `ACTIVE`; a releitura confirmou a ação `register` e o import map.
+- Deploy Vercel não realizado; permanece manual sob controle do usuário.
+
 ### Validação pendente
 
-- Executar build e type-check e corrigir qualquer regressão antes de integrar.
-- Publicar a nova versão de `email-verification` após revisar a branch.
-- Fazer deploy manual da Vercel somente após integração autorizada.
+- Executar build e type-check e corrigir qualquer regressão.
+- Fazer deploy manual da Vercel após decisão do usuário.
 - Testar cadastro novo e confirmar que chega somente o e-mail do Resend com seis dígitos; validar código correto/incorreto/expirado, reenvio e limites 429.
 - Confirmar que o usuário não consegue entrar antes de validar o código e que, após validar, consegue entrar e registrar-se apenas no tenant correto.
 - Testar e-mail já cadastrado e falha do Resend; verificar logs sem expor senha, código ou token.
 
-**Status:** implementação em branch separada; ainda não validada por build/E2E nem publicada. Não marcar como validada até concluir os testes funcionais.
+**Status:** código integrado à `main` e Edge Function publicada; ainda não validada por build/E2E nem por teste real de e-mail. Não marcar como validada até concluir os testes funcionais.
