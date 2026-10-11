@@ -350,3 +350,13 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Médico vê somente seus próprios encaminhamentos atribuídos na seção “Meus exames”; a fila disponível contém somente casos ainda não atribuídos e dados operacionais mínimos.
 - Evidência: [Lote 13 — fila por clínica](maintenance/2026-10-11-lote13-fila-escopada-por-clinica.md).
 - Isolamento multi-clínica e acesso por papel serão testados na etapa final. Nenhum teste/build/type-check foi executado; sem aplicação de migrations remotas ou deploy.
+
+
+### Atualização — Lote 14: desistência de candidatura por RH (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Nova RPC `rpc_cancelar_candidatura_rh` exige papel autorizado no tenant da vaga, justificativa, vínculo candidatura/vaga e bloqueia desistência de candidato já contratado ou terminal.
+- A interface de RH recebeu ação separada para encerrar candidatura por desistência; não é a mesma operação que reprovar, cancelar exame complementar ou cancelar agendamento.
+- O status de desistência não conta como vaga preenchida; o contador continua considerando somente `Contratado`.
+- Evidência: [Lote 14 — desistência por RH](maintenance/2026-10-11-lote14-desistencia-candidatura-rh.md).
+- Compatibilidade de estados legados e controles de autorização serão testados na etapa final. Nenhum teste/build/type-check foi executado; sem aplicação de migration remota, merge ou deploy.
