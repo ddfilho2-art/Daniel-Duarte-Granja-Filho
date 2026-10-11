@@ -677,7 +677,8 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 | Fechar período e congelar valores | Implementado no código; não validado | RPC fecha ciclo e inclui itens de rascunho |
 | Registrar boleto/fatura externa e pagamento | Implementado no código; não validado | Referência externa, vencimento, data de emissão e pagamento |
 | Ajustes/estornos auditáveis | Implementado no código; não validado | Ajustes positivos/negativos pós-fechamento e reversão justificada apenas em rascunho |
-| Relatórios macro/detalhados e exportação | Em aberto | RPCs de lista estão versionadas; falta UI, reconciliação e exportação CSV/XLSX/PDF |
+| Relatório macro por clínica/período | Implementado no código; não validado | RPC agrega admissionais, complementares por status, itens faturáveis, ajustes e ciclos por status/contrato |
+| Relatório detalhado e exportação | Em aberto | RPCs de itens/ciclos estão versionadas; falta UI, reconciliação e exportação CSV/XLSX/PDF |
 | Integração bancária/geração de boleto | Aguardando decisão de escopo | Base atual registra emissão externa; não gera boleto nem chama provedor |
 | Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
 | Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
