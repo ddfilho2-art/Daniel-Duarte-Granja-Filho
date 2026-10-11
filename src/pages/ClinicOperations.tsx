@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { ClinicBilling } from "./ClinicBilling";
 
-type Referral={id:string;candidate_name?:string;job_title?:string;exam_type:string;status:string;fifo_original_at?:string;fitness_result?:string};
+type Referral={id:string;clinic_tenant_id?:string;candidate_name?:string;job_title?:string;exam_type:string;status:string;fifo_original_at?:string;fitness_result?:string;priority_override?:boolean};
 type Catalog={id:string;code:string;name:string;description?:string|null;active:boolean;service_kind?:string};
 type Exam={id:string;code:string;name:string;status:string;requested_at:string;scheduled_for:string|null;performed_at:string|null;cancellation_reason?:string|null};
 type PriorityReferral={id:string;candidate_name?:string;job_title?:string;exam_type:string;status:string;fifo_original_at?:string;priority_override:boolean;priority_justification?:string|null};
@@ -16,12 +16,13 @@ export function ClinicOperations(){
  const [code,setCode]=useState(""),[name,setName]=useState(""),[catalogId,setCatalogId]=useState(""),[reason,setReason]=useState("");
  const [examSchedule,setExamSchedule]=useState<Record<string,string>>({}),[examCancelReasons,setExamCancelReasons]=useState<Record<string,string>>({});
  const act=async(fn:()=>Promise<void>)=>{setBusy(true);setError("");setNotice("");try{await fn()}catch(e){setError(e instanceof Error?e.message:"Não foi possível concluir a operação.")}finally{setBusy(false)}};
- const load=async()=>{const [a,b,c]=await Promise.all([supabase.rpc("list_available_medical_referrals"),supabase.rpc("list_my_assigned_medical_referrals"),supabase.rpc("list_my_medical_referrals")]);if(a.error||b.error||c.error)throw a.error||b.error||c.error;setQueue(a.data||[]);setMine(b.data||[]);setReferrals(c.data||[])};
+ const load=async()=>{if(!clinicId){setQueue([]);setMine([]);setReferrals([]);return}const [a,b,c]=await Promise.all([supabase.rpc("list_available_medical_referrals_for_clinic",{p_clinic_tenant_id:clinicId}),supabase.rpc("list_my_assigned_medical_referrals_for_clinic",{p_clinic_tenant_id:clinicId}),supabase.rpc("list_clinic_referrals_for_complementary_exam",{p_clinic_tenant_id:clinicId})]);if(a.error||b.error||c.error)throw a.error||b.error||c.error;setQueue(a.data||[]);setMine(b.data||[]);setReferrals(c.data||[])};
  const loadTenants=async()=>{const {data,error}=await supabase.rpc("list_my_clinic_operational_tenants");if(error)throw error;const list=(data||[]) as {tenant_id:string;tenant_name:string;can_manage:boolean}[];setClinicTenants(list);if(!clinicId&&list[0])setClinicId(list[0].tenant_id)};
  const loadCatalog=async()=>{if(!clinicId){setCatalog([]);return}const r=await supabase.rpc("list_occupational_health_exam_catalog",{p_clinic_tenant_id:clinicId});if(r.error)throw r.error;setCatalog(r.data||[])};
  const loadPriorityQueue=async()=>{if(!clinicId||!clinicTenants.some(t=>t.tenant_id===clinicId&&t.can_manage)){setPriorityQueue([]);return}const r=await supabase.rpc("list_clinic_priority_queue",{p_clinic_tenant_id:clinicId});if(r.error)throw r.error;setPriorityQueue(r.data||[])};
  const loadExams=async(id:string)=>{if(!id){setExams([]);return}const {data,error}=await supabase.rpc("list_medical_referral_complementary_exams",{p_referral_id:id});if(error)throw error;setExams(data||[])};
  useEffect(()=>{void act(async()=>{await Promise.all([load(),loadTenants()])})},[]);
+ useEffect(()=>{setReferralId("");setExams([]);void act(load)},[clinicId]);
  useEffect(()=>{void act(()=>loadCatalog())},[clinicId]);
  useEffect(()=>{void act(()=>loadPriorityQueue())},[clinicId,clinicTenants]);
  useEffect(()=>{void act(()=>loadExams(referralId))},[referralId]);
