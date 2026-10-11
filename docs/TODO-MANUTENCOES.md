@@ -585,3 +585,9 @@ Projeto consultado somente leitura: `dmzagrakkduddofkqjhg`.
 - **Ação:** concluir matriz de dependências, migrations e funções; não considerar o lote empresa–clínica disponível em produção nem publicar frontend antes da sincronização controlada e da validação integrada.
 
 Detalhamento e critérios: [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md). Nenhuma alteração de banco, publicação de Edge Function, build ou deploy foi executada nesta auditoria.
+### Novo achado crítico — transição para contrato e acesso a anexos (2026-10-10)
+
+- A RPC remota `rpc_atualizar_candidatura_processo` grava fase/status sem exigir resultado apto do exame admissional; hoje não há trava transacional de contratação vinculada à aptidão médica.
+- `medical_referrals.legacy_application_id` é texto sem FK para `candidaturas.id`, então o vínculo é fraco e não garante integridade transacional.
+- A Edge Function `storage-authorize` usa `can_access_medical_referral()` para upload e download. Como a função permite `is_platform_master_admin()`, o risco de acesso global alcança potencialmente anexos médicos privados.
+- Prioridade: incluir na matriz de impacto a transação contratação↔resultado médico, vínculo íntegro candidatura↔encaminhamento e correção de autorização clínica/Storage. Não aplicar revogações genéricas de `SECURITY DEFINER`; classificar por função e validar com testes negativos.
