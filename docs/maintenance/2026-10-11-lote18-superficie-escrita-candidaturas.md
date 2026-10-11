@@ -36,3 +36,10 @@ O inventário estático anterior apontou a marcação de leitura em src/pages/HR
 - [ ] Atualizar documentação com evidência real; aplicar remoto/deploy somente com autorização explícita.
 
 **Situação:** implementação versionada, ainda não validada.
+
+
+## Descoberta de RLS associada
+
+A policy histórica de UPDATE em candidaturas elegia também o próprio candidato e restringia WITH CHECK principalmente pelo tenant, sem limitar as colunas que ele poderia modificar. O trigger de transição de fase/status protege esses dois campos, mas não é uma proteção geral de todas as colunas. O Lote 18 complementa a defesa revogando UPDATE direto em candidaturas e movendo a única atualização executável de cliente localizada (marcação de leitura do RH) para uma RPC com validação de tenant e papel.
+
+Ainda falta confirmar ACL e owner efetivos das RPCs no banco de homologação, além de reconfirmar todos os escritores externos antes de aplicar a migration.
