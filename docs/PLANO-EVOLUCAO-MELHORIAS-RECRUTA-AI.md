@@ -140,10 +140,10 @@ Esta rodada foi uma leitura de código/migrations no GitHub. Não houve execuç�
 | ID | Atividade | Status / progresso | Feito até agora | Falta fazer / critério de conclusão |
 |---|---|---|---|---|
 | B1 | Uma vaga por cargo com quantidade de posições e candidaturas independentes | **Não iniciado — 0%** | Especificação funcional prévia registrada em `docs/maintenance/2026-10-10-multiple-openings-per-requisition.md`. | Concluir auditoria A1/A5; implementar apenas após matriz de impacto e plano de migração. |
-| B2 | Contabilizar posição somente ao registrar contratação | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Definir transição canônica, idempotência, reversão auditável e contagem consistente em transações concorrentes. |
-| B3 | Candidato inapto não preenche a posição; vaga continua aberta | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Mapear estados de resultado médico e de candidatura; garantir que inaptidão não marque contratação nem feche vaga, e que o RH receba apenas informação autorizada. |
-| B4 | Bloquear novas candidaturas ao atingir o headcount | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Aplicar bloqueio no backend/banco em todos os caminhos de inscrição; testar concorrência, reabertura e alteração autorizada de quantidade. |
-| B5 | Cancelamento de candidatura pelo RH autorizado | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Identificar ações atuais e reforçar validação de papel, tenant, histórico e distinção de cancelamento de exame/agendamento. |
+| B2 | Contabilizar posição somente ao registrar contratação | **Em progresso — 80% (implementação; não validada)** | Migration do Lote 1 define status canônico `Contratado`, trigger transacional de limite/aptidão e contador derivado; Lote 15 alinha a interface e o dashboard ao status canônico. | Revisar caminhos restantes de escrita, estados legados e reversão auditável; validar concorrência somente na etapa autorizada de testes. |
+| B3 | Candidato inapto não preenche a posição; vaga continua aberta | **Em progresso — 80% (implementação; não validada)** | Trigger do Lote 1 exige encaminhamento admissional apto, não cancelado, vinculado à candidatura e empresa antes de status `Contratado`. | Conferir estados legados e todos os caminhos de atualização; validar cenários apto/inapto e privacidade do retorno ao RH na etapa integrada. |
+| B4 | Bloquear novas candidaturas ao atingir o headcount | **Em progresso — 80% (implementação; não validada)** | Migration do Lote 1 adiciona quantitativos, backfill, locks e bloqueio no banco; fluxo de candidatura e transição de contratação compartilham o lock por vaga. | Revisar criação/edição de vaga, estados históricos, aumento/redução autorizada e confirmar concorrência em testes posteriores. |
+| B5 | Cancelamento de candidatura pelo RH autorizado | **Em progresso — 85% (implementação; não validada)** | Lote 14 implementa `rpc_cancelar_candidatura_rh` com papel/tenant, justificativa, auditoria e bloqueio de estados terminais. | Validar valores legados, permissões efetivas e regressão com headcount. |
 | B6 | Relatórios de posições preenchidas e disponíveis | **Não iniciado — 0%** | Requisito identificado. | Definir métricas derivadas do estado transacional e reconciliar com dados existentes; validar com cenários de contratação e reversão. |
 
 ### Fase C — Operação da Saúde Ocupacional
@@ -360,3 +360,13 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - O status de desistência não conta como vaga preenchida; o contador continua considerando somente `Contratado`.
 - Evidência: [Lote 14 — desistência por RH](maintenance/2026-10-11-lote14-desistencia-candidatura-rh.md).
 - Compatibilidade de estados legados e controles de autorização serão testados na etapa final. Nenhum teste/build/type-check foi executado; sem aplicação de migration remota, merge ou deploy.
+
+
+### Atualização — Lote 15: status canônico de contratação e headcount (2026-10-11)
+
+- **Status:** concluído — não validado (correção de interface e documentação).
+- A ação de RH agora envia status `Contratado` ao alcançar a fase `Contratado`, em vez de `APROVADA`, para acionar as proteções transacionais do banco já versionadas no Lote 1.
+- O indicador de contratações do dashboard passa a contar exclusivamente status `Contratado`, alinhado ao contador de posições preenchidas.
+- Não foram alterados dados legados nem a migration do Lote 1. Estados antigos com fase `Contratado` e status `APROVADA` permanecem pendentes de reconciliação aprovada.
+- Evidência: [Lote 15 — status canônico de contratação](maintenance/2026-10-11-lote15-status-canonico-contratacao-headcount.md).
+- Nenhum teste, build, type-check ou E2E foi executado. Nenhuma migration remota, merge, PR ou deploy foi realizado.
