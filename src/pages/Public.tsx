@@ -1000,7 +1000,7 @@ export function Cadastro() {
     const destination = resolveAuthorizedHomePath(
       profile.perfil,
       isTenantRoute,
-      { roles: tenantRoles, canAdministerTenant },
+      { roles: tenantRoles, canAdministerTenant, isPlatformMasterAdmin },
     );
     if (destination) navigate(destination, { replace: true });
   }, [
