@@ -32,6 +32,9 @@ Criada a migration versionada `supabase/migrations/20261011150000_harden_candida
 - Reservar desistência/cancelamento para operação específica.
 - Manter a proteção existente do trigger para exame admissional apto e limite concorrente de vagas.
 - Revogar execução de `PUBLIC` e `anon` e conceder execução a `authenticated`.
+- Criar o trigger `guard_candidatura_transition_write` para impedir alterações diretas de fase/status por candidatos ou usuários sem papel RH autorizado, inclusive quando a chamada tenta contornar a RPC.
+- Impor coerência de fase/status no nível da tabela, impedir reabertura de estados terminais e exigir justificativa e auditoria correspondente para registrar desistência.
+- Redefinir `rpc_cancelar_candidatura_rh` para gravar a auditoria antes da atualização; se a atualização falhar, a transação também desfaz o registro de auditoria.
 
 ### Interface de RH
 
@@ -52,7 +55,7 @@ As atualizações não relacionadas à transição de fase/status, como marcaç�
 - A migration está apenas versionada na branch; não foi aplicada ao Supabase remoto.
 - A proteção de exame e headcount depende da migration do Lote 1 estar aplicada no ambiente em que o fluxo for validado.
 - Registros legados incoerentes não foram modificados.
-- Esta RPC protege os caminhos que a chamam; outros clientes/rotas com permissão direta de UPDATE ainda precisam ser inventariados e avaliados antes de afirmar que todas as escritas estão centralizadas.
+- O trigger protege alterações de fase/status mesmo nos caminhos diretos restantes; ainda é necessário terminar o inventário de clientes/rotas e revisar políticas SQL/RLS para confirmar todos os campos e caminhos de escrita.
 - A ação de desistência permanece na RPC dedicada `rpc_cancelar_candidatura_rh`.
 - Nenhum teste, build, type-check ou E2E foi executado, conforme orientação de deixar a validação para o final.
 - Não houve aplicação de migration remota, merge, pull request ou deploy.
@@ -63,15 +66,15 @@ No final da etapa de implementação, testar pelo menos:
 
 1. Aprovação intermediária conserva a fase/status esperado.
 2. Aprovação a partir de `Exame` e da última etapa `Contrato` só conclui a contratação quando o banco confirma exame admissional apto.
-2. Fase `Contratado` sem status `Contratado` é rejeitada.
-3. Status `Contratado` fora da fase final é rejeitado.
-4. Contratação sem exame admissional apto é rejeitada pelo banco.
-5. Duas contratações simultâneas para a última posição não excedem o headcount.
-6. Reprovação gera fase `Encerrado` e não pode ser reaberta pela RPC genérica.
-7. Desistência exige justificativa, grava auditoria e não ocupa posição.
-8. Usuário de outro tenant ou sem papel autorizado não consegue atualizar a candidatura.
-9. Ações em massa tratam falhas individuais sem apresentar contagem enganosa de sucesso.
-10. Indicadores de vaga e dashboard usam o status canônico, e registros legados divergentes são apenas reportados até existir plano aprovado de reconciliação.
+3. Fase `Contratado` sem status `Contratado` é rejeitada.
+4. Status `Contratado` fora da fase final é rejeitado.
+5. Contratação sem exame admissional apto é rejeitada pelo banco.
+6. Duas contratações simultâneas para a última posição não excedem o headcount.
+7. Reprovação gera fase `Encerrado` e não pode ser reaberta pela RPC genérica.
+8. Desistência exige justificativa, grava auditoria e não ocupa posição.
+9. Usuário de outro tenant ou sem papel autorizado não consegue atualizar a candidatura.
+10. Ações em massa tratam falhas individuais sem apresentar contagem enganosa de sucesso.
+11. Indicadores de vaga e dashboard usam o status canônico, e registros legados divergentes são apenas reportados até existir plano aprovado de reconciliação.
 
 **Ambiente remoto:** intocado.  
 **Testes:** adiados para o final.  
