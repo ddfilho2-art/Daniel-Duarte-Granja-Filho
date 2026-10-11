@@ -213,3 +213,19 @@ Foram preservados os controles existentes: identidade do ator igual a auth.uid()
 ### Situação / validação
 
 **Implementado em código — não validado.** As migrations não foram aplicadas ao Supabase remoto. Nenhum build, type-check, teste automatizado ou E2E foi executado durante implementação. A etapa integrada final deve confirmar owners/grants reais das RPCs SECURITY DEFINER, escritores externos, RLS, estados legados, concorrência de contratação e os cenários de sucesso/parcial/falha de ações em massa. Não marcar como validado apenas porque os arquivos foram escritos.
+
+
+### Validação de build e correções encontradas — 2026-10-11
+
+A primeira execução da CI de manutenção falhou no type-check. O log revelou e levou à correção dos seguintes problemas:
+
+- src/pages/Candidate.tsx: bloco condicional da lista de vagas não tinha chaves e causava erros de sintaxe; o bloco foi corrigido.
+- src/App.tsx e src/pages/Public.tsx: chamadas a resolveAuthorizedHomePath omitiram isPlatformMasterAdmin, obrigatório no contrato de autorização; o campo foi incluído.
+- src/App.tsx: o helper lazyNamed apagava o tipo de props da tela clínica; a importação lazy de TenantClinicChat foi tipada diretamente para aceitar isClinic.
+- src/lib/events.ts e src/pages/HR.tsx: o tipo EventoTipo não aceitava DESISTÊNCIA; o tipo foi alinhado. A função logCandidaturaEvento agora retorna boolean para que a interface distinga persistência do histórico de falha na transição.
+- src/pages/TenantClinicChat.tsx: calendarTimezone e setCalendarTimezone eram usados sem estado declarado; estado com padrão America/Sao_Paulo foi adicionado.
+- src/pages/HR.tsx: ações individual/em massa agora relatam resultados parciais; reserva individual e em massa usam a mesma fase Banco de Talentos.
+
+A execução posterior da CI de manutenção concluiu com sucesso type-check e build no commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f. Essa evidência cobre compilação e empacotamento da aplicação, não a execução das migrations ou testes contra o banco real.
+
+**Pendência não resolvida por build:** confirmar owner/grants efetivos das RPCs SECURITY DEFINER e executar o plano integrado em banco de homologação. Não marcar os lotes 16–19 como validados somente com CI verde.
