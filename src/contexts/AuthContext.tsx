@@ -76,6 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [authSession, setAuthSession] = useState<Session | null>(null);
   const [authorizationLoading, setAuthorizationLoading] = useState(false);
+  // Forces permission revalidation on every successful explicit login, including
+  // when Supabase returns the same user ID as the existing session.
+  const [authorizationRefreshVersion, setAuthorizationRefreshVersion] = useState(0);
   const [authLoading, setAuthLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
   const [tenantMembershipLoading, setTenantMembershipLoading] = useState(
@@ -315,7 +318,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false;
     };
-  }, [authUserId]);
+  }, [authUserId, authorizationRefreshVersion]);
 
   useEffect(() => {
     let active = true;
@@ -403,12 +406,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // A autorização deve estar pendente antes de publicar o perfil autenticado
       // no contexto, evitando um redirecionamento prematuro de rotas Master.
       setAuthorizationLoading(true);
+      setAuthorizationRefreshVersion((current) => current + 1);
       lastProfileSyncUserIdRef.current = nextProfile.uid;
       setAuthUserId(nextProfile.uid);
       setProfile(nextProfile);
 
       console.info("[AUTH DEBUG]", { event: "LOGIN_PROFILE_SYNCED", userId: nextProfile.uid, session: true });
+      console.info("[AUTH DEBUG]", { event: "LOGIN_AUTHORIZATION_REFRESH_REQUESTED", userId: nextProfile.uid });
     } catch (error) {
+      setAuthorizationLoading(false);
       const candidateRegistrationRequired =
         error instanceof Error &&
         error.message === "CANDIDATE_TENANT_REGISTRATION_REQUIRED";
