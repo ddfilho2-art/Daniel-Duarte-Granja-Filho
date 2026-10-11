@@ -870,6 +870,7 @@ Documento: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-1
 | Endurecer sequência de status clínico | Implementado — não validado | referred → scheduled → attended → result_reported → completed; saltos, regressões e alteração após completed rejeitados |
 | Exigir data e local para agendamento | Implementado — não validado | Validação no backend da RPC update_medical_referral |
 | Exigir resultado explícito e autorização para registrar resultado | Implementado — não validado | Resultado não pode ficar pending; somente administrador clínico ou médico atribuído pode registrar resultado |
+| Concluir atendimento após resultado | Implementado — não validado | Interface inclui ação após result_reported; RPC exige resultado existente e preserva aptidão registrada |
 | Corrigir lista de exames admissionais para usuário com papel de scheduler e médico | Implementado — não validado | A visão ampla operacional prevalece quando o usuário também é scheduler; médico sem papel administrativo só vê os próprios exames |
 | Incluir médico responsável na listagem geral de encaminhamentos | Implementado — não validado | RPC list_my_medical_referrals inclui apenas encaminhamentos atribuídos ao médico ativo; equipes administrativas mantêm a visão da clínica |
 | Inventariar todos os escritores em clientes, Edge Functions e integrações | Em progresso — 40% | Páginas principais revisadas; inventário completo de funções Edge/jobs/consumidores externos ainda pendente |
