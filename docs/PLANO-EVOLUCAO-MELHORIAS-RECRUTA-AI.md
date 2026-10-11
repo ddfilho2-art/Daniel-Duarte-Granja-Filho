@@ -314,3 +314,12 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - A tela de operações permite selecionar o contexto de clínica para fila/exames e mostra catálogo/faturamento apenas quando o usuário é administrador daquela clínica. O acesso continua protegido pelas RPCs do banco; ocultar uma aba não é tratado como controle de segurança suficiente.
 - Evidência: [Lote 9 — contexto operacional](maintenance/2026-10-11-lote9-contexto-operacional-clinica.md).
 - Testes negativos de acesso cruzado e chamadas diretas às RPCs ficam para a etapa integrada final. Nenhum teste/build/type-check foi executado; banco remoto e Vercel permanecem intocados.
+
+
+### Atualização — Lote 10: exceções justificadas à fila FIFO (2026-10-11)
+
+- **Status:** em progresso; código versionado, não validado.
+- Criada RPC administrativa para listar encaminhamentos não atribuídos da clínica selecionada e adicionar/remover exceção de prioridade.
+- A interface exige justificativa ao priorizar e apresenta a justificativa já registrada ao administrador. A RPC existente registra auditoria/histórico; a posição FIFO original permanece intacta.
+- Evidência: [Lote 10 — exceções FIFO](maintenance/2026-10-11-lote10-excecoes-fifo.md).
+- Testes de autorização, tenant cruzado e preservação FIFO serão parte do plano integrado ao final. Nenhum teste/build/type-check foi executado; sem migration remota, merge ou deploy.
