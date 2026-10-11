@@ -770,3 +770,17 @@ Documento: [status do Lote 9](maintenance/2026-10-11-lote9-contexto-operacional-
 | Aplicar migration / merge / deploy | Não iniciado | Requer autorização explícita |
 
 Documento: [status do Lote 10](maintenance/2026-10-11-lote10-excecoes-fifo.md).
+
+
+## Manutenção — 2026-10-11 — Lote 11: agendamento e cancelamento de complementares
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Agendamento com confirmação explícita | Implementado no código — não validado | Selecionar data/hora e confirmar via RPC |
+| Cancelamento justificado de exame não realizado | Implementado no código — não validado | RPC existente grava motivo e auditoria |
+| Exibição do motivo de cancelamento | Implementado no código — não validado | Listagem de exames complementares |
+| Testes de transição e permissões | Adiado para a etapa final | Confirmar bloqueio de cancelamento de exame realizado e acesso por perfil |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 11](maintenance/2026-10-11-lote11-agendamento-cancelamento-complementares.md).
