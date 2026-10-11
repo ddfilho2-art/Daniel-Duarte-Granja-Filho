@@ -45,7 +45,7 @@ Em `src/pages/HR.tsx`:
 - A ação legada da fase `Exame` é tratada como decisão final de contratação; a proteção de banco exige que exista encaminhamento admissional vinculado, apto e não cancelado.
 - A ação em massa reconhece a aprovação da última etapa (`Contrato`) e registra fase/status `Contratado` juntos.
 - Todas as rotas que avançam à fase `Contratado` enviam o status canônico `Contratado`.
-- A reprovação da ação individual é encerrada na fase `Encerrado`, em alinhamento com a regra do banco.
+- A reprovação comum encerra a candidatura na fase `Encerrado`; na fase legada `Exame`, a reprovação retorna a candidatura para `Entrevista RH`, conforme o rótulo da interface. A aprovação dessa fase leva à decisão final, sempre sujeita ao exame admissional apto no banco.
 - O caminho de salvamento de entrevista mantém a chamada à RPC e usa o status canônico.
 
 As atualizações não relacionadas à transição de fase/status, como marcação de visualização, não foram convertidas nesta manutenção.
@@ -65,7 +65,8 @@ As atualizações não relacionadas à transição de fase/status, como marcaç�
 No final da etapa de implementação, testar pelo menos:
 
 1. Aprovação intermediária conserva a fase/status esperado.
-2. Aprovação a partir de `Exame` e da última etapa `Contrato` só conclui a contratação quando o banco confirma exame admissional apto.
+2. Reprovação na fase `Exame` retorna a `Entrevista RH`, enquanto reprovação nas demais fases encerra a candidatura.
+3. Aprovação a partir de `Exame` e da última etapa `Contrato` só conclui a contratação quando o banco confirma exame admissional apto.
 3. Fase `Contratado` sem status `Contratado` é rejeitada.
 4. Status `Contratado` fora da fase final é rejeitado.
 5. Contratação sem exame admissional apto é rejeitada pelo banco.
