@@ -378,6 +378,7 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Criada a migration `20261011150000_harden_candidatura_process_transition.sql` para reforçar `rpc_atualizar_candidatura_processo`: autorização no tenant corrente, bloqueio de estados terminais, consistência entre fase/status de contratação e reprovação, e execução restrita a `authenticated`.
 - Os principais caminhos de RH em `src/pages/HR.tsx` — modal, ação em massa, ação individual, salvamento de entrevista e encaminhamento para exame — agora usam a RPC para transições de fase/status.
 - Corrigidos os caminhos que ainda marcavam a fase `Contratado` como status `APROVADA`.
+- Ajustado o fim do fluxo: a etapa visível `Contrato` é seguida da fase/status canônico `Contratado` na aprovação final, inclusive em ações em massa.
 - **Limite conhecido:** ainda é necessário inventariar outras rotas/clientes com permissão de UPDATE direto em `candidaturas`; não declarar centralização global antes dessa revisão.
 - Testes/build/type-check/E2E permanecem adiados para o plano de validação final. A migration não foi aplicada remotamente e não houve merge/PR/deploy.
 - Evidência: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
