@@ -305,3 +305,12 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Preços já utilizados ficam protegidos contra mudança de valor/início de vigência; permite-se encurtar a vigência com salvaguardas para não excluir serviços já faturados. Código/nome/tipo do catálogo ficam protegidos contra alteração depois de preço/uso.
 - Evidência: [Lote 8 — integridade do histórico](maintenance/2026-10-11-lote8-integridade-historico-faturamento.md).
 - Nenhuma validação técnica/funcional foi executada; nenhuma migration foi aplicada ao Supabase remoto; sem merge, PR ou deploy. O plano integrado de testes continua reservado à etapa final.
+
+
+### Atualização — Lote 9: contexto operacional e escopo de interface por perfil (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Nova RPC `list_my_clinic_operational_tenants` fornece apenas clínicas ativas em que o usuário tem associação operacional ativa (administrador, equipe clínica ou médico), incluindo sinalizador de administração.
+- A tela de operações permite selecionar o contexto de clínica para fila/exames e mostra catálogo/faturamento apenas quando o usuário é administrador daquela clínica. O acesso continua protegido pelas RPCs do banco; ocultar uma aba não é tratado como controle de segurança suficiente.
+- Evidência: [Lote 9 — contexto operacional](maintenance/2026-10-11-lote9-contexto-operacional-clinica.md).
+- Testes negativos de acesso cruzado e chamadas diretas às RPCs ficam para a etapa integrada final. Nenhum teste/build/type-check foi executado; banco remoto e Vercel permanecem intocados.
