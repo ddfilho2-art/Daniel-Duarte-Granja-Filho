@@ -38,6 +38,8 @@ Criada a migration versionada `supabase/migrations/20261011150000_harden_candida
 Em `src/pages/HR.tsx`:
 
 - Modal de perfil, ações em massa, ação individual e encaminhamento para exame passam pela RPC de transição em vez de atualizar diretamente fase/status.
+- A última etapa configurada (`Contrato`) agora avança para a fase final canônica `Contratado`, em vez de `Finalizado` sem status de contratação.
+- A ação em massa reconhece a aprovação da última etapa (`Contrato`) e registra fase/status `Contratado` juntos.
 - Todas as rotas que avançam à fase `Contratado` enviam o status canônico `Contratado`.
 - A reprovação da ação individual é encerrada na fase `Encerrado`, em alinhamento com a regra do banco.
 - O caminho de salvamento de entrevista mantém a chamada à RPC e usa o status canônico.
