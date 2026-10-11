@@ -14,6 +14,7 @@ Ampliar a manutenção de integridade para além da candidatura, cobrindo a oper
 
 - src/pages/OccupationalHealth.tsx usa list_my_medical_referrals para leitura e update_medical_referral para mudanças de estado.
 - src/pages/ClinicOperations.tsx usa RPCs para listar fila por clínica, assumir exame, devolver à fila, priorizar e consultar encaminhamentos.
+- As Edge Functions apply-to-vacancy, tenant-clinic-chat-storage e storage-authorize foram inspecionadas quanto a UPDATEs diretos em medical_referrals; nenhum foi localizado nos caminhos revisados.
 - A política histórica medical_referrals_update_policy permite UPDATE para membros clínicos ativos. Uma política RLS isolada não impede alteração direta por um membro autorizado pela política; os campos operacionais devem ser alterados por caminhos de negócio controlados.
 - list_clinic_referrals_for_complementary_exam filtrava somente os exames do médico quando o mesmo usuário também tinha papel de scheduler. Isso ocultava parte da visão operacional de usuários com papéis combinados.
 
@@ -38,7 +39,7 @@ São rejeitados saltos, regressões e alterações após completed. O agendament
 
 ### 3. Papéis combinados na listagem clínica
 
-A listagem de exames admissionais para exames complementares permite que o scheduler veja a operação da clínica mesmo se também possuir papel de médico. Usuário sem papel de scheduler continua limitado aos encaminhamentos que lhe foram atribuídos.
+A listagem de exames admissionais para exames complementares permite que o scheduler veja a operação da clínica mesmo se também possuir papel de médico. Usuário sem papel de scheduler continua limitado aos encaminhamentos que lhe foram atribuídos. A RPC list_my_medical_referrals também inclui os encaminhamentos do médico ativo somente quando assigned_doctor_id corresponde ao usuário autenticado.
 
 ## Riscos e pontos pendentes
 
@@ -46,7 +47,7 @@ A listagem de exames admissionais para exames complementares permite que o sched
 - A sequência estrita pode revelar encaminhamentos legados já existentes fora de ordem. Não corrigir dados legados automaticamente.
 - Não foi confirmado em runtime o owner efetivo das funções SECURITY DEFINER.
 - A policy RLS histórica não foi removida; o privilégio de tabela é a barreira adicional. Rever grants e policies no banco de homologação antes de aplicar.
-- A revisão estática dos dois principais componentes de interface não equivale a um inventário completo de todos os escritores.
+- A revisão estática dos principais componentes e de algumas Edge Functions não equivale a um inventário completo de todos os escritores.
 - Nenhum build, type-check, teste automatizado ou E2E foi executado nesta etapa.
 - A migration não foi aplicada ao Supabase remoto; não houve merge, PR ou deploy.
 
@@ -91,4 +92,4 @@ A listagem de exames admissionais para exames complementares permite que o sched
 
 ## Situação final desta etapa
 
-**Implementado em código, não validado.** O percentual de progresso do Lote 17 é estimado em 65% porque a escrita da migration e a análise dos principais componentes estão concluídas, mas o inventário integral, a confirmação de privilégios, a validação integrada e o tratamento de dados legados ainda faltam.
+**Implementado em código, não validado.** O percentual de progresso do Lote 17 é estimado em 70% porque a escrita da migration e a análise dos principais componentes estão concluídas, mas o inventário integral, a confirmação de privilégios, a validação integrada e o tratamento de dados legados ainda faltam.
