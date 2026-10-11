@@ -2,12 +2,14 @@
 
 Data: 2026-10-10  
 Branch: `maintenance/lote-1-integridade-clinica-contratacao-20261010`  
-Status: em progresso — implementação inicial versionada; ainda não validada.
+Status: em progresso — implementação inicial versionada; ainda não validada (40%).
 
 ## O que está implementado nesta branch
 
 - Migration aditiva com `quantidade_vagas` e `quantidade_contratada`, com backfill do total contratado a partir do status canônico `Contratado`.
 - Bloqueio no banco para impedir novas candidaturas quando a quantidade de contratações já atingir o limite da vaga.
+- RPC de candidatura ajustada para adquirir o advisory lock antes do lock da linha da vaga, padronizando a ordem e reduzindo risco de deadlock.
+- Portal do candidato filtra vagas preenchidas e apresenta mensagem compreensível se a última posição for ocupada entre a listagem e a tentativa de candidatura.
 - Serialização transacional por vaga via advisory lock para concorrência de candidatura/contratação.
 - Bloqueio de transição para `Contratado` sem encaminhamento admissional vinculado à mesma candidatura e empresa, com resultado `fit` e encaminhamento não cancelado.
 - Sincronização do contador de contratações após mudanças de status e proteção contra mover uma candidatura para outra vaga.
@@ -20,7 +22,7 @@ Status: em progresso — implementação inicial versionada; ainda não validada
 - Nenhuma Edge Function foi publicada e não houve deploy na Vercel.
 - O vínculo legado `medical_referrals.legacy_application_id` continua sendo texto. A regra da contratação valida igualdade exata, empresa e tipo/resultado do exame, mas a FK tipada e a estratégia de backfill ficam pendentes de auditoria dos formatos de IDs e compatibilidade.
 - O isolamento da fila por médico, papel clínico explícito e FIFO imutável pertencem a uma etapa clínica própria; esta branch não deve ser interpretada como implementação completa dessas regras.
-- A quantidade de vagas recebe padrão 1 em novas linhas; antes de produção, validar a UX de criação/edição e confirmar que o RH consegue definir o headcount corretamente.
+- A tela de criação de vaga em `src/pages/HR.tsx` já inclui campo numérico `quantidade_vagas` com mínimo 1 e envia `quantidade_contratada: 0`. Ainda é necessário validar em homologação a persistência desses campos após a migration.
 - A regra de bloqueio por headcount usa o status textual normalizado `Contratado`. Validar todos os caminhos legados de atualização de fase/status e confirmar que esse é o valor canônico da aplicação.
 - É necessário rever efeitos colaterais de permissões de `medical_referrals` para fluxos legítimos de RH e clínica antes de aprovar.
 
