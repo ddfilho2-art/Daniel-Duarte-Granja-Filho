@@ -609,10 +609,12 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 
 ## Lote 1 — integridade clínica e contratação (2026-10-10)
 
-**Status geral: Em progresso — 35%.** Implementação inicial isolada na branch `maintenance/lote-1-integridade-clinica-contratacao-20261010`. O percentual reflete código/documentação versionados, não validação funcional.
+**Status geral: Em progresso — 40%.** Implementação inicial isolada na branch `maintenance/lote-1-integridade-clinica-contratacao-20261010`. O percentual reflete código/documentação versionados, não validação funcional.
 
 - [x] Criar migration com campos de quantidade de vagas e contador derivado de contratações.
 - [x] Incluir guardas transacionais no banco para limite de candidaturas/contratações e aptidão do exame admissional.
+- [x] Ajustar a ordem dos locks da RPC de candidatura para reduzir risco de deadlock sob concorrência.
+- [x] Filtrar vagas preenchidas no portal do candidato e tratar a rejeição por headcount com mensagem amigável.
 - [x] Remover acesso clínico implícito de administrador global nas políticas de encaminhamentos e anexos.
 - [x] Criar RPC autorizada para metadados dos anexos e ajustar frontend para usá-la.
 - [x] Registrar matriz de testes e limites conhecidos em [documento do Lote 1](maintenance/2026-10-10-lote1-integridade-clinica-contratacao.md).
@@ -620,7 +622,8 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 - [ ] Executar lint, type-check, build e suíte de testes do repositório.
 - [ ] Aplicar migration em homologação (não no projeto de produção) e testar concorrência com sessões separadas.
 - [ ] Validar permissões efetivas para RH, clínica, médico, administrador global e tenant cruzado.
-- [ ] Confirmar UX de cadastro/edição de `quantidade_vagas` e todos os escritores de `candidaturas.status`.
+- [x] Inspecionar a tela de criação: já possui campo `quantidade_vagas` (mínimo 1) e envia contador inicial zero.
+- [ ] Validar persistência do headcount em homologação e revisar todos os escritores de `candidaturas.status`.
 - [ ] Registrar evidências dos testes, corrigir falhas e só então solicitar revisão para merge.
 - [ ] Manter migration remota, publicação de Edge Functions e deploy Vercel bloqueados até autorização explícita.
 
