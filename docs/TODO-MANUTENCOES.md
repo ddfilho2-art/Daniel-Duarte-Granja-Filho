@@ -663,3 +663,21 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 | Preços por contrato e faturamento | Não iniciado | Próximo lote de implementação |
 | Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
 | Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
+
+
+## Manutenção — 2026-10-10 — Lote 4: preços e faturamento da clínica
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Definir tipo de serviço faturável | Implementado no código; não validado | Catálogo distingue admissional, complementar e outro serviço |
+| Preço por contrato e vigência | Implementado no código; não validado | Tabela de preços por contrato/serviço, vigência e trigger contra sobreposição |
+| Ciclo de cobrança por período | Implementado no código; não validado | Ciclo em rascunho/fechado/emitido/pago/anulado |
+| Gerar itens a partir de serviços realizados | Implementado no código; não validado | Snapshots de nome, data e preço; ausência de preço vigente bloqueia geração |
+| Impedir cobrança duplicada | Implementado no código; não validado | Índice único por origem faturável ativa |
+| Fechar período e congelar valores | Implementado no código; não validado | RPC fecha ciclo e inclui itens de rascunho |
+| Registrar boleto/fatura externa e pagamento | Implementado no código; não validado | Referência externa, vencimento, data de emissão e pagamento |
+| Ajustes/estornos auditáveis | Implementado no código; não validado | Ajustes positivos/negativos pós-fechamento e reversão justificada apenas em rascunho |
+| Relatórios macro/detalhados e exportação | Em aberto | RPCs de lista estão versionadas; falta UI, reconciliação e exportação CSV/XLSX/PDF |
+| Integração bancária/geração de boleto | Aguardando decisão de escopo | Base atual registra emissão externa; não gera boleto nem chama provedor |
+| Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
+| Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
