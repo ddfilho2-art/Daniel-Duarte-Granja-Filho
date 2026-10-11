@@ -383,3 +383,5 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - **Limite conhecido:** ainda é necessário inventariar outras rotas/clientes com permissão de UPDATE direto em `candidaturas`; não declarar centralização global antes dessa revisão.
 - Testes/build/type-check/E2E permanecem adiados para o plano de validação final. A migration não foi aplicada remotamente e não houve merge/PR/deploy.
 - Evidência: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
+
+- Complemento de integridade do Lote 16: trigger de tabela impede alterações de fase/status por usuário sem papel RH autorizado, bloqueia reabertura de estados terminais, exige justificativa/auditoria para desistência e torna atômico o registro de auditoria com a transição. A migration continua não validada e não aplicada remotamente.
