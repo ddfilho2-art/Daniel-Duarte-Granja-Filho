@@ -647,3 +647,19 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 | Criar plano integrado de testes | Planejado para a etapa final | Cobrir concorrência, FIFO, perfis, isolamento, anexos, agenda e regressões |
 | Aplicar migrations no Supabase remoto | Não iniciado | Exige autorização explícita do usuário |
 | Merge para main / deploy Vercel | Não iniciado | Deploy Vercel manual; não executar sem autorização explícita |
+
+
+## Manutenção — 2026-10-10 — Lote 3: exames complementares
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Criar catálogo de exames por clínica | Implementado no código; não validado | `occupational_health_exam_catalog`, com código único por clínica, nome, descrição e ativo/inativo |
+| Criar itens complementares associados ao admissional | Implementado no código; não validado | `medical_referral_complementary_exams` aponta para um encaminhamento e item de catálogo |
+| Solicitar exame complementar | Implementado no código; não validado | RPC verifica encaminhamento admissional ativo, atribuição do médico/admin e catálogo da mesma clínica |
+| Agendar exame complementar | Implementado no código; não validado | RPC permite secretaria/equipe clínica ou médico atribuído e exige data futura |
+| Registrar realização | Implementado no código; não validado | RPC restrita ao médico atribuído ou administrador clínico |
+| Cancelar com justificativa | Implementado no código; não validado | RPC exige motivo e grava ator/data |
+| UI de catálogo e complementares | Não iniciado | Integrar frontend aos RPCs após a base de dados e contratos de autorização estarem definidos |
+| Preços por contrato e faturamento | Não iniciado | Próximo lote de implementação |
+| Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
+| Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
