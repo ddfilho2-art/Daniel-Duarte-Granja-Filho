@@ -229,3 +229,35 @@ A primeira execução da CI de manutenção falhou no type-check. O log revelou 
 A execução posterior da CI de manutenção concluiu com sucesso type-check e build no commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f. Essa evidência cobre compilação e empacotamento da aplicação, não a execução das migrations ou testes contra o banco real.
 
 **Pendência não resolvida por build:** confirmar owner/grants efetivos das RPCs SECURITY DEFINER e executar o plano integrado em banco de homologação. Não marcar os lotes 16–19 como validados somente com CI verde.
+
+
+## 2026-10-11 — Liberação direta dos Lotes 16–19 em main e Supabase
+
+### Decisão e execução
+
+- O responsável determinou explicitamente que o código fosse incorporado em `main` e as migrations fossem aplicadas diretamente no Supabase de produção, sem ambiente separado de homologação.
+- PR [#10](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/pull/10) foi mergeado por squash no commit `d50153b097ad6d03258a9573709d78a65654d41f`.
+- A `main` recebeu também `20261011180000_revoke_trigger_function_execute.sql`, com revogações de EXECUTE para três funções de trigger do fluxo de contratação/headcount.
+- A execução CI do PR passou no type-check e no build de produção. O replay da cadeia completa de migrations em Supabase local também passou após corrigir erros históricos de SQL e normalizar nomes/ordem apenas na cópia descartável de CI.
+- O histórico remoto do Supabase passou de 110 para **138 registros de migration**. As 27 migrations clínicas, de faturamento e integridade de candidaturas, bem como a migration de hardening de funções de trigger, aparecem como aplicadas.
+
+### Correções reaproveitáveis identificadas na homologação técnica
+
+- A migration de desistência precisava criar `public.candidaturas.motivo_declinio` antes de compilar a RPC que referencia a coluna.
+- A migration de contratos opcionais continha uma vírgula final inválida na definição da tabela `analise_ia_candidato`.
+- A migration de cadastro de candidato terminava a definição de uma função sem `;` após `$function$`.
+- A migration de gestão de administradores de empresa terminava a definição de `record_tenant_admin_operation` sem encerrar corretamente a instrução `CREATE FUNCTION`.
+- A migration de integridade de contratação/headcount terminava a definição de `rpc_candidatar_se` sem o `;` necessário antes da próxima instrução.
+- Duas migrations históricas compartilhavam o mesmo prefixo de versão. Para replay da cópia local, a CI normaliza a ordem/nome somente no checkout descartável; os arquivos versionados de produto não foram renomeados por esse mecanismo.
+
+### Verificações após aplicação remota
+
+- As principais tabelas e colunas de encaminhamento clínico, fila/atribuição, exames complementares, agenda, contratos, catálogo de exames e faturamento foram encontradas no catálogo de produção.
+- As novas tabelas clínicas/de faturamento consultadas não concedem privilégios diretos a `PUBLIC`, `anon` ou `authenticated`; o cliente utiliza RPCs autorizadas em vez de acesso direto a essas tabelas.
+- O UPDATE direto em `candidaturas` e `medical_referrals` está revogado para as roles de cliente. As funções de transição e visualização de candidatura existem com os grants esperados.
+- Antes da aplicação, as tabelas de vagas, candidaturas, encaminhamentos e contratos clínicos consultadas estavam vazias. Por isso, esta verificação não provou compatibilidade com registros legados nem cobriu a execução funcional de ponta a ponta.
+- O linter de segurança ainda mostra findings: 14 tabelas com RLS sem policy (as novas tabelas de clínica/faturamento consultadas não têm grants diretos para clientes) e warnings de funções SECURITY DEFINER. Esses resultados não devem ser descritos como “zero alertas”; devem ser triados em manutenção posterior.
+
+### Limite de validação e próximo passo
+
+**Status:** merge e aplicação das migrations concluídos; type-check/build e replay local passaram. **Não** foram executados E2E funcionais completos nem testes manuais após o deploy Vercel. O próximo passo é o deploy manual pelo responsável, seguido dos smoke tests documentados em `docs/maintenance/2026-10-11-plano-liberacao-main-supabase.md`. Não declarar a clínica, contratação ou faturamento integralmente validados antes desses testes.
