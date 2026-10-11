@@ -107,6 +107,7 @@ Deno.serve(async (req) => {
       const code =
         message.includes("already_applied") ? "already_applied" :
         message.includes("resume_incomplete") ? "resume_incomplete" :
+        message.includes("vacancy_headcount_reached") ? "vacancy_not_available" :
         message.includes("vacancy_not_available") ? "vacancy_not_available" :
         message.includes("candidate_access_required") ? "candidate_access_required" :
         message.includes("authentication_required") ? "authentication_required" :
