@@ -57,6 +57,18 @@ jobs:
         with:
           version: latest
 
+      # The legacy migration filenames no longer reflect the exact order
+      # recorded on the current Supabase project. Rename only in this disposable
+      # CI checkout so the replay follows the historical dependency order.
+      - name: Normalize legacy migration order for disposable replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          migrations="supabase/migrations"
+          mv "$migrations/20260926140000_legacy_recruitment_baseline.sql" "$migrations/20260808095000_legacy_recruitment_baseline.sql"
+          mv "$migrations/20260926130000_email_queue_retry_claim.sql" "$migrations/20260811120500_email_queue_retry_claim.sql"
+          mv "$migrations/20260808101000_legacy_rpc_hardening.sql" "$migrations/20260811121000_legacy_rpc_hardening.sql"
+
       - name: Start local Supabase stack
         run: supabase start
 
