@@ -104,7 +104,7 @@ begin
   where r.clinic_tenant_id = p_clinic_tenant_id
     and r.exam_type = 'admission'
     and r.status <> 'cancelled'
-    and (v_is_scheduler or r.assigned_doctor_id = auth.uid())
+    and ((v_is_scheduler and not v_is_doctor) or r.assigned_doctor_id = auth.uid())
   order by r.fifo_original_at asc, r.id asc;
 end;
 $function$;
