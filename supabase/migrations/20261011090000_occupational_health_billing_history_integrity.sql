@@ -191,7 +191,7 @@ begin
   join public.occupational_health_exam_catalog c
     on c.clinic_tenant_id = v_clinic and c.service_kind = 'admission_exam'
   join lateral (
-    select p0.unit_price from public.occupational_health_contract_prices p0
+    select p0.id, p0.unit_price from public.occupational_health_contract_prices p0
     where p0.contract_id = v_cycle.contract_id and p0.catalog_exam_id = c.id and p0.active
       and p0.valid_from <= coalesce(r.completed_at, r.result_reported_at, r.referred_at)::date
       and (p0.valid_to is null or p0.valid_to > coalesce(r.completed_at, r.result_reported_at, r.referred_at)::date)
@@ -214,7 +214,7 @@ begin
   join public.occupational_health_exam_catalog c
     on c.id = e.catalog_exam_id and c.clinic_tenant_id = v_clinic
   join lateral (
-    select p0.unit_price from public.occupational_health_contract_prices p0
+    select p0.id, p0.unit_price from public.occupational_health_contract_prices p0
     where p0.contract_id = v_cycle.contract_id and p0.catalog_exam_id = c.id and p0.active
       and p0.valid_from <= e.performed_at::date
       and (p0.valid_to is null or p0.valid_to > e.performed_at::date)
