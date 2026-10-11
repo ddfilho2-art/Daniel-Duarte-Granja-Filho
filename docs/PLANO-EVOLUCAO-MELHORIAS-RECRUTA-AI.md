@@ -323,3 +323,12 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - A interface exige justificativa ao priorizar e apresenta a justificativa já registrada ao administrador. A RPC existente registra auditoria/histórico; a posição FIFO original permanece intacta.
 - Evidência: [Lote 10 — exceções FIFO](maintenance/2026-10-11-lote10-excecoes-fifo.md).
 - Testes de autorização, tenant cruzado e preservação FIFO serão parte do plano integrado ao final. Nenhum teste/build/type-check foi executado; sem migration remota, merge ou deploy.
+
+
+### Atualização — Lote 11: agendamento e cancelamento de exames complementares (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- O agendamento agora exige selecionar data/hora e confirmar explicitamente, evitando chamar a RPC a cada alteração parcial do campo.
+- A interface permite cancelar exame complementar não realizado com justificativa e apresenta o motivo registrado; a RPC mantém as restrições por perfil e a trilha de auditoria.
+- Evidência: [Lote 11 — agendamento e cancelamento](maintenance/2026-10-11-lote11-agendamento-cancelamento-complementares.md).
+- Testes de transição, data/hora e autorização ficam para a etapa integrada final. Nenhum build/teste/type-check foi executado; banco remoto e Vercel seguem intocados.
