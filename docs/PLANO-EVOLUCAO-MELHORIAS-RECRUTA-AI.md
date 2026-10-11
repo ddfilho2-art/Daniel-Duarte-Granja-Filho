@@ -285,3 +285,13 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Percentual de implementação dos lotes 5/6: **aproximadamente 70% do escopo de interface previsto**, sem equivalência a validação técnica ou funcional. Ainda faltam revisão de versionamento histórico de preços, exportações XLSX/PDF, refinamento de permissões/experiência por perfil e eventual decisão de integração de boleto/banco.
 - **Validações seguem adiadas por orientação do usuário:** não executar build, type-check, testes automatizados ou validação funcional neste momento. O plano integrado de testes será criado ao final do desenvolvimento.
 - Nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; não houve merge para `main`, criação de PR ou deploy Vercel. Deploy permanece manual e depende de autorização explícita.
+
+
+### Atualização — Lote 7: catálogo de serviços faturáveis (2026-10-11)
+
+- **Status:** em progresso; código versionado, não validado.
+- Adicionada a RPC `save_occupational_health_service_catalog_item` para cadastrar/editar catálogo com tipo faturável (admissional, complementar ou outro), descrição e situação ativa/inativa, exigindo perfil administrativo da clínica.
+- A RPC de listagem passa a retornar o tipo faturável. A interface adiciona aba de catálogo e seletor explícito de clínica, evitando assumir a primeira clínica do usuário.
+- A mudança de tipo é bloqueada quando o serviço já possui preço, item faturável ou uso operacional; a base impede mais de um item admissional ativo por clínica.
+- Evidência: [Lote 7 — catálogo de serviços](maintenance/2026-10-11-lote7-catalogo-servicos.md).
+- Nenhum build/teste/type-check foi executado. A migration não foi aplicada ao Supabase remoto; sem merge, PR ou deploy. O plano integrado de testes permanece para a etapa final.
