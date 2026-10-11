@@ -67,15 +67,15 @@ No final da etapa de implementação, testar pelo menos:
 1. Aprovação intermediária conserva a fase/status esperado.
 2. Reprovação na fase `Exame` retorna a `Entrevista RH`, enquanto reprovação nas demais fases encerra a candidatura.
 3. Aprovação a partir de `Exame` e da última etapa `Contrato` só conclui a contratação quando o banco confirma exame admissional apto.
-3. Fase `Contratado` sem status `Contratado` é rejeitada.
-4. Status `Contratado` fora da fase final é rejeitado.
-5. Contratação sem exame admissional apto é rejeitada pelo banco.
-6. Duas contratações simultâneas para a última posição não excedem o headcount.
-7. Reprovação gera fase `Encerrado` e não pode ser reaberta pela RPC genérica.
-8. Desistência exige justificativa, grava auditoria e não ocupa posição.
-9. Usuário de outro tenant ou sem papel autorizado não consegue atualizar a candidatura.
-10. Ações em massa tratam falhas individuais sem apresentar contagem enganosa de sucesso.
-11. Indicadores de vaga e dashboard usam o status canônico, e registros legados divergentes são apenas reportados até existir plano aprovado de reconciliação.
+4. Fase `Contratado` sem status `Contratado` é rejeitada.
+5. Status `Contratado` fora da fase final é rejeitado.
+6. Contratação sem exame admissional apto é rejeitada pelo banco.
+7. Duas contratações simultâneas para a última posição não excedem o headcount.
+8. Reprovação gera fase `Encerrado` e não pode ser reaberta pela RPC genérica.
+9. Desistência exige justificativa, grava auditoria e não ocupa posição.
+10. Usuário de outro tenant ou sem papel autorizado não consegue atualizar a candidatura.
+11. Ações em massa tratam falhas individuais sem apresentar contagem enganosa de sucesso.
+12. Indicadores de vaga e dashboard usam o status canônico, e registros legados divergentes são apenas reportados até existir plano aprovado de reconciliação.
 
 **Ambiente remoto:** intocado.  
 **Testes:** adiados para o final.  
