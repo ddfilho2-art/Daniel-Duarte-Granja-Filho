@@ -600,3 +600,8 @@ Detalhamento atualizado no [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELH
 ## Atualização — matriz de impacto técnico (2026-10-10)
 
 Matriz criada: [MATRIZ-IMPACTO-TECNICO-RECRUTA-AI.md](MATRIZ-IMPACTO-TECNICO-RECRUTA-AI.md). A análise/documentação está concluída; a implementação não começou. Próximo lote recomendado: integridade candidatura/admissional, validação de aptidão médica, limite transacional de posições e autorização de anexos clínicos. Nenhuma alteração de banco, publicação de funções, build/teste ou deploy foi realizada nesta rodada.
+
+
+### Complemento da auditoria de chat/agenda — 2026-10-10
+
+A matriz registra mais três pontos a tratar antes de publicar o lote empresa–clínica: a RPC de reserva pode retornar uma reserva por chave idempotente sem verificar que ela pertence à mesma conversa; a filtragem de conteúdo clínico no chat é heurística e não pode ser tratada como controle de confidencialidade; e uma constraint de vínculo de encaminhamento é tautológica e não valida integridade. Corrigir e incluir testes de reuso de chave entre conversas, acesso cruzado e envio de conteúdo sensível antes da release.
