@@ -41,3 +41,31 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  database-migrations:
+    name: Replay all Supabase migrations in isolated local DB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Replay full migration chain without seed data
+        run: supabase db reset --local --no-seed
+
+      - name: Confirm migration state
+        run: supabase migration list --local
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup
