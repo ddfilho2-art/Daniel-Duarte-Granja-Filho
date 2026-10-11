@@ -728,3 +728,17 @@ Documento: [status do Lote 6](maintenance/2026-10-11-lote6-interface-faturamento
 | Aplicar migration / merge / deploy | Não iniciado | Produção intocada; exige autorização explícita |
 
 Documento: [status do Lote 7](maintenance/2026-10-11-lote7-catalogo-servicos.md).
+
+
+## Manutenção — 2026-10-11 — Lote 8: integridade do histórico de faturamento
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Registrar o preço de origem em cada item faturável | Implementado no código — não validado | Nova coluna contract_price_id e geração com vínculo ao preço usado |
+| Manter faturáveis os serviços realizados antes da inativação do catálogo | Implementado no código — não validado | Geração de itens considera vigência/preço, não o estado ativo atual do catálogo |
+| Bloquear alteração retroativa de preços já usados | Implementado no código — não validado | Permite somente encurtamento seguro de vigência |
+| Proteger nome/código/tipo do catálogo após uso ou preço | Implementado no código — não validado | RPC de catálogo com bloqueio de alteração histórica |
+| Revisão e testes integrados | Adiado para a etapa final | Cobrir períodos, preços históricos, inativação, duplicidade, concorrência e regressões |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita; produção intocada |
+
+Documento: [status do Lote 8](maintenance/2026-10-11-lote8-integridade-historico-faturamento.md).
