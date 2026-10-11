@@ -295,3 +295,13 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - A mudança de tipo é bloqueada quando o serviço já possui preço, item faturável ou uso operacional; a base impede mais de um item admissional ativo por clínica.
 - Evidência: [Lote 7 — catálogo de serviços](maintenance/2026-10-11-lote7-catalogo-servicos.md).
 - Nenhum build/teste/type-check foi executado. A migration não foi aplicada ao Supabase remoto; sem merge, PR ou deploy. O plano integrado de testes permanece para a etapa final.
+
+
+### Atualização — Lote 8: integridade do histórico de preços e faturamento (2026-10-11)
+
+- **Status:** em progresso; migration versionada, não validada.
+- Cada novo item de faturamento registra o preço contratual de origem, além dos snapshots de valor/data/descrição.
+- A geração de cobrança continua considerando serviços realizados antes de o item de catálogo ser inativado, desde que o preço esteja vigente na data do serviço.
+- Preços já utilizados ficam protegidos contra mudança de valor/início de vigência; permite-se encurtar a vigência com salvaguardas para não excluir serviços já faturados. Código/nome/tipo do catálogo ficam protegidos contra alteração depois de preço/uso.
+- Evidência: [Lote 8 — integridade do histórico](maintenance/2026-10-11-lote8-integridade-historico-faturamento.md).
+- Nenhuma validação técnica/funcional foi executada; nenhuma migration foi aplicada ao Supabase remoto; sem merge, PR ou deploy. O plano integrado de testes continua reservado à etapa final.
