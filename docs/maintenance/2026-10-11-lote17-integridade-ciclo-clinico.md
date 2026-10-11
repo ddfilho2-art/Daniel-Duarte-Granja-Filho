@@ -39,7 +39,7 @@ São rejeitados saltos, regressões e alterações após completed. O agendament
 
 ### 3. Papéis combinados na listagem clínica
 
-A listagem de exames admissionais para exames complementares permite que o scheduler veja a operação da clínica mesmo se também possuir papel de médico. Usuário sem papel de scheduler continua limitado aos encaminhamentos que lhe foram atribuídos. A RPC list_my_medical_referrals também inclui os encaminhamentos do médico ativo somente quando assigned_doctor_id corresponde ao usuário autenticado.
+A listagem de exames admissionais para exames complementares permite que o scheduler veja a operação da clínica mesmo se também possuir papel de médico. Usuário sem papel de scheduler continua limitado aos encaminhamentos que lhe foram atribuídos. A RPC list_my_medical_referrals também inclui os encaminhamentos do médico ativo somente quando assigned_doctor_id corresponde ao usuário autenticado. O e-mail do candidato é omitido para o médico e permanece disponível apenas na visão administrativa autorizada.
 
 ## Riscos e pontos pendentes
 
