@@ -167,4 +167,53 @@ $function$;
 revoke all on function public.list_clinic_referrals_for_complementary_exam(uuid) from public, anon;
 grant execute on function public.list_clinic_referrals_for_complementary_exam(uuid) to authenticated;
 
+
+-- Também disponibiliza ao médico somente os encaminhamentos que lhe foram atribuídos
+-- na tela geral de Saúde Ocupacional; a equipe administrativa mantém a visão da clínica.
+create or replace function public.list_my_medical_referrals()
+returns table (
+  id uuid,
+  employer_tenant_id uuid,
+  clinic_tenant_id uuid,
+  candidate_name text,
+  candidate_email text,
+  job_title text,
+  exam_type public.medical_exam_type,
+  status public.medical_referral_status,
+  fitness_result public.medical_fitness_result,
+  scheduled_for timestamptz,
+  scheduled_location text,
+  updated_at timestamptz
+)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $function$
+  select r.id, r.employer_tenant_id, r.clinic_tenant_id,
+    r.candidate_snapshot ->> 'name', r.candidate_snapshot ->> 'email',
+    r.job_snapshot ->> 'title', r.exam_type, r.status, r.fitness_result,
+    r.scheduled_for, r.scheduled_location, r.updated_at
+  from public.medical_referrals r
+  where r.status <> 'cancelled'
+    and (
+      public.is_active_clinic_scheduler(r.clinic_tenant_id)
+      or (
+        r.assigned_doctor_id = (select auth.uid())
+        and public.is_active_clinic_doctor(r.clinic_tenant_id)
+      )
+      or (
+        r.employer_tenant_id = public.current_tenant_id()
+        and public.has_tenant_role(r.employer_tenant_id, array[
+          'tenant_admin'::public.tenant_role,
+          'tenant_admin_substitute'::public.tenant_role,
+          'hr'::public.tenant_role
+        ])
+      )
+    );
+$function$;
+
+revoke all on function public.list_my_medical_referrals() from public, anon;
+grant execute on function public.list_my_medical_referrals() to authenticated;
+
 commit;
