@@ -26,7 +26,7 @@ type BillingItem = {
 type ReportRow = {
   contract_id: string; employer_tenant_id: string; contract_status: string;
   admission_referrals: number; admission_exams_performed: number; complementary_requested: number;
-  complementary_scheduled: number; complementary_performed: number; billable_items: number;
+  complementary_scheduled: number; complementary_performed: number; billable_items: number; draft_items: number; billed_items: number; draft_amount: number;
   billed_amount: number; adjustments_amount: number; amount_with_adjustments: number;
   draft_cycles: number; closed_cycles: number; issued_cycles: number; paid_cycles: number;
 };
@@ -140,7 +140,7 @@ export function ClinicBilling() {
 
   const loadReport = useCallback(async () => {
     if (!clinicId || !reportStart || !reportEnd) { setReport([]); return; }
-    const { data, error } = await supabase.rpc("get_occupational_health_billing_macro_report", {
+    const { data, error } = await supabase.rpc("get_occupational_health_billing_macro_report_v2", {
       p_clinic_tenant_id: clinicId, p_period_start: reportStart, p_period_end: addDay(reportEnd),
     });
     if (error) throw error;
@@ -250,7 +250,7 @@ export function ClinicBilling() {
     </section>}
     <section className={styles.panel+" space-y-3"}>
       <div className="flex flex-wrap items-end justify-between gap-3"><div><h3 className="text-lg font-bold">Relatório macro por empresa</h3><p className="text-sm text-slate-600">Consolida admissionais, complementares, itens e situação de cobrança para o período.</p></div><div className="grid grid-cols-2 gap-2"><label className="text-sm">De<input className={styles.input+" mt-1"} type="date" value={reportStart} onChange={e=>setReportStart(e.target.value)}/></label><label className="text-sm">Até<input className={styles.input+" mt-1"} type="date" value={reportEnd} onChange={e=>setReportEnd(e.target.value)}/></label></div></div>
-      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="p-2">Empresa</th><th className="p-2">Contrato</th><th className="p-2">Admissionais realizados</th><th className="p-2">Complementares (sol./ag./real.)</th><th className="p-2">Itens</th><th className="p-2">Valor + ajustes</th><th className="p-2">Ciclos (rasc./fech./emit./pag.)</th></tr></thead><tbody>{report.map(r=><tr key={r.contract_id} className="border-b"><td className="p-2">{contracts.find(c=>c.contract_id===r.contract_id)?.employer_name||r.employer_tenant_id}</td><td className="p-2">{r.contract_status}</td><td className="p-2">{r.admission_exams_performed} / {r.admission_referrals} encaminhados</td><td className="p-2">{r.complementary_requested} / {r.complementary_scheduled} / {r.complementary_performed}</td><td className="p-2">{r.billable_items}</td><td className="p-2 font-semibold">{money(r.amount_with_adjustments)}</td><td className="p-2">{r.draft_cycles}/{r.closed_cycles}/{r.issued_cycles}/{r.paid_cycles}</td></tr>)}{!report.length&&<tr><td colSpan={7} className="p-3 text-slate-500">Sem dados no período ou sem permissão de administrador da clínica.</td></tr>}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b text-slate-500"><th className="p-2">Empresa</th><th className="p-2">Contrato</th><th className="p-2">Admissionais realizados</th><th className="p-2">Complementares (sol./ag./real.)</th><th className="p-2">Faturáveis / rascunho / faturados</th><th className="p-2">Valor em rascunho</th><th className="p-2">Faturado + ajustes</th><th className="p-2">Ciclos (rasc./fech./emit./pag.)</th></tr></thead><tbody>{report.map(r=><tr key={r.contract_id} className="border-b"><td className="p-2">{contracts.find(c=>c.contract_id===r.contract_id)?.employer_name||r.employer_tenant_id}</td><td className="p-2">{r.contract_status}</td><td className="p-2">{r.admission_exams_performed} / {r.admission_referrals} encaminhados</td><td className="p-2">{r.complementary_requested} / {r.complementary_scheduled} / {r.complementary_performed}</td><td className="p-2">{r.billable_items} / {r.draft_items} / {r.billed_items}</td><td className="p-2">{money(r.draft_amount)}</td><td className="p-2 font-semibold">{money(r.amount_with_adjustments)}</td><td className="p-2">{r.draft_cycles}/{r.closed_cycles}/{r.issued_cycles}/{r.paid_cycles}</td></tr>)}{!report.length&&<tr><td colSpan={8} className="p-3 text-slate-500">Sem dados no período ou sem permissão de administrador da clínica.</td></tr>}</tbody></table></div>
     </section>
     <p className="text-xs text-slate-500">A emissão de boleto e a integração bancária não são realizadas aqui: esta versão registra referência de faturamento externo. Os dados dependem das migrations versionadas e ainda não publicadas.</p>
   </div>;
