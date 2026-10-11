@@ -798,3 +798,17 @@ Documento: [status do Lote 11](maintenance/2026-10-11-lote11-agendamento-cancela
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [status do Lote 12](maintenance/2026-10-11-lote12-relatorio-macro-faturamento.md).
+
+
+## Manutenção — 2026-10-11 — Lote 13: fila escopada por clínica
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Fila disponível filtrada pela clínica selecionada | Implementado no código — não validado | RPC list_available_medical_referrals_for_clinic |
+| Exames atribuídos filtrados pelo médico atual e clínica | Implementado no código — não validado | RPC list_my_assigned_medical_referrals_for_clinic |
+| Seletor de encaminhamentos complementares por clínica | Implementado no código — não validado | RPC list_clinic_referrals_for_complementary_exam |
+| Testes de tenant cruzado e perfis | Adiado para a etapa final | Incluir médico em múltiplas clínicas e casos atribuídos a terceiros |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 13](maintenance/2026-10-11-lote13-fila-escopada-por-clinica.md).
