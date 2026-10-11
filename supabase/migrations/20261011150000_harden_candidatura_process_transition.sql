@@ -61,11 +61,14 @@ begin
   end if;
 
   if v_tenant_id is distinct from public.current_tenant_id()
-     or not public.has_tenant_role(v_tenant_id, array[
-       'tenant_admin'::public.tenant_role,
-       'tenant_admin_substitute'::public.tenant_role,
-       'hr'::public.tenant_role
-     ]) then
+     or not (
+       public.is_platform_master_admin()
+       or public.has_tenant_role(v_tenant_id, array[
+         'tenant_admin'::public.tenant_role,
+         'tenant_admin_substitute'::public.tenant_role,
+         'hr'::public.tenant_role
+       ])
+     ) then
     raise exception using errcode = '42501', message = 'tenant_hr_or_admin_required';
   end if;
 
@@ -140,11 +143,14 @@ begin
 
   if auth.uid() is null
      or new.tenant_id is distinct from public.current_tenant_id()
-     or not public.has_tenant_role(new.tenant_id, array[
-       'tenant_admin'::public.tenant_role,
-       'tenant_admin_substitute'::public.tenant_role,
-       'hr'::public.tenant_role
-     ]) then
+     or not (
+       public.is_platform_master_admin()
+       or public.has_tenant_role(new.tenant_id, array[
+         'tenant_admin'::public.tenant_role,
+         'tenant_admin_substitute'::public.tenant_role,
+         'hr'::public.tenant_role
+       ])
+     ) then
     raise exception using errcode = '42501', message = 'authorized_hr_required_for_candidatura_transition';
   end if;
 
