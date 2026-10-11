@@ -78,23 +78,26 @@ begin
     end if;
   end if;
 
-  if p_status in ('result_reported', 'completed') then
+  if p_status = 'result_reported' then
     if not (v_is_admin or v_is_assigned_doctor) then
       raise exception using errcode = '42501', message = 'assigned_doctor_or_clinic_admin_required_for_result';
     end if;
     if coalesce(p_fitness_result, 'pending') = 'pending' then
       raise exception using errcode = '22023', message = 'fitness_result_required';
     end if;
+  elsif p_status = 'completed'
+        and coalesce(v_referral.fitness_result, 'pending') = 'pending' then
+    raise exception using errcode = '22023', message = 'reported_fitness_result_required_before_completion';
   end if;
 
   update public.medical_referrals set
     status = p_status,
     scheduled_for = case when p_status = 'scheduled' then p_scheduled_for else scheduled_for end,
     scheduled_location = case when p_status = 'scheduled' then nullif(trim(p_scheduled_location), '') else scheduled_location end,
-    fitness_result = case when p_status in ('result_reported', 'completed') then p_fitness_result else fitness_result end,
-    clinic_note = case when p_status in ('result_reported', 'completed') then nullif(trim(p_clinic_note), '') else clinic_note end,
-    result_reported_by = case when p_status in ('result_reported', 'completed') then v_actor else result_reported_by end,
-    result_reported_at = case when p_status in ('result_reported', 'completed') then coalesce(result_reported_at, now()) else result_reported_at end,
+    fitness_result = case when p_status = 'result_reported' then p_fitness_result else fitness_result end,
+    clinic_note = case when p_status = 'result_reported' then nullif(trim(p_clinic_note), '') else clinic_note end,
+    result_reported_by = case when p_status = 'result_reported' then v_actor else result_reported_by end,
+    result_reported_at = case when p_status = 'result_reported' then coalesce(result_reported_at, now()) else result_reported_at end,
     completed_at = case when p_status = 'completed' then now() else completed_at end
   where id = p_referral_id
   returning * into v_referral;
