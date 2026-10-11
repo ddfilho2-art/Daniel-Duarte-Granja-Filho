@@ -908,3 +908,19 @@ Documento: [Lote 18 — superfície de escrita de candidaturas](maintenance/2026
 | Confirmar indicadores após processamento em lote | Aguardando etapa integrada final | Comparar contagens da interface e do banco em ambiente autorizado |
 
 Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11-lote19-confiabilidade-acoes-rh.md).
+
+
+## Marco de validação integrada — 2026-10-11
+
+| Verificação | Status | Evidência / limitação |
+|---|---|---|
+| Type-check TypeScript | Concluído — passou na CI | Commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f |
+| Build Vite de produção | Concluído — passou na CI | Mesmo run; sem deploy |
+| Revisar e corrigir erros reportados pelo primeiro type-check | Concluído — passou na CI após correções | Candidate.tsx, App.tsx, Public.tsx, TenantClinicChat.tsx, eventos de candidatura e ações RH |
+| Revisão estática das policies/ACLs das tabelas-alvo | Concluído — estática | Não comprova privilégios/owners efetivos no banco remoto |
+| Validar migrations em banco de homologação | Não iniciado | Requer ambiente de homologação autorizado; migrations não foram aplicadas remotamente |
+| E2E integração candidato → RH → exame → contratação | Pendente | Rodar somente após homologar schema/migrations; não usar o workflow antigo que faz checkout explícito de main para validar esta branch |
+| Verificar concorrência de headcount e atribuição clínica | Pendente | Fixtures isoladas e testes controlados necessários |
+| Merge / PR / deploy | Não iniciado | Dependem de autorização explícita; deploy continua manual |
+
+Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-10-11-validacao-integrada-lotes16-19.md).
