@@ -93,3 +93,12 @@ No final da etapa de implementação, testar pelo menos:
 **Ambiente remoto:** intocado.  
 **Testes:** adiados para o final.  
 **Merge/PR/deploy:** não realizados.
+
+
+## Auditoria estática de RLS e superfície de escrita — 2026-10-11
+
+A revisão das migrations históricas encontrou que a policy de UPDATE de candidaturas permite que o dono da candidatura seja elegível para atualização e tem WITH CHECK limitado ao tenant corrente, sem restringir por coluna os campos alteráveis. A migration fundacional não foi localizada como revogando UPDATE de candidaturas para authenticated. Isso significava que a proteção de fase/status via trigger não era suficiente, por si só, para impedir tentativa de alteração direta de outros campos da candidatura. O Lote 18 fecha essa superfície revogando UPDATE direto da tabela para PUBLIC, anon e authenticated e substituindo a marcação de leitura de RH por uma RPC autorizada.
+
+Para medical_referrals, a migration fundacional já revogava todos os privilégios de tabela para PUBLIC, anon e authenticated, concedendo acesso de tabela ao service_role. Assim, a nova revogação explícita de UPDATE no Lote 17 é defesa em profundidade/documentação; a revisão não afirma que havia um bypass ativo de UPDATE por cliente.
+
+**Limite:** esta é revisão estática dos contratos e migrations versionados, não leitura do catálogo real do banco nem teste de grants/owners em homologação. Os lotes 17 e 18 continuam implementados em código, não validados.
