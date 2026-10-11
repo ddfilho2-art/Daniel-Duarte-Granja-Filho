@@ -155,7 +155,7 @@ Esta rodada foi uma leitura de código/migrations no GitHub. Não houve execuç�
 | C3 | Prioridade excepcional com justificativa | **Em progresso — 50%** | RPC de prioridade versionada com justificativa obrigatória e trilha de auditoria; autorização provisória restrita a `clinic_admin` até confirmação de outro perfil. | Confirmar o perfil autorizado e validar a ordenação sem alterar o FIFO original. |
 | C4 | Permissões diferenciadas de médico e secretaria | **Em progresso — 40%** | Papel `doctor`, listagem mínima da fila disponível, listagem dos exames próprios e autorização de encaminhamento/anexo por atribuição versionados. | Revisar todos os caminhos de leitura e anexos e executar testes negativos por perfil/tenant na etapa final. |
 | C5 | Secretaria e médico responsável podem agendar | **Em progresso — 15%** | A atualização do encaminhamento passa a permitir agenda pela equipe administrativa da clínica ou pelo médico responsável atribuído. A tabela de agenda Google existente ainda é separada e não foi vinculada diretamente ao encaminhamento neste lote. | Integrar agenda ao encaminhamento e ao responsável médico, prevenindo conflitos e preservando histórico de reagendamento/cancelamento. |
-| C6 | Catálogo de exames complementares associado ao admissional | **Não iniciado — 0%** | Tipos de exame e necessidade de múltiplos itens documentados. | Desenhar cadastro configurável, relação por encaminhamento, status de solicitação/agendamento/realização e controle de prestador. |
+| C6 | Catálogo de exames complementares associado ao admissional | **Em progresso — 45%** | Migration versionada para catálogo configurável por clínica e itens individuais ligados ao encaminhamento, com status de solicitação/agendamento/realização/cancelamento e trilha de atores. | Criar UI e integração de fluxo; relacionar preços por contrato e faturamento em lote separado; validar permissões e isolamento na etapa final. |
 | C7 | Anexos e documentos clínicos com acesso mínimo | **Não iniciado — 0%** | Há código prévio de anexos privados vinculado a encaminhamentos, ainda não validado integralmente. | Auditar policies e Edge Functions; testar leitura/download por médico não responsável, empresa errada e usuário sem vínculo. |
 
 ### Fase D — Relatórios e faturamento
@@ -258,3 +258,11 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - A RPC de atualização do encaminhamento foi restringida: secretaria/equipe administrativa e médico responsável podem manter o agendamento; resultado de aptidão é reservado ao médico atribuído ou administrador clínico.
 - Nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; não houve merge para `main` nem deploy Vercel.
 - O plano de testes integrado será elaborado e executado na etapa final, conforme orientação do usuário. Até lá, o código permanece **não validado**.
+
+
+### Atualização — Lote 3: exames complementares (2026-10-10)
+
+- Migration versionada: `20261010210000_complementary_exam_catalog_and_workflow.sql`.
+- Documento: [Lote 3 — exames complementares](maintenance/2026-10-10-lote3-exames-complementares.md).
+- Implementação inclui catálogo por clínica, itens individuais por encaminhamento, solicitação, agendamento, registro operacional de realização e cancelamento com justificativa.
+- O lote ainda não tem UI, preço por contrato nem faturamento; não está validado. Os testes serão planejados e executados na etapa final.
