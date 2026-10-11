@@ -137,6 +137,10 @@ const ETAPAS_PROCESSO = [
 const getProximaFase = (faseAtual: string, vaga?: any) => {
   const exigeProva = vaga?.exige_prova === true || vaga?.exige_prova === "Sim";
 
+  // The legacy "Exame" action is explicitly labeled as the hiring decision.
+  // The database still requires a linked, non-cancelled fit admission exam.
+  if (faseAtual === "Exame") return "Contratado";
+
   if (faseAtual === "Prova" && !exigeProva) {
     return "Entrevista Gestor";
   }
@@ -5179,7 +5183,10 @@ export function HRCandidatos() {
 
           if (action === "Aprovar") {
             const currentIndex = stages.findIndex((s) => s.id === currentFase);
-            if (currentIndex >= 0 && currentIndex < stages.length - 1) {
+            if (currentFase === "Exame") {
+              newFase = "Contratado";
+              newStatus = "Contratado";
+            } else if (currentIndex >= 0 && currentIndex < stages.length - 1) {
               newFase = stages[currentIndex + 1].id;
               newStatus = "APROVADA";
             } else if (currentIndex === stages.length - 1) {
