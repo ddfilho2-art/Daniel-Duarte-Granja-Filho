@@ -402,3 +402,17 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - **Pendente — testes integrados:** não executar build, type-check, testes automatizados ou E2E antes da etapa final definida. A migration não foi aplicada ao Supabase remoto.
 
 Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md).
+
+
+## Lote 18 — Superfície de escrita de candidaturas (2026-10-11)
+
+**Status geral: Em progresso — 60%.** A RPC e a troca do único UPDATE direto executável identificado na interface foram versionadas; faltam validação integrada e confirmação de todos os consumidores externos.
+
+- **Implementado, não validado:** criada a RPC rpc_marcar_candidatura_visualizada, que confirma candidatura, vínculo com vaga/tenant, tenant corrente e papel RH/administrador antes de marcar visualizado, rh_visualizou_recrutamento e updated_at.
+- **Implementado, não validado:** o UPDATE direto em src/pages/HR.tsx foi substituído pela RPC.
+- **Implementado, não validado:** a migration revoga UPDATE direto em public.candidaturas para PUBLIC, anon e authenticated, centralizando alterações executáveis de negócio em RPCs SECURITY DEFINER.
+- **Revisão estática prévia:** não foram encontrados outros UPDATEs executáveis de fase/status nos caminhos de cliente e Edge Functions inspecionados; o UPDATE antigo de Candidate.tsx está comentado. O inventário deve ser reconfirmado antes de aplicar.
+- **Pendente:** confirmar todas as funções/jobs externos que escrevem candidaturas, owner/ACL das RPCs, grants e políticas RLS efetivas. Nenhum teste/build/type-check foi executado.
+- **Pendente:** validar que a tela RH consegue marcar visualização e que candidatura, desistência, contratação, contagem de vagas e fila de análise continuam operacionais.
+
+Migration: supabase/migrations/20261011170000_harden_candidatura_client_write_surface.sql.
