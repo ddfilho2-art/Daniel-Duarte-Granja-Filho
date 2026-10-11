@@ -59,3 +59,14 @@ Esta matriz consolida leitura do código versionado e consultas somente leitura 
 - Definir política de faturamento para falta/no-show e exames repetidos/cancelados após execução.
 - Definir quem pode autorizar exceção de FIFO/prioridade; por padrão, limitar a administrador da clínica e registrar justificativa.
 - Definir como registrar reversão de contratação e reabertura de vaga, com trilha de auditoria.
+
+
+## Complemento da auditoria — chat e agenda (2026-10-10)
+
+A leitura adicional das migrations do lote empresa–clínica identificou três pontos para corrigir antes da publicação:
+
+1. **Idempotência de reserva precisa vincular a chave ao recurso autorizado.** Em `reserve_tenant_clinic_appointment`, após autorizar a conversa recebida, a função consulta a chave de idempotência e retorna o ID encontrado sem confirmar que a reserva existente pertence à mesma conversa/empresa/clínica. A resposta expõe somente o ID, mas o contrato idempotente deve exigir que a chave repetida corresponda à mesma operação e ao mesmo escopo. Ajustar a função para verificar o vínculo e retornar conflito explícito quando a chave for reutilizada em outro contexto.
+2. **Bloqueio de conteúdo clínico no chat é apenas heurístico.** A constraint e a RPC barram algumas palavras como laudo, diagnóstico, CID e prontuário, mas não garantem que outras descrições clínicas sejam detectadas. Tratar isso como aviso/defesa em profundidade, não como controle de confidencialidade; a UI deve orientar o usuário e documentos clínicos devem usar fluxo privado com autorização clínica específica.
+3. **Constraint redundante de vínculo de encaminhamento.** `tenant_clinic_conversations_referral_pair` testa `medical_referral_id IS NULL OR medical_referral_id IS NOT NULL`, uma condição sempre verdadeira. Ela não valida vínculo algum e pode ser removida ou substituída por regra real quando o modelo de conversa/exame for ajustado.
+
+Esses achados aumentam o escopo do lote de release do chat/agenda: testar reuso de chave entre conversas, autorização em ambos os lados, conteúdo não permitido e anexos privados. Nenhuma migration foi aplicada e nenhuma função foi alterada nesta rodada.
