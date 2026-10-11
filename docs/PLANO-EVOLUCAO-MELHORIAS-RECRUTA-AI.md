@@ -430,3 +430,12 @@ Migration: supabase/migrations/20261011170000_harden_candidatura_client_write_su
 - **Pendente:** validar que contagens e relatórios após ação em massa correspondem ao estado real no banco; nenhuma mudança de dado foi feita manualmente.
 
 Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11-lote19-confiabilidade-acoes-rh.md).
+
+
+## Marco de validação de código — 2026-10-11
+
+- **Type-check:** aprovado pela GitHub Actions no commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f.
+- **Build Vite de produção:** aprovado no mesmo run, sem deploy.
+- **Ajustes motivados pelo primeiro type-check:** corrigida condição sem chaves na lista de vagas do candidato; contratos de resolveAuthorizedHomePath; tipo da importação lazy de TenantClinicChat; EventoTipo com DESISTÊNCIA e retorno booleano do registro de evento; estado calendarTimezone; confiabilidade das ações individuais/em massa.
+- **Status geral dos lotes 16–19:** Implementado em código; **não validado integralmente**. Não houve aplicação de migration no Supabase remoto e nenhum E2E funcional de banco/clínica foi executado.
+- Próxima etapa obrigatória: executar [o plano integrado dos Lotes 16–19](maintenance/2026-10-11-validacao-integrada-lotes16-19.md) em ambiente de homologação depois de aprovar a aplicação das migrations.
