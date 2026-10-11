@@ -8,7 +8,7 @@ const validPassword=(p:string)=>p.length>=8&&p.length<=128&&/[a-z]/.test(p)&&/[A
 const env=(n:string)=>{const v=Deno.env.get(n)?.trim();if(!v)throw new Error("missing_secret:"+n);return v;};
 
 Deno.serve(async(req)=>{
- const cors=corsHeaders(req), request=idRequest();
+ const cors=corsHeaders(req), request=requestId(req);
  if(!cors)return jsonResponse({success:false,code:"ORIGIN_NOT_ALLOWED",requestId:request},403);
  if(req.method==="OPTIONS")return new Response(null,{status:204,headers:cors});
  if(req.method!=="POST")return jsonResponse({success:false,code:"METHOD_NOT_ALLOWED",requestId:request},405,cors);
@@ -96,4 +96,3 @@ Deno.serve(async(req)=>{
   return jsonResponse({success:false,code,requestId:request},code.includes("NOT_FOUND")?404:400,cors);
  }
 });
-function idRequest(){return requestId();}
