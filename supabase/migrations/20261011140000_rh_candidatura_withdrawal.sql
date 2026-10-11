@@ -54,7 +54,7 @@ begin
   end if;
 
   if lower(trim(coalesce(v_candidatura.status, ''))) in ('contratado', 'desistência', 'desistencia', 'reprovada')
-     or lower(trim(coalesce(v_candidatura.fase, ''))) = 'contratado' then
+     or lower(trim(coalesce(v_candidatura.fase, ''))) in ('contratado', 'encerrado', 'finalizado') then
     raise exception using errcode = '55000', message = 'candidatura_is_already_terminal_or_hired';
   end if;
 
