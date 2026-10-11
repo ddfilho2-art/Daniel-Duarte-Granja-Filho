@@ -278,5 +278,5 @@ A execução posterior da CI de manutenção concluiu com sucesso type-check e b
 
 ### Validação e estado
 - Typecheck e build de produção passaram no CI para o commit final da correção: run [38185976835](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185976835).
-- O replay das migrations em Supabase local ainda estava em execução na última consulta, durante a inicialização do stack; não deve ser marcado como aprovado até haver resultado final.
+- O replay integral das migrations em Supabase local e a confirmação do estado passaram no CI do PR [#11](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185974030). O job ainda estava finalizando a limpeza dos containers na última consulta.
 - Não foi feito deploy da Vercel nem teste manual de login após a correção. Os testes manuais pendentes são entrar com o administrador da plataforma e com o administrador da clínica, confirmar redirecionamento e verificar os eventos `LOGIN_AUTHORIZATION_REFRESH_REQUESTED`, `is_platform_master_admin` e `get_current_clinic_access` no console.
