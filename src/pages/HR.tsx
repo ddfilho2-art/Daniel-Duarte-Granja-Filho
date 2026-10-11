@@ -5304,6 +5304,7 @@ export function HRCandidatos() {
     id: string,
     action: "Aprovar" | "Reprovar" | "Reserva",
   ) => {
+    let historyFailed = false;
     try {
       const { data: currentData, error: fetchError } = await supabase
         .from("candidaturas")
@@ -5311,14 +5312,16 @@ export function HRCandidatos() {
         .eq("id", id)
         .maybeSingle();
 
-      if (fetchError || !currentData) return;
+      if (fetchError) throw fetchError;
+      if (!currentData) {
+        alert("Candidatura não encontrada ou sem permissão para acessá-la.");
+        return;
+      }
 
       const currentFase = currentData.fase ?? "Triagem";
-      const currentStatus = currentData.status ?? "ATIVO";
       const vaga = vagas.find((v) => v.id === selectedVaga);
-
       let newFase = currentFase;
-      let newStatus = currentStatus;
+      let newStatus = currentData.status ?? "ATIVO";
 
       if (action === "Aprovar") {
         newFase = getProximaFase(currentFase, vaga);
@@ -5331,87 +5334,73 @@ export function HRCandidatos() {
           newStatus = "REPROVADA";
           newFase = "Encerrado";
         }
-      } else if (action === "Reserva") {
+      } else {
         newStatus = "RESERVA";
+        newFase = "Banco de Talentos";
       }
-
-      console.log(
-        "Ação:",
-        action,
-        "Fase Atual:",
-        currentFase,
-        "Nova Fase:",
-        newFase,
-        "Novo Status:",
-        newStatus,
-      );
 
       if (
         newFase === currentFase &&
         newStatus === currentData.status &&
         action === "Aprovar"
       ) {
-        // Preservar o status canônico se a fase atual já for a de contratação.
         newStatus = newFase === "Contratado" ? "Contratado" : "APROVADA";
       }
 
       if (newFase === currentFase && newStatus === currentData.status) {
-        console.log("Nenhuma mudança detectada, abortando update.");
+        alert("A candidatura já está nessa situação; nenhuma alteração foi necessária.");
         return;
       }
 
-      const payload = {
-        status: newStatus,
-        fase: newFase,
-        visualizado: true,
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("Payload enviado (handleSingleAction):", payload);
-
-      const { data, error: updateError } = await supabase.rpc(
+      const { error: updateError } = await supabase.rpc(
         "rpc_atualizar_candidatura_processo",
         {
           p_id: id,
-          p_fase: payload.fase,
-          p_status: payload.status,
-          p_visualizado: payload.visualizado,
-          p_updated_at: payload.updated_at,
+          p_fase: newFase,
+          p_status: newStatus,
+          p_visualizado: true,
+          p_updated_at: new Date().toISOString(),
         },
       );
-
-      console.log("Resposta (handleSingleAction RPC):", data, updateError);
-
       if (updateError) throw updateError;
 
-      // Registrar evento de histórico
-      await logCandidaturaEvento(
-        id,
-        action.toUpperCase() as any,
-        `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
-        profile?.id,
-      );
+      try {
+        await logCandidaturaEvento(
+          id,
+          action.toUpperCase() as any,
+          `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
+          profile?.id,
+        );
+      } catch (historyError) {
+        historyFailed = true;
+        console.error("Transição concluída, mas falhou o histórico:", id, historyError);
+      }
 
-      setCandidatos(candidatos.filter((c) => c.id !== id));
-      setVagas(
-        vagas.map((v) =>
+      setCandidatos((current) => current.filter((candidate) => candidate.id !== id));
+      setVagas((current) =>
+        current.map((v) =>
           v.id === selectedVaga
             ? { ...v, candidaturas: Math.max(0, v.candidaturas - 1) }
             : v,
         ),
       );
+
       try {
         await logAudit(
           "Ação Individual",
           "Candidatos",
-          `Ação ${action} aplicada a 1 candidato.`,
+          `Ação ${action} aplicada a 1 candidato; fase final: ${newFase}; status: ${newStatus}.`,
         );
       } catch (logError) {
-        console.warn("Erro ao registrar log:", logError);
+        console.warn("Transição concluída, mas falhou a auditoria da ação individual:", logError);
+      }
+
+      if (historyFailed) {
+        alert("A candidatura foi atualizada, mas o histórico não foi gravado. Verifique os logs antes de encerrar a manutenção.");
       }
     } catch (error) {
-      console.error("Erro ao aplicar ação:", error);
-      alert("Erro ao aplicar ação. Tente novamente.");
+      console.error("Erro ao aplicar ação individual:", error);
+      alert("Não foi possível atualizar a candidatura. Nenhuma alteração foi confirmada nesta operação; verifique a situação antes de tentar novamente.");
     }
   };
 
