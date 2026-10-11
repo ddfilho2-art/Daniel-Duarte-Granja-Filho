@@ -4,6 +4,10 @@
 
 begin;
 
+-- Garante a coluna antes de compilar as operações de desistência e o trigger de transição.
+alter table public.candidaturas
+  add column if not exists motivo_declinio text;
+
 create or replace function public.rpc_cancelar_candidatura_rh(
   p_id text,
   p_reason text
