@@ -591,3 +591,8 @@ Detalhamento e critérios: [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELH
 - `medical_referrals.legacy_application_id` é texto sem FK para `candidaturas.id`, então o vínculo é fraco e não garante integridade transacional.
 - A Edge Function `storage-authorize` usa `can_access_medical_referral()` para upload e download. Como a função permite `is_platform_master_admin()`, o risco de acesso global alcança potencialmente anexos médicos privados.
 - Prioridade: incluir na matriz de impacto a transação contratação↔resultado médico, vínculo íntegro candidatura↔encaminhamento e correção de autorização clínica/Storage. Não aplicar revogações genéricas de `SECURITY DEFINER`; classificar por função e validar com testes negativos.
+### Achado adicional — listagem de anexos médicos
+
+Consulta somente leitura no Supabase confirmou que `authenticated` não tem privilégio `SELECT` na tabela `medical_referral_attachments`, mas `src/lib/medical-attachments.ts` consulta essa tabela diretamente para listar anexos. A tabela mantém RLS habilitado; não liberar leitura indiscriminada. Projetar RPC/Edge Function autorizada para retornar metadados e validar com testes por empresa/clínica/médico.
+
+Detalhamento atualizado no [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md).
