@@ -93,3 +93,8 @@ A listagem de exames admissionais para exames complementares permite que o sched
 ## Situação final desta etapa
 
 **Implementado em código, não validado.** O percentual de progresso do Lote 17 é estimado em 70% porque a escrita da migration e a análise dos principais componentes estão concluídas, mas o inventário integral, a confirmação de privilégios, a validação integrada e o tratamento de dados legados ainda faltam.
+
+
+## Revisão complementar de ACL — 2026-10-11
+
+A migration fundacional 20260808090000 já revogava privilégios de tabela de medical_referrals para PUBLIC, anon e authenticated. Por isso, o REVOKE explícito do Lote 17 é uma declaração defensiva da regra pretendida, e não evidência de que a ACL anterior permitia UPDATE direto. O owner real das RPCs SECURITY DEFINER ainda precisa ser confirmado em ambiente de homologação.
