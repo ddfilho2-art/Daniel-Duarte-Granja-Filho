@@ -39,6 +39,7 @@ Em `src/pages/HR.tsx`:
 
 - Modal de perfil, ações em massa, ação individual e encaminhamento para exame passam pela RPC de transição em vez de atualizar diretamente fase/status.
 - A última etapa configurada (`Contrato`) agora avança para a fase final canônica `Contratado`, em vez de `Finalizado` sem status de contratação.
+- A ação legada da fase `Exame` é tratada como decisão final de contratação; a proteção de banco exige que exista encaminhamento admissional vinculado, apto e não cancelado.
 - A ação em massa reconhece a aprovação da última etapa (`Contrato`) e registra fase/status `Contratado` juntos.
 - Todas as rotas que avançam à fase `Contratado` enviam o status canônico `Contratado`.
 - A reprovação da ação individual é encerrada na fase `Encerrado`, em alinhamento com a regra do banco.
@@ -61,6 +62,7 @@ As atualizações não relacionadas à transição de fase/status, como marcaç�
 No final da etapa de implementação, testar pelo menos:
 
 1. Aprovação intermediária conserva a fase/status esperado.
+2. Aprovação a partir de `Exame` e da última etapa `Contrato` só conclui a contratação quando o banco confirma exame admissional apto.
 2. Fase `Contratado` sem status `Contratado` é rejeitada.
 3. Status `Contratado` fora da fase final é rejeitado.
 4. Contratação sem exame admissional apto é rejeitada pelo banco.
