@@ -880,3 +880,17 @@ Documento: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-1
 | Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita; deploy continua manual |
 
 Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md).
+
+
+## Manutenção integrada — Lote 18: superfície de escrita de candidaturas (2026-10-11)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Criar RPC autorizada para marcar candidatura visualizada | Implementado — não validado | RPC verifica autenticação, vaga/tenant, tenant corrente e papel autorizado |
+| Substituir UPDATE direto em HR.tsx | Implementado — não validado | Cliente chama rpc_marcar_candidatura_visualizada |
+| Revogar UPDATE direto em candidaturas para clientes | Implementado — não validado | Migration 20261011170000_harden_candidatura_client_write_surface.sql; depende de confirmar escritores e owner das RPCs |
+| Confirmar todos os escritores diretos e consumidores externos | Em progresso — 60% | Escrita direta remanescente localizada no cliente foi substituída; inventário de todos os consumidores externos pendente |
+| Testar leitura visualizada e fluxos críticos de candidatura | Adiado para etapa final | Sem build/testes nesta fase |
+| Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita |
+
+Documento: [Lote 18 — superfície de escrita de candidaturas](maintenance/2026-10-11-lote18-superficie-escrita-candidaturas.md).
