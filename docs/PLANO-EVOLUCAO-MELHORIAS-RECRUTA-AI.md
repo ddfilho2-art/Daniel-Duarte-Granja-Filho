@@ -341,3 +341,12 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - A interface por empresa/período foi atualizada para mostrar essas distinções e exportá-las em CSV.
 - Evidência: [Lote 12 — relatório macro](maintenance/2026-10-11-lote12-relatorio-macro-faturamento.md).
 - A validação de reconciliação de totais, períodos e isolamento de tenant fica para o plano integrado final. Nenhum teste/build/type-check foi executado; sem publicação remota.
+
+
+### Atualização — Lote 13: fila e encaminhamentos escopados por clínica (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Fila disponível, exames atribuídos e seletor de encaminhamentos complementares agora consultam RPCs com a clínica selecionada, evitando misturar dados operacionais entre clínicas.
+- Médico vê somente seus próprios encaminhamentos atribuídos na seção “Meus exames”; a fila disponível contém somente casos ainda não atribuídos e dados operacionais mínimos.
+- Evidência: [Lote 13 — fila por clínica](maintenance/2026-10-11-lote13-fila-escopada-por-clinica.md).
+- Isolamento multi-clínica e acesso por papel serão testados na etapa final. Nenhum teste/build/type-check foi executado; sem aplicação de migrations remotas ou deploy.
