@@ -370,3 +370,14 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Não foram alterados dados legados nem a migration do Lote 1. Estados antigos com fase `Contratado` e status `APROVADA` permanecem pendentes de reconciliação aprovada.
 - Evidência: [Lote 15 — status canônico de contratação](maintenance/2026-10-11-lote15-status-canonico-contratacao-headcount.md).
 - Nenhum teste, build, type-check ou E2E foi executado. Nenhuma migration remota, merge, PR ou deploy foi realizado.
+
+
+### Atualização — Lote 16: transições de candidatura pela RPC protegida (2026-10-11)
+
+- **Status:** implementação concluída — não validada.
+- Criada a migration `20261011150000_harden_candidatura_process_transition.sql` para reforçar `rpc_atualizar_candidatura_processo`: autorização no tenant corrente, bloqueio de estados terminais, consistência entre fase/status de contratação e reprovação, e execução restrita a `authenticated`.
+- Os principais caminhos de RH em `src/pages/HR.tsx` — modal, ação em massa, ação individual, salvamento de entrevista e encaminhamento para exame — agora usam a RPC para transições de fase/status.
+- Corrigidos os caminhos que ainda marcavam a fase `Contratado` como status `APROVADA`.
+- **Limite conhecido:** ainda é necessário inventariar outras rotas/clientes com permissão de UPDATE direto em `candidaturas`; não declarar centralização global antes dessa revisão.
+- Testes/build/type-check/E2E permanecem adiados para o plano de validação final. A migration não foi aplicada remotamente e não houve merge/PR/deploy.
+- Evidência: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
