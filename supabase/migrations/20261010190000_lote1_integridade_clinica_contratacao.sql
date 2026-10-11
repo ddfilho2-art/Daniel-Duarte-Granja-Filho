@@ -536,6 +536,35 @@ begin
 end;
 $function$;
 
+-- The UI may read the derived counter, but must not be able to forge it.
+create or replace function public.protect_vacancy_hired_count()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $function$
+begin
+  if tg_op = 'INSERT' then
+    new.quantidade_contratada := 0;
+    return new;
+  end if;
+
+  -- The sync trigger updates this field through a nested statement. Direct
+  -- client edits are rejected; the authoritative value is the candidaturas table.
+  if pg_trigger_depth() <= 1
+     and new.quantidade_contratada is distinct from old.quantidade_contratada then
+    raise exception using errcode = '42501', message = 'vacancy_hired_count_is_derived';
+  end if;
+
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_protect_vacancy_hired_count on public.vagas;
+create trigger trg_protect_vacancy_hired_count
+before insert or update on public.vagas
+for each row execute function public.protect_vacancy_hired_count();
+
 drop trigger if exists trg_enforce_vacancy_headcount_and_admission on public.candidaturas;
 create trigger trg_enforce_vacancy_headcount_and_admission
 before insert or update or delete on public.candidaturas
