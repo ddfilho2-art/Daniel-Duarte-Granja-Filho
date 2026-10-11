@@ -164,10 +164,10 @@ Esta rodada foi uma leitura de código/migrations no GitHub. Não houve execuç�
 |---|---|---|---|---|
 | D1 | Relatório macro de exames por clínica/período | **Não iniciado — 0%** | Requisito registrado. | Definir métricas, filtros e fonte de verdade; reconciliar totais com os itens detalhados. |
 | D2 | Detalhamento por empresa | **Não iniciado — 0%** | Requisito registrado. | Incluir itens que compõem o total, datas, tipo, status, preço e situação de cobrança com controle de acesso. |
-| D3 | Cadastro de preços por contrato/empresa e vigência | **Não iniciado — 0%** | Requisito registrado. | Auditar contratos existentes e definir histórico de preço para que alterações futuras não reescrevam cobranças passadas. |
-| D4 | Fechamento de período e memória de cobrança | **Não iniciado — 0%** | Requisito registrado. | Definir elegibilidade de cobrança, fechamento, itens duplicados, ajustes, estornos e trilha de auditoria. |
-| D5 | Geração/registro de boletos | **Não iniciado — 0%** | Necessidade operacional identificada; integração externa ainda não decidida. | Após decisão A7, definir se será exportação para emissão externa ou integração com provedor/banco; nunca armazenar segredos em frontend. |
-| D6 | Exportação e reconciliação dos relatórios | **Não iniciado — 0%** | Requisito registrado. | Definir formatos CSV/XLSX/PDF e testar se macro e detalhamento fecham os mesmos totais, sem exposição clínica indevida. |
+| D3 | Cadastro de preços por contrato/empresa e vigência | **Em progresso — 45%** | Tabelas e RPC versionadas para preços por contrato/serviço, vigência e prevenção de sobreposição; snapshots protegem os valores históricos. | Integrar UI, revisar fluxos de preço e validar vigência/histórico na etapa final. |
+| D4 | Fechamento de período e memória de cobrança | **Em progresso — 40%** | Ciclos, geração de itens, snapshots, bloqueio de duplicidade, fechamento, ajustes auditáveis e reversão de rascunho versionados. | Integrar interface/exportação e validar reconciliação, fechamento e correções pós-fechamento. |
+| D5 | Geração/registro de boletos | **Em progresso — 20%** | Base permite registrar referência externa, vencimento e pagamento; geração de boleto e integração bancária não foram implementadas, aguardando decisão de escopo. | Decidir exportação vs integração com provedor/banco e implementar após aprovação explícita do escopo. |
+| D6 | Exportação e reconciliação dos relatórios | **Em progresso — 10%** | RPCs versionadas para listar ciclos e itens com valores/ajustes e dados operacionais mínimos. Não há exportação nem relatório macro reconciliado. | Implementar relatórios macro/detalhados e exportação CSV/XLSX/PDF; validar reconciliação na etapa final. |
 
 ### Fase E — Validação, documentação e entrega
 
@@ -266,3 +266,12 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Documento: [Lote 3 — exames complementares](maintenance/2026-10-10-lote3-exames-complementares.md).
 - Implementação inclui catálogo por clínica, itens individuais por encaminhamento, solicitação, agendamento, registro operacional de realização e cancelamento com justificativa.
 - O lote ainda não tem UI, preço por contrato nem faturamento; não está validado. Os testes serão planejados e executados na etapa final.
+
+
+### Atualização — Lote 4: faturamento da clínica (2026-10-10)
+
+- Migration: `supabase/migrations/20261010220000_occupational_health_billing_foundation.sql`.
+- Documento: [Lote 4 — faturamento da Saúde Ocupacional](maintenance/2026-10-10-lote4-faturamento-clinica.md).
+- Implementada a fundação de preço contratual com vigência, ciclos e itens de cobrança com snapshots, prevenção de duplicidade, fechamento, referência de emissão externa, pagamento, ajustes e reversão em rascunho.
+- Integração de boleto/banco permanece não implementada até decisão de escopo; UI e exportações também pendentes.
+- Validação adiada para a etapa final; migrations ainda não aplicadas ao Supabase remoto.
