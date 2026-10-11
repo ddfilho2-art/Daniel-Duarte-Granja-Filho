@@ -852,7 +852,7 @@ Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-con
 | Modal de perfil de RH | Concluído — não validado | Usa `rpc_atualizar_candidatura_processo` |
 | Ações em massa e individuais | Concluído — não validado | Usam RPC; status canônico, reprovação encerrada e aprovação da última etapa `Contrato` convertida em contratação |
 | Salvamento de entrevista | Concluído — não validado | Usa RPC existente com status canônico corrigido |
-| Encaminhamento para exame | Concluído — não validado | Transição de fase usa RPC e trata erro |
+| Encaminhamento para exame | Concluído — não validado | Transição de fase usa RPC e trata erro; decisão final da fase legada `Exame` permanece protegida pelo exame admissional apto no banco |
 | Inventariar todos os clientes/rotas com UPDATE direto de fase/status | Em progresso — 70% | `src/pages/HR.tsx`, `Candidate.tsx`, `Public.tsx`, `HRDetalheVaga.tsx`, `HRRelatorios.tsx` e Edge Functions de candidatura revisados; faltam busca ampla final e revisão das permissões SQL/RLS para confirmar todos os caminhos |
 | Reconciliação de estados legados | Não iniciado | Apenas identificar e reportar; não modificar dados sem plano aprovado |
 | Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar nesta fase, conforme orientação |
