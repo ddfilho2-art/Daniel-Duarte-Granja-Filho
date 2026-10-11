@@ -827,3 +827,18 @@ Documento: [status do Lote 13](maintenance/2026-10-11-lote13-fila-escopada-por-c
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [status do Lote 14](maintenance/2026-10-11-lote14-desistencia-candidatura-rh.md).
+
+
+## Manutenção — 2026-10-11 — Lote 15: status canônico de contratação e headcount
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Status final de RH ao contratar | Concluído — não validado | `src/pages/HR.tsx` envia status `Contratado` na fase final |
+| Indicador do dashboard | Concluído — não validado | Conta apenas candidaturas com status canônico `Contratado` |
+| Reconciliar estados legados fase/status divergentes | Não iniciado | Inventariar registros antes de propor correção de dados; não alterar produção |
+| Testar bloqueio por exame apto e headcount | Adiado para etapa final | Depende de ambiente autorizado e migration aplicada em homologação |
+| Testar concorrência, desistência e regressão de dashboard | Adiado para etapa final | Incluir no plano integrado; não executar nesta fase |
+| Build/type-check/testes | Adiado para etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-contratacao-headcount.md).
