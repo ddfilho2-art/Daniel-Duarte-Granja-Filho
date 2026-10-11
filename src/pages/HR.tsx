@@ -946,7 +946,7 @@ function CandidateProfileModal({
                             ? "Reprovar (Retorna p/ Entrevista RH)"
                             : "Reprovar"}
                       </button>
-                      {!["contratado", "desistência", "desistencia", "reprovada"].includes(String(currentStatus || "").trim().toLowerCase()) && String(currentFase || "").trim().toLowerCase() !== "contratado" && (
+                      {!["contratado", "desistência", "desistencia", "reprovada"].includes(String(currentStatus || "").trim().toLowerCase()) && !["contratado", "encerrado", "finalizado"].includes(String(currentFase || "").trim().toLowerCase()) && (
                         <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
                           {!showWithdrawForm ? (
                             <button
