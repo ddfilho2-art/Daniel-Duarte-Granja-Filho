@@ -596,3 +596,7 @@ Detalhamento e critérios: [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELH
 Consulta somente leitura no Supabase confirmou que `authenticated` não tem privilégio `SELECT` na tabela `medical_referral_attachments`, mas `src/lib/medical-attachments.ts` consulta essa tabela diretamente para listar anexos. A tabela mantém RLS habilitado; não liberar leitura indiscriminada. Projetar RPC/Edge Function autorizada para retornar metadados e validar com testes por empresa/clínica/médico.
 
 Detalhamento atualizado no [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md).
+
+## Atualização — matriz de impacto técnico (2026-10-10)
+
+Matriz criada: [MATRIZ-IMPACTO-TECNICO-RECRUTA-AI.md](MATRIZ-IMPACTO-TECNICO-RECRUTA-AI.md). A análise/documentação está concluída; a implementação não começou. Próximo lote recomendado: integridade candidatura/admissional, validação de aptidão médica, limite transacional de posições e autorização de anexos clínicos. Nenhuma alteração de banco, publicação de funções, build/teste ou deploy foi realizada nesta rodada.
