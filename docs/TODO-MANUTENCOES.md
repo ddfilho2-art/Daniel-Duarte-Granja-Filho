@@ -574,3 +574,14 @@ Plano e status detalhados: [PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md](PLANO-EVOLUC
 | Testes, build e deploy | Não iniciado — 0% | Não foram executados testes/build nesta rodada. Nenhuma migration ou deploy foi feito. Deploy Vercel segue manual e depende de autorização explícita. |
 
 **Achados de risco para priorizar no próximo lote:** ausência de isolamento por médico no fluxo clínico atual; acesso de platform master a encaminhamentos sem vínculo clínico; falta de evidência de headcount transacional; agenda não vinculada ao encaminhamento; modelo de faturamento ainda não identificado. Ver plano para evidências e próximos passos.
+## Atualização da auditoria — confronto com Supabase remoto (2026-10-10)
+
+Projeto consultado somente leitura: `dmzagrakkduddofkqjhg`.
+
+- **Descompasso de publicação:** histórico remoto contém 110 migrations e termina em `20261009220539`; migrations `20261010...` existentes no GitHub não aparecem como aplicadas. As tabelas de conversas/agenda do lote e as Edge Functions `google-calendar-appointments`, `tenant-clinic-chat-storage` e `clinic-user-management` não constam no Supabase remoto.
+- **Headcount:** `public.vagas` não contém `quantidade_vagas` nem `quantidade_contratada`; a RPC `rpc_candidatar_se` não aplica limite de posições/contratações.
+- **Saúde Ocupacional:** `tenant_role` não tem papel `doctor`; as RPCs clínicas atuais não filtram por médico responsável. `can_access_medical_referral()` concede acesso a platform master.
+- **Security Advisor:** alertas de funções `SECURITY DEFINER` acessíveis via Data API, duas tabelas com RLS sem policies e leaked-password protection desativada. Triar intenção e risco antes de alterar.
+- **Ação:** concluir matriz de dependências, migrations e funções; não considerar o lote empresa–clínica disponível em produção nem publicar frontend antes da sincronização controlada e da validação integrada.
+
+Detalhamento e critérios: [Plano de evolução e melhorias](PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md). Nenhuma alteração de banco, publicação de Edge Function, build ou deploy foi executada nesta auditoria.
