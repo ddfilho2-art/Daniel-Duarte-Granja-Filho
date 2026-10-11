@@ -1,6 +1,6 @@
 # Plano de evolução e melhorias — Recruta AÍ
 
-- **Última atualização:** 2026-10-10
+- **Última atualização:** 2026-10-11
 - **Repositório:** `ddfilho2-art/Daniel-Duarte-Granja-Filho`
 - **Ambiente de produção:** https://daniel-duarte-granja-filho.vercel.app
 - **Escopo desta etapa:** consolidar regras, planejar e avaliar impactos; não implementar funcionalidades.
@@ -385,3 +385,20 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Evidência: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
 
 - Complemento de integridade do Lote 16: trigger de tabela impede alterações de fase/status por usuário sem papel RH autorizado, bloqueia reabertura de estados terminais, exige justificativa/auditoria para desistência e torna atômico o registro de auditoria com a transição. A migration continua não validada e não aplicada remotamente.
+
+
+## Lote 17 — Integridade do ciclo de vida clínico e fechamento de escrita direta (2026-10-11)
+
+**Status geral: Em progresso — 65%.** A revisão estática e a primeira versão da migration foram concluídas; a integração e a validação em ambiente continuam pendentes. Este percentual não significa validação de segurança em runtime.
+
+- **Concluído — análise estática dos caminhos principais:** src/pages/OccupationalHealth.tsx atualiza encaminhamentos pela RPC update_medical_referral; src/pages/ClinicOperations.tsx usa RPCs para fila, atribuição, devolução e priorização. Não foi encontrado UPDATE direto nesses caminhos de interface revisados.
+- **Concluído — migration versionada:** supabase/migrations/20261011160000_harden_medical_referral_writes_and_transitions.sql.
+- **Implementado, não validado — bloqueio de escrita direta:** revoga o privilégio de UPDATE em medical_referrals para PUBLIC, anon e authenticated; alterações de negócio devem passar pelas RPCs SECURITY DEFINER. O acesso do service role permanece fora dessa revogação.
+- **Implementado, não validado — máquina de estados clínica:** referred → scheduled → attended → result_reported → completed; rejeita saltos, regressões e alterações após completed. Agendamento exige data/local; resultado exige aptidão explícita e perfil clínico autorizado.
+- **Implementado, não validado — lista de exames admissionais para equipes com papéis sobrepostos:** secretaria/equipe com papel de scheduler mantém a visão operacional da clínica mesmo quando o mesmo usuário também tem papel de médico; médico sem papel administrativo continua limitado aos próprios exames.
+- **Pendente — inventário completo de escritores:** confirmar todos os componentes, Edge Functions, integrações e jobs que eventualmente atualizem medical_referrals diretamente. Se algum escritor legítimo for encontrado, migrá-lo para RPC antes de aplicar a migration.
+- **Pendente — compatibilidade dos estados legados:** identificar encaminhamentos que já estejam em estados que não seguem a sequência estrita; não corrigir registros automaticamente.
+- **Pendente — revisão final de grants/RLS e owner efetivo das RPCs:** a revogação de UPDATE pressupõe que as RPCs SECURITY DEFINER executem com owner autorizado a escrever na tabela.
+- **Pendente — testes integrados:** não executar build, type-check, testes automatizados ou E2E antes da etapa final definida. A migration não foi aplicada ao Supabase remoto.
+
+Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md).
