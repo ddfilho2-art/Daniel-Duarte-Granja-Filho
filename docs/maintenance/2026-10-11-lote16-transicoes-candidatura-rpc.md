@@ -24,7 +24,7 @@ A RPC original verificava autenticação, tenant e papel, mas não impedia estad
 
 Criada a migration versionada `supabase/migrations/20261011150000_harden_candidatura_process_transition.sql`, que redefine `rpc_atualizar_candidatura_processo` para:
 
-- Exigir usuário autenticado e papel ativo de RH/administrador autorizado no tenant corrente.
+- Exigir usuário autenticado e contexto do tenant corrente; preservar a permissão de `is_platform_master_admin()` já prevista na RPC anterior, além dos papéis RH/administradores do tenant. O trigger da tabela replica a mesma autorização para impedir bypass por UPDATE direto.
 - Bloquear candidatura inexistente e inconsistência entre candidatura, vaga e tenant.
 - Bloquear alterações em candidaturas contratadas, reprovadas, desistentes ou encerradas.
 - Exigir fase e status `Contratado` juntos.
@@ -59,6 +59,10 @@ As atualizações não relacionadas à transição de fase/status, como marcaç�
 - A ação de desistência permanece na RPC dedicada `rpc_cancelar_candidatura_rh`.
 - Nenhum teste, build, type-check ou E2E foi executado, conforme orientação de deixar a validação para o final.
 - Não houve aplicação de migration remota, merge, pull request ou deploy.
+
+## Revisão estática adicional de autorização
+
+Na comparação com a migration anterior `20260927130000_rpc_candidatura_tenant_isolation.sql`, foi identificado que ela também autorizava `is_platform_master_admin()` no tenant selecionado. A primeira versão do endurecimento havia removido essa exceção. O bloco de autorização da RPC e o trigger foram corrigidos para preservar o acesso do administrador master sem remover a exigência de contexto do tenant corrente. **Ainda não validado em runtime.**
 
 ## Inventário complementar de escritas
 
