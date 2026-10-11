@@ -369,7 +369,7 @@ begin
   select v_candidatura.id,v_candidate.id,v_vaga.id,v_vaga.tenant_id,
     v_request_key,coalesce(v_claim->>'status','queued');
 end;
-$function$
+$function$;
 
 -- Serialize admission of applications and hire transitions per vacancy.
 create or replace function public.enforce_vacancy_headcount_and_admission()
