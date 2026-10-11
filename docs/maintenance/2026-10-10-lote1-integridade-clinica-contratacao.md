@@ -12,7 +12,7 @@ Status: em progresso — implementação inicial versionada; ainda não validada
 - Portal do candidato filtra vagas preenchidas e apresenta mensagem compreensível se a última posição for ocupada entre a listagem e a tentativa de candidatura.
 - Serialização transacional por vaga via advisory lock para concorrência de candidatura/contratação.
 - Bloqueio de transição para `Contratado` sem encaminhamento admissional vinculado à mesma candidatura e empresa, com resultado `fit` e encaminhamento não cancelado.
-- Sincronização do contador de contratações após mudanças de status e proteção contra mover uma candidatura para outra vaga.
+- Sincronização do contador de contratações após mudanças de status, proteção contra edição direta do contador derivado e proteção contra mover uma candidatura para outra vaga.
 - Remoção do acesso clínico automático concedido ao administrador global nas políticas de encaminhamentos e anexos. Acesso permanece condicionado a vínculo ativo e papel pertinente na empresa ou clínica.
 - Nova RPC `list_medical_referral_attachments` para listar metadados autorizados, com execução limitada a `authenticated`; frontend ajustado para utilizá-la em vez de consultar a tabela diretamente.
 
@@ -30,7 +30,7 @@ Status: em progresso — implementação inicial versionada; ainda não validada
 
 | ID | Cenário | Resultado esperado | Estado |
 |---|---|---|---|
-| L1-01 | RH define quantidade de vagas maior que zero | Valor persistido; valores zero/negativos rejeitados | Não executado |
+| L1-01 | RH define quantidade de vagas maior que zero | Valor persistido; valores zero/negativos rejeitados; contador de contratações não pode ser editado pelo cliente | Não executado |
 | L1-02 | Nova candidatura quando há posições disponíveis | Candidatura criada normalmente | Não executado |
 | L1-03 | Nova candidatura após atingir quantidade contratada | Banco rejeita com `vacancy_headcount_reached` | Não executado |
 | L1-04 | Duas transações concorrentes disputam a última posição | No máximo uma contratação adicional é confirmada | Não executado |
