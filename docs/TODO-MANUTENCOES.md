@@ -558,3 +558,19 @@ Plano de acompanhamento central: [`docs/PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md`]
 - Auditoria preliminar em andamento: `src/lib/useVagas.ts`, `src/pages/HR.tsx`, `src/pages/OccupationalHealth.tsx` e migration inicial de agenda. Campos de quantitativo existem no contrato de tipos, mas a integração completa ainda não foi comprovada.
 - **Status geral: em progresso / não validado.** A especificação e o plano foram registrados; a auditoria integral e qualquer implementação permanecem pendentes. Nenhum teste/build foi executado e nenhum deploy foi feito.
 - Todos os status e percentuais detalhados devem ser atualizados no plano central acima. Deploy Vercel continua manual e requer autorização explícita.
+
+## Manutenção — Auditoria consolidada Recruta AÍ (2026-10-10)
+
+Plano e status detalhados: [PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md](PLANO-EVOLUCAO-MELHORIAS-RECRUTA-AI.md).
+
+| Frente | Status | Evidência / próximo passo |
+|---|---|---|
+| Auditoria de headcount e contratação | Em progresso — 35% | `useVagas.ts` declara campos de headcount, mas o baseline SQL versionado não os define; `apply-to-vacancy` usa `rpc_candidatar_se`. Rastrear RPC efetiva e todas as mutações de fase/status antes de alterar schema. |
+| Fila clínica e atribuição por médico | Em progresso — 55% | RPCs atuais listam/atualizam encaminhamentos da clínica sem filtrar médico responsável; não foram encontrados timestamp FIFO imutável ou claim atômico no modelo revisado. |
+| Segurança de dados clínicos | Em progresso — 45% | `can_access_medical_referral()` inclui acesso de platform master; auditar função final, storage e policies e aplicar mínimo privilégio antes de validar. |
+| Agenda | Em progresso — 65% | Reserva/reagendamento tem controle de conflito/idempotência, mas vincula-se à conversa/contrato, não ao encaminhamento e médico responsável. |
+| Exames complementares e faturamento | Em progresso — 35% | Não encontrados no schema versionado revisado catálogo, itens complementares faturáveis, histórico de preços ou ciclo de fechamento; reconciliar com banco remoto antes de modelar. |
+| Matriz de impacto | Em progresso — 20% | Achados iniciais registrados no plano. Concluir inventário de RPCs, schema remoto, papéis, migrations e estratégia de migração/rollback antes de implementar. |
+| Testes, build e deploy | Não iniciado — 0% | Não foram executados testes/build nesta rodada. Nenhuma migration ou deploy foi feito. Deploy Vercel segue manual e depende de autorização explícita. |
+
+**Achados de risco para priorizar no próximo lote:** ausência de isolamento por médico no fluxo clínico atual; acesso de platform master a encaminhamentos sem vínculo clínico; falta de evidência de headcount transacional; agenda não vinculada ao encaminhamento; modelo de faturamento ainda não identificado. Ver plano para evidências e próximos passos.
