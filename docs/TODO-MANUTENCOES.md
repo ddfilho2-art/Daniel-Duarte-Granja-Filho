@@ -756,3 +756,17 @@ Documento: [status do Lote 8](maintenance/2026-10-11-lote8-integridade-historico
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [status do Lote 9](maintenance/2026-10-11-lote9-contexto-operacional-clinica.md).
+
+
+## Manutenção — 2026-10-11 — Lote 10: exceções justificadas à fila FIFO
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Listagem administrativa da fila por clínica | Implementado no código — não validado | RPC list_clinic_priority_queue, somente encaminhamentos não atribuídos e não cancelados |
+| Definir/remover prioridade excepcional | Implementado no código — não validado | UI conecta set_medical_referral_priority |
+| Justificativa e auditoria | Implementado no código — não validado | RPC exige justificativa e mantém FIFO original |
+| Testes negativos de permissão e tenant | Adiado para a etapa final | Validar por RPC, não apenas por visibilidade de UI |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Requer autorização explícita |
+
+Documento: [status do Lote 10](maintenance/2026-10-11-lote10-excecoes-fifo.md).
