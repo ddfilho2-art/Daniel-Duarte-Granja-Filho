@@ -1659,7 +1659,7 @@ export function CandidateVagas() {
           return !Number.isFinite(total) || total < 1 || contratadas < total;
         });
 
-        if (profile?.uid && tenant?.id && finalVagas.length > 0)
+        if (profile?.uid && tenant?.id && finalVagas.length > 0) {
           const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
           if (candidate) {
             const { data: candidaturas } = await supabase
