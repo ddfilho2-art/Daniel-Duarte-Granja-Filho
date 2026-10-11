@@ -153,7 +153,8 @@ const getProximaFase = (faseAtual: string, vaga?: any) => {
 
   let proxima = etapasFiltradas[index + 1];
 
-  return proxima || "Finalizado";
+  // A última etapa configurada é "Contrato"; concluir sua aprovação registra a contratação real.
+  return proxima || "Contratado";
 };
 
 const getStages = (vaga: any) => {
@@ -5180,8 +5181,13 @@ export function HRCandidatos() {
             const currentIndex = stages.findIndex((s) => s.id === currentFase);
             if (currentIndex >= 0 && currentIndex < stages.length - 1) {
               newFase = stages[currentIndex + 1].id;
+              newStatus = "APROVADA";
+            } else if (currentIndex === stages.length - 1) {
+              newFase = "Contratado";
+              newStatus = "Contratado";
+            } else {
+              newStatus = "APROVADA";
             }
-            newStatus = "APROVADA";
           } else if (action === "Reprovar") {
             newFase = "Encerrado";
             newStatus = "REPROVADA";
