@@ -14,10 +14,9 @@
 ## Pendências
 
 - Melhorar a experiência para contas sem perfil médico ou de administrador clínico.
-- Implementar cadastro de preços por contrato e vigência.
-- Implementar ciclos e itens de faturamento, fechamento, emissão externa, pagamento, ajustes e exportação.
-- Implementar relatórios detalhados e exportação.
-- Atualizar a documentação geral/TODO na próxima atualização documental.
+- Preços por contrato/vigência, ciclos, itens, fechamento, emissão externa, pagamento, ajustes, relatório macro e exportação CSV foram conectados na aba “Contratos e faturamento”; detalhes em [Lote 6](2026-10-11-lote6-interface-faturamento-clinica.md).
+- Exportação XLSX/PDF, histórico imutável de preços e integração de boleto/banco continuam pendentes ou dependentes de decisão de escopo.
+- Atualizar o plano geral e o TODO para refletir os lotes 5 e 6.
 
 ## Validação adiada
 
