@@ -150,11 +150,11 @@ Esta rodada foi uma leitura de código/migrations no GitHub. Não houve execuç�
 
 | ID | Atividade | Status / progresso | Feito até agora | Falta fazer / critério de conclusão |
 |---|---|---|---|---|
-| C1 | Fila clínica compartilhada e atribuição atômica | **Não iniciado — 0%** | Requisitos de negócio consolidados; tela atual de encaminhamentos inspecionada superficialmente. | Confirmar modelo existente; implementar claim concorrente seguro, retirada da fila dos outros médicos e lista “meus exames”. |
-| C2 | FIFO original após devolução | **Não iniciado — 0%** | Regra aprovada. | Persistir timestamp original imutável e eventos de devolução/atribuição; testar retorno múltiplo e ordenação. |
-| C3 | Prioridade excepcional com justificativa | **Não iniciado — 0%** | Regra aprovada; perfil autorizado ainda precisa ser confirmado. | Definir permissão, motivo obrigatório, início/fim e auditoria; testar impacto na ordenação sem modificar timestamp original. |
-| C4 | Permissões diferenciadas de médico e secretaria | **Não iniciado — 0%** | Modelo de papéis descrito nos requisitos. | Concluir auditoria A4; restringir no banco/backend os dados disponíveis e atribuídos, com testes de acesso negado. |
-| C5 | Secretaria e médico responsável podem agendar | **Não iniciado — 0%** | Migration inicial de agenda identificada. | Concluir A3; vincular corretamente agendamento ao encaminhamento e responsável, prevenir conflitos e testar reagendamento/cancelamento. |
+| C1 | Fila clínica compartilhada e atribuição atômica | **Em progresso — 45%** | Migration versionada com papel `doctor`, atribuição exclusiva por lock da linha, RPC de fila disponível e RPC de exames atribuídos ao próprio médico. | Revisar compatibilidade com as funções existentes e, na etapa final, executar testes concorrentes e de isolamento por perfil. |
+| C2 | FIFO original após devolução | **Em progresso — 55%** | `fifo_original_at` versionado com backfill, proteção contra alteração, histórico de atribuição/devolução e preservação do timestamp ao retornar à fila. | Na etapa final, testar devoluções repetidas, ordenação e exceções de prioridade. |
+| C3 | Prioridade excepcional com justificativa | **Em progresso — 50%** | RPC de prioridade versionada com justificativa obrigatória e trilha de auditoria; autorização provisória restrita a `clinic_admin` até confirmação de outro perfil. | Confirmar o perfil autorizado e validar a ordenação sem alterar o FIFO original. |
+| C4 | Permissões diferenciadas de médico e secretaria | **Em progresso — 40%** | Papel `doctor`, listagem mínima da fila disponível, listagem dos exames próprios e autorização de encaminhamento/anexo por atribuição versionados. | Revisar todos os caminhos de leitura e anexos e executar testes negativos por perfil/tenant na etapa final. |
+| C5 | Secretaria e médico responsável podem agendar | **Em progresso — 15%** | A atualização do encaminhamento passa a permitir agenda pela equipe administrativa da clínica ou pelo médico responsável atribuído. A tabela de agenda Google existente ainda é separada e não foi vinculada diretamente ao encaminhamento neste lote. | Integrar agenda ao encaminhamento e ao responsável médico, prevenindo conflitos e preservando histórico de reagendamento/cancelamento. |
 | C6 | Catálogo de exames complementares associado ao admissional | **Não iniciado — 0%** | Tipos de exame e necessidade de múltiplos itens documentados. | Desenhar cadastro configurável, relação por encaminhamento, status de solicitação/agendamento/realização e controle de prestador. |
 | C7 | Anexos e documentos clínicos com acesso mínimo | **Não iniciado — 0%** | Há código prévio de anexos privados vinculado a encaminhamentos, ainda não validado integralmente. | Auditar policies e Edge Functions; testar leitura/download por médico não responsável, empresa errada e usuário sem vínculo. |
 
@@ -248,3 +248,13 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 
 
 | 2026-10-10 | Iniciada implementação isolada do Lote 1 em branch de manutenção: migration de headcount/contratação e autorização clínica, RPC segura para metadados de anexos, atualização do frontend e matriz de testes. Status 35%, ainda sem build/testes/homologação; Supabase remoto e Vercel não foram alterados. |
+
+
+### Atualização — Lote 2: fila clínica e FIFO (2026-10-10)
+
+- Branch: `maintenance/lote-1-integridade-clinica-contratacao-20261010`.
+- Status geral do lote: **em progresso — implementação versionada; validações adiadas para a etapa final**.
+- Criadas migrations separadas para adicionar o papel `doctor` e implementar fila clínica, atribuição exclusiva, FIFO imutável, devolução justificada, prioridade auditada e listagens com escopo de acesso.
+- A RPC de atualização do encaminhamento foi restringida: secretaria/equipe administrativa e médico responsável podem manter o agendamento; resultado de aptidão é reservado ao médico atribuído ou administrador clínico.
+- Nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; não houve merge para `main` nem deploy Vercel.
+- O plano de testes integrado será elaborado e executado na etapa final, conforme orientação do usuário. Até lá, o código permanece **não validado**.
