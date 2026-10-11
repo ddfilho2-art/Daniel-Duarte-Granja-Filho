@@ -302,6 +302,8 @@ function CandidateProfileModal({
   const [aiEvaluation, setAiEvaluation] = useState<any>(null);
   const [isReferring, setIsReferring] = useState(false);
   const [referralSuccess, setReferralSuccess] = useState(false);
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
 
   // Scroll para o topo quando o modal abre
   useEffect(() => {
@@ -837,6 +839,43 @@ function CandidateProfileModal({
     }
   };
 
+  const handleWithdrawCandidatura = async () => {
+    if (!candidaturaId || withdrawReason.trim().length < 5) return;
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase.rpc("rpc_cancelar_candidatura_rh", {
+        p_id: candidaturaId,
+        p_reason: withdrawReason.trim(),
+      });
+      if (error) throw error;
+
+      try {
+        await logCandidaturaEvento(
+          candidaturaId,
+          "DESISTÊNCIA",
+          `Candidatura encerrada por RH. Motivo: ${withdrawReason.trim()}`,
+          profile?.id,
+        );
+      } catch (historyError) {
+        console.warn("A auditoria do banco foi gravada, mas o histórico visual não foi atualizado:", historyError);
+      }
+
+      setCandidatura((current: any) => current
+        ? { ...current, status: "Desistência", fase: "Encerrado", motivo_declinio: withdrawReason.trim() }
+        : current);
+      setShowWithdrawForm(false);
+      setWithdrawReason("");
+      if (onActionComplete) onActionComplete();
+      alert("Candidatura encerrada por desistência. A posição só é considerada preenchida quando o status é Contratado.");
+      onClose();
+    } catch (error) {
+      console.error("Erro ao encerrar candidatura por desistência:", error);
+      alert(error instanceof Error ? error.message : "Não foi possível encerrar a candidatura.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -907,6 +946,49 @@ function CandidateProfileModal({
                             ? "Reprovar (Retorna p/ Entrevista RH)"
                             : "Reprovar"}
                       </button>
+                      {!["contratado", "desistência", "desistencia", "reprovada"].includes(String(currentStatus || "").trim().toLowerCase()) && String(currentFase || "").trim().toLowerCase() !== "contratado" && (
+                        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          {!showWithdrawForm ? (
+                            <button
+                              onClick={() => setShowWithdrawForm(true)}
+                              disabled={isProcessing}
+                              className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-900 disabled:opacity-50"
+                            >
+                              Encerrar candidatura por desistência
+                            </button>
+                          ) : (
+                            <>
+                              <label className="block text-sm font-medium text-amber-950">
+                                Motivo do encerramento (obrigatório)
+                                <textarea
+                                  value={withdrawReason}
+                                  onChange={(event) => setWithdrawReason(event.target.value)}
+                                  maxLength={1000}
+                                  rows={3}
+                                  className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                                  placeholder="Registre o motivo da desistência/encerramento."
+                                />
+                              </label>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => void handleWithdrawCandidatura()}
+                                  disabled={isProcessing || withdrawReason.trim().length < 5}
+                                  className="flex-1 rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                >
+                                  Confirmar encerramento
+                                </button>
+                                <button
+                                  onClick={() => { setShowWithdrawForm(false); setWithdrawReason(""); }}
+                                  disabled={isProcessing}
+                                  className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                                >
+                                  Voltar
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                       <button
                         onClick={() => handleAction("Reserva")}
                         disabled={isProcessing || currentStatus === "RESERVA"}
