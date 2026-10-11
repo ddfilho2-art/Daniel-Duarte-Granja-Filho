@@ -172,15 +172,20 @@ declare
   v_is_hired boolean;
   v_was_hired boolean := false;
 begin
-  v_vacancy_id := coalesce(new.vaga_id, old.vaga_id);
+  if tg_op = 'DELETE' then
+    v_vacancy_id := old.vaga_id;
+    v_is_hired := false;
+    v_was_hired := lower(trim(coalesce(old.status, ''))) = 'contratado';
+  else
+    v_vacancy_id := new.vaga_id;
+    v_is_hired := lower(trim(coalesce(new.status, ''))) = 'contratado';
+    if tg_op = 'UPDATE' then
+      v_was_hired := lower(trim(coalesce(old.status, ''))) = 'contratado';
+    end if;
+  end if;
 
   if v_vacancy_id is null then
     if tg_op = 'DELETE' then return old; else return new; end if;
-  end if;
-
-  v_is_hired := lower(trim(coalesce(new.status, ''))) = 'contratado';
-  if tg_op = 'UPDATE' then
-    v_was_hired := lower(trim(coalesce(old.status, ''))) = 'contratado';
   end if;
 
   -- Lock key is stable per vacancy and does not depend on the calling client.
@@ -255,8 +260,25 @@ begin
     v_vacancy_id := new.vaga_id;
   end if;
 
+  if tg_op = 'INSERT'
+     and lower(trim(coalesce(new.status, ''))) <> 'contratado' then
+    return new;
+  end if;
+
+  if tg_op = 'DELETE'
+     and lower(trim(coalesce(old.status, ''))) <> 'contratado' then
+    return old;
+  end if;
+
   if tg_op = 'UPDATE'
      and lower(trim(coalesce(old.status, ''))) = lower(trim(coalesce(new.status, '')))
+     and old.vaga_id is not distinct from new.vaga_id then
+    return new;
+  end if;
+
+  if tg_op = 'UPDATE'
+     and lower(trim(coalesce(old.status, ''))) <> 'contratado'
+     and lower(trim(coalesce(new.status, ''))) <> 'contratado'
      and old.vaga_id is not distinct from new.vaga_id then
     return new;
   end if;
