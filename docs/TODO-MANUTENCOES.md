@@ -961,7 +961,7 @@ Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-
 | Evitar submissões de login duplicadas | **Concluído** | 100% | Botão fica desabilitado durante autenticação, carga do perfil, associação ao tenant e autorização. |
 | Corrigir arquivo auxiliar para empacotamento local da função clínica | **Concluído** | 100% | Adicionado `supabase/functions/clinic-user-management/shared/http.ts` para corresponder ao import relativo da função. |
 | Typecheck e build de produção | **Concluído** | 100% | Passaram no CI do commit final; [run 38185976835](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185976835). |
-| Replay integral das migrations em Supabase local | **Em tratamento** | 70% | A tentativa inicial falhou por não existir o helper no caminho relativo; arquivo foi adicionado e o replay foi iniciado novamente. A última consulta ainda mostrava a inicialização do stack, sem resultado final. |
+| Replay integral das migrations em Supabase local | **Concluído** | 100% | Após incluir o helper no caminho relativo, o replay integral e a confirmação do estado passaram no CI do PR [#11](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185974030); a última consulta mostrava apenas a limpeza final dos containers. |
 | Deploy manual da Vercel | **Não iniciado** | 0% | Mantido sob controle do responsável; não foi disparado pela manutenção. |
 | Teste real de login como administrador da plataforma e administrador da clínica | **Não iniciado** | 0% | Fazer após o deploy e confirmar rota final, fim do carregamento e ausência de novo loop na tela de login. |
 
