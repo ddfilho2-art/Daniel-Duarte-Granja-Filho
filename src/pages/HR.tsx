@@ -644,6 +644,4526 @@ function CandidateProfileModal({
   const isVisualizado = candidatura?.visualizado || false;
 
   const handleAction = async (action: "Aprovar" | "Reprovar" | "Reserva") => {
+    if (!candidaturaId) return;
+    setIsProcessing(true);
+    try {
+      const { data: currentData, error: fetchError } = await supabase
+        .from("candidaturas")
+        .select("*")
+        .eq("id", candidaturaId)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      const dbCurrentFase =
+        currentData?.fase || currentData?.status || "Triagem";
+
+      const trimmedComment = (currentData?.rh_observacoes || "").trim();
+      const trimmedDate = (currentData?.rh_data || "").trim();
+      const trimmedMotivoReserva =
+        (currentData?.motivo_reserva || "").trim() || trimmedComment;
+
+      let newFase = dbCurrentFase;
+      let newStatus = null;
+
+      if (action === "Aprovar") {
+        newFase = getProximaFase(dbCurrentFase, vaga);
+        newStatus = "APROVADA";
+      } else if (action === "Reprovar") {
+        if (dbCurrentFase === "Exame") {
+          newFase = "Entrevista RH";
+          newStatus = "APROVADA";
+        } else {
+          newFase = "Encerrado";
+          newStatus = "REPROVADA";
+        }
+      } else if (action === "Reserva") {
+        newFase = dbCurrentFase;
+        newStatus = "RESERVA";
+      }
+
+      if (newFase === "Contratado") newStatus = "Contratado";
+
+      const payload = {
+        fase: newFase,
+        status: newStatus,
+        visualizado: true,
+        updated_at: new Date().toISOString(),
+        rh_observacoes: currentData?.rh_observacoes || null,
+        rh_data: currentData?.rh_data || null,
+        motivo_reserva:
+          action === "Reserva"
+            ? trimmedMotivoReserva
+            : currentData?.motivo_reserva || null,
+      };
+
+      console.log("Payload enviado (CandidateProfileModal):", payload);
+
+      const { data, error: updateError } = await supabase.rpc(
+        "rpc_atualizar_candidatura_processo",
+        {
+          p_id: candidaturaId,
+          p_fase: payload.fase,
+          p_status: payload.status,
+          p_visualizado: payload.visualizado,
+          p_updated_at: payload.updated_at,
+        },
+      );
+
+      console.log("Resposta (CandidateProfileModal RPC):", data, updateError);
+
+      if (updateError) throw updateError;
+
+      // Registrar evento de histórico
+      await logCandidaturaEvento(
+        candidaturaId,
+        action.toUpperCase() as any,
+        `Candidato ${
+          action === "Aprovar"
+            ? "avançou para " + newFase
+            : action === "Reprovar"
+              ? "reprovado"
+              : "movido para reserva na etapa " + dbCurrentFase
+        }`,
+        profile?.id,
+      );
+
+      // Envio automático de prova via chat
+      if (
+        action === "Aprovar" &&
+        dbCurrentFase === "Entrevista RH" &&
+        newFase === "Prova"
+      ) {
+        try {
+          // Buscar template ENVIO_PROVA
+          const { data: templateData } = await supabase
+            .from("settings")
+            .select("*")
+            .eq("id", "ENVIO_PROVA")
+            .maybeSingle();
+
+          const settings = templateData?.data || templateData;
+          const provaNome =
+            (vaga?.provas as any)?.nome ||
+            vaga?.prova_nome ||
+            vaga?.provaNome ||
+            "Prova Técnica";
+
+          let msgTexto =
+            `Olá ${nome}, parabéns! Você avançou para a fase de Prova Técnica.\n\n` +
+            `A prova vinculada a esta vaga é: **${provaNome}**.\n\n` +
+            `Por favor, acesse a aba "Provas" no seu painel para mais detalhes e instruções de realização.`;
+
+          if (settings && settings.template) {
+            msgTexto = settings.template
+              .replace("[Nome do Candidato]", nome)
+              .replace("[Nome da Prova]", provaNome)
+              .replace("[Título da Vaga]", vaga?.titulo || "Vaga");
+          }
+
+          await supabase.from("mensagens").insert({
+            id: crypto.randomUUID(),
+            candidatura_id: candidaturaId,
+            remetente_id: profile?.id || profile?.uid,
+            texto: msgTexto,
+            criado_em: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            tamanho_total: 0,
+          });
+
+          try {
+            const rhEmail = profile?.email || settings?.smtpUser || "";
+            const provaLink =
+              (vaga as any)?.provas?.link ||
+              vaga?.prova_link ||
+              vaga?.link_prova ||
+              "";
+
+            const subject = (
+              settings?.subject || "Envio de Prova - [Título da Vaga]"
+            )
+              .replace("[Nome do Candidato]", nome)
+              .replace("[Título da Vaga]", vaga?.titulo || "Vaga")
+              .replace("[Nome do RH]", profile?.nome || "RH")
+              .replace("[Email do RH]", rhEmail)
+              .replace("[Nome da Prova]", provaNome)
+              .replace("[Link da Prova]", provaLink);
+
+            const body = (
+              settings?.template ||
+              "Olá [Nome do Candidato],\n\nVocê avançou para a etapa de prova da vaga [Título da Vaga].\n\nProva: [Nome da Prova]\nLink: [Link da Prova]\n\nResponsável RH: [Nome do RH]\nE-mail RH: [Email do RH]"
+            )
+              .replace("[Nome do Candidato]", nome)
+              .replace("[Título da Vaga]", vaga?.titulo || "Vaga")
+              .replace("[Nome do RH]", profile?.nome || "RH")
+              .replace("[Email do RH]", rhEmail)
+              .replace("[Nome da Prova]", provaNome)
+              .replace("[Link da Prova]", provaLink);
+
+            if (email && email !== "Não informado") {
+              try {
+                await safeFetch("/api/send-email", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    to: email,
+                    subject,
+                    body,
+                    smtpConfig: {
+                      smtpHost: settings?.smtpHost,
+                      smtpPort: settings?.smtpPort,
+                      smtpUser: settings?.smtpUser,
+                      smtpPass: settings?.smtpPass,
+                    },
+                  }),
+                });
+              } catch (emailError) {
+                console.warn(
+                  "Falha não bloqueante ao enviar e-mail de prova:",
+                  emailError,
+                );
+              }
+            }
+          } catch (emailErr) {
+            console.warn(
+              "Falha não bloqueante ao enfileirar e-mail de prova:",
+              emailErr,
+            );
+          }
+        } catch (msgErr) {
+          console.warn("Erro ao enviar mensagem automática de prova:", msgErr);
+        }
+      }
+
+      try {
+        await logAudit(
+          "Atualizou Candidatura",
+          "Candidatos",
+          `Candidato ${nome} movido para ${newStatus}.`,
+        );
+      } catch (logError) {
+        console.warn("Erro ao registrar log:", logError);
+      }
+      if (onActionComplete) onActionComplete();
+      onClose();
+    } catch (error) {
+      console.error("Erro ao atualizar candidatura:", error);
+      alert("Erro ao processar ação.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleWithdrawCandidatura = async () => {
+    if (!candidaturaId || withdrawReason.trim().length < 5) return;
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase.rpc("rpc_cancelar_candidatura_rh", {
+        p_id: candidaturaId,
+        p_reason: withdrawReason.trim(),
+      });
+      if (error) throw error;
+
+      try {
+        await logCandidaturaEvento(
+          candidaturaId,
+          "DESISTÊNCIA",
+          `Candidatura encerrada por RH. Motivo: ${withdrawReason.trim()}`,
+          profile?.id,
+        );
+      } catch (historyError) {
+        console.warn("A auditoria do banco foi gravada, mas o histórico visual não foi atualizado:", historyError);
+      }
+
+      setCandidatura((current: any) => current
+        ? { ...current, status: "Desistência", fase: "Encerrado", motivo_declinio: withdrawReason.trim() }
+        : current);
+      setShowWithdrawForm(false);
+      setWithdrawReason("");
+      if (onActionComplete) onActionComplete();
+      alert("Candidatura encerrada por desistência. A posição só é considerada preenchida quando o status é Contratado.");
+      onClose();
+    } catch (error) {
+      console.error("Erro ao encerrar candidatura por desistência:", error);
+      alert(error instanceof Error ? error.message : "Não foi possível encerrar a candidatura.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+          <div>
+            <h3 className="text-xl font-bold text-slate-900">
+              Perfil Detalhado do Candidato
+            </h3>
+            <p className="text-sm text-slate-500">
+              ID da Candidatura: {candidaturaId || "N/A"}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-200 rounded-full transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <div
+          ref={modalContentRef}
+          className="flex-1 overflow-y-auto p-6 space-y-8"
+        >
+          <div className="flex flex-col md:flex-row gap-8 mb-10">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center text-primary text-4xl font-bold border-4 border-white shadow-sm overflow-hidden">
+                {resume.foto ? (
+                  <img
+                    src={resume.foto}
+                    alt={nome}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  nome.charAt(0).toUpperCase()
+                )}
+              </div>
+              <div className="text-center">
+                <h4 className="text-2xl font-bold text-slate-900">{nome}</h4>
+                <p className="text-slate-500 mb-4">{email}</p>
+
+                {candidaturaId && showDecisionActions && (
+                  <div className="flex flex-col gap-2">
+                    <div className="space-y-3 mb-4">
+                      <button
+                        onClick={() => handleAction("Aprovar")}
+                        disabled={isProcessing}
+                        className="w-full bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-600 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        {currentStatus === "RESERVA"
+                          ? "Aprovar (Sair da Reserva e Avançar)"
+                          : ["Exame"].includes(currentFase)
+                            ? "Aprovado no Exame (Contratar)"
+                            : currentFase === "Prova"
+                              ? "Aprovado no Teste (Avançar)"
+                              : "Aprovar (Avançar Fase)"}
+                      </button>
+                      <button
+                        onClick={() => handleAction("Reprovar")}
+                        disabled={isProcessing}
+                        className="w-full bg-red-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        {currentStatus === "RESERVA"
+                          ? "Reprovar (Encerrar Candidato)"
+                          : ["Exame"].includes(currentFase)
+                            ? "Reprovar (Retorna p/ Entrevista RH)"
+                            : "Reprovar"}
+                      </button>
+                      {!["contratado", "desistência", "desistencia", "reprovada"].includes(String(currentStatus || "").trim().toLowerCase()) && !["contratado", "encerrado", "finalizado"].includes(String(currentFase || "").trim().toLowerCase()) && (
+                        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          {!showWithdrawForm ? (
+                            <button
+                              onClick={() => setShowWithdrawForm(true)}
+                              disabled={isProcessing}
+                              className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-900 disabled:opacity-50"
+                            >
+                              Encerrar candidatura por desistência
+                            </button>
+                          ) : (
+                            <>
+                              <label className="block text-sm font-medium text-amber-950">
+                                Motivo do encerramento (obrigatório)
+                                <textarea
+                                  value={withdrawReason}
+                                  onChange={(event) => setWithdrawReason(event.target.value)}
+                                  maxLength={1000}
+                                  rows={3}
+                                  className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                                  placeholder="Registre o motivo da desistência/encerramento."
+                                />
+                              </label>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => void handleWithdrawCandidatura()}
+                                  disabled={isProcessing || withdrawReason.trim().length < 5}
+                                  className="flex-1 rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                >
+                                  Confirmar encerramento
+                                </button>
+                                <button
+                                  onClick={() => { setShowWithdrawForm(false); setWithdrawReason(""); }}
+                                  disabled={isProcessing}
+                                  className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                                >
+                                  Voltar
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        onClick={() => handleAction("Reserva")}
+                        disabled={isProcessing || currentStatus === "RESERVA"}
+                        className="w-full bg-amber-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-amber-600 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        <User className="w-4 h-4" />
+                        {currentStatus === "RESERVA"
+                          ? "Candidato já está em Reserva"
+                          : "Marcar como Reserva"}
+                      </button>
+                      {(["Entrega de documentação", "Proposta", "Exame", "Exame Médico"].includes(currentFase)) && (
+                        <button
+                          onClick={async () => {
+                            if (!candidaturaId || !vaga) return;
+                            setIsReferring(true);
+                            try {
+                              // Find active contract
+                              const { data: contracts } = await supabase
+                                .from("occupational_health_contracts")
+                                .select("id")
+                                .eq("status", "active")
+                                .limit(1);
+                              if (!contracts || contracts.length === 0) {
+                                alert("Nenhum contrato ativo com clínica de saúde ocupacional.");
+                                return;
+                              }
+                              const contractId = contracts[0].id;
+                              const candidateName = fullCandidatoData?.nome || candidato?.nome || nome;
+                              const candidateEmail = fullCandidatoData?.email || candidato?.email || email;
+                              const { error: rpcError } = await supabase.rpc("refer_to_medical_exam", {
+                                p_contract_id: contractId,
+                                p_legacy_application_id: candidaturaId,
+                                p_candidate_snapshot: { name: candidateName, email: candidateEmail },
+                                p_job_snapshot: { title: vaga?.titulo || "Vaga", id: vaga?.id },
+                                p_exam_type: "admission",
+                                p_employer_note: null,
+                              });
+                              if (rpcError) throw rpcError;
+                              // Advance phase to Exame Médico
+                              const { error: transitionError } = await supabase.rpc(
+                                "rpc_atualizar_candidatura_processo",
+                                {
+                                  p_id: candidaturaId,
+                                  p_fase: "Exame Médico",
+                                  p_status: "APROVADA",
+                                  p_visualizado: true,
+                                  p_updated_at: new Date().toISOString(),
+                                },
+                              );
+                              if (transitionError) throw transitionError;
+                              setReferralSuccess(true);
+                              setTimeout(() => { setReferralSuccess(false); onActionComplete?.(); }, 2000);
+                            } catch (err: any) {
+                              alert("Erro ao encaminhar: " + (err.message || String(err)));
+                            } finally {
+                              setIsReferring(false);
+                            }
+                          }}
+                          disabled={isReferring || isProcessing}
+                          className="w-full bg-teal-500 text-white px-4 py-2 rounded-lg font-medium hover:bg-teal-600 transition-colors text-sm disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <Heart className="w-4 h-4" />
+                          {isReferring ? "Encaminhando..." : referralSuccess ? "Encaminhado!" : "Encaminhar p/ Exame Médico"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex-1 space-y-8">
+              {aiEvaluation && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2 text-indigo-700">
+                      <Sparkles className="w-5 h-5" />
+                      <h4 className="font-bold">Avaliação do Recrutador IA</h4>
+                    </div>
+                    <div className="bg-indigo-600 text-white px-3 py-1 rounded-full text-sm font-bold">
+                      Score: {aiEvaluation.score_total}/100
+                    </div>
+                  </div>
+                  <div
+                    className="bg-white p-4 rounded-lg border border-indigo-100"
+                    style={{ minHeight: 300 }}
+                  >
+                    <ResponsiveContainer width="100%" height={300}>
+                      <RadarChart
+                        data={[
+                          {
+                            subject: "Técnico",
+                            value: aiEvaluation.metricas.tecnico,
+                            fullMark: 100,
+                          },
+                          {
+                            subject: "Experiência",
+                            value: aiEvaluation.metricas.experiencia,
+                            fullMark: 100,
+                          },
+                          {
+                            subject: "Formação",
+                            value: aiEvaluation.metricas.formacao,
+                            fullMark: 100,
+                          },
+                          {
+                            subject: "Soft Skills",
+                            value: aiEvaluation.metricas.soft_skills,
+                            fullMark: 100,
+                          },
+                          {
+                            subject: "Cultura",
+                            value: aiEvaluation.metricas.cultura,
+                            fullMark: 100,
+                          },
+                        ]}
+                      >
+                        <PolarGrid stroke="#e2e8f0" />
+                        <PolarAngleAxis
+                          dataKey="subject"
+                          tick={{ fill: "#64748b", fontSize: 12 }}
+                        />
+                        <PolarRadiusAxis
+                          angle={90}
+                          domain={[0, 100]}
+                          tick={{ fill: "#94a3b8", fontSize: 10 }}
+                        />
+                        <Radar
+                          name="Score"
+                          dataKey="value"
+                          stroke="#6366f1"
+                          fill="#6366f1"
+                          fillOpacity={0.6}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#fff",
+                            border: "1px solid #e2e8f0",
+                            borderRadius: "8px",
+                          }}
+                          formatter={(value: any) => [`${value}/100`, "Score"]}
+                        />
+                      </RadarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="bg-white/50 p-3 rounded-lg border border-indigo-50">
+                    <p className="text-sm text-slate-700 italic leading-relaxed">
+                      "{aiEvaluation.justificativa}"
+                    </p>
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <section className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <h5 className="font-bold text-slate-900 flex items-center gap-2 mb-3">
+                    <User className="w-4 h-4 text-primary" /> Dados Pessoais
+                  </h5>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <span className="text-slate-500">Idade:</span>{" "}
+                      {calcularIdade(
+                        resume.dataNascimento || resume.data_nascimento,
+                      )}
+                    </p>
+                    <p>
+                      <span className="text-slate-500">Nascimento:</span>{" "}
+                      {resume.dataNascimento ||
+                        resume.data_nascimento ||
+                        "Não informado"}
+                    </p>
+                    <p>
+                      <span className="text-slate-500">Gênero:</span>{" "}
+                      {resume.genero || "Não informado"}
+                    </p>
+                    <p>
+                      <span className="text-slate-500">PcD:</span>{" "}
+                      {resume.pcd || "Não informado"}
+                    </p>
+                    <p>
+                      <span className="text-slate-500">Telefone:</span>{" "}
+                      {resume.telefone || "Não informado"}
+                    </p>
+                  </div>
+                </section>
+
+                <section className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <h5 className="font-bold text-slate-900 flex items-center gap-2 mb-3">
+                    <MapPin className="w-4 h-4 text-primary" /> Endereço
+                  </h5>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <span className="font-medium text-slate-700">
+                        Localização Resumida:
+                      </span>{" "}
+                      {getLocalizacao(resume)}
+                    </p>
+                    <p>
+                      {resume.logradouro}, {resume.numero}
+                    </p>
+                    {resume.complemento && <p>{resume.complemento}</p>}
+                    <p>{resume.bairro}</p>
+                    <p>
+                      {resume.cidade} - {resume.estado}
+                    </p>
+                    <p>CEP: {resume.cep}</p>
+                  </div>
+                </section>
+              </div>
+
+              {candidatura && (
+                <section className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                  <h5 className="font-bold text-blue-900 flex items-center gap-2 mb-3">
+                    <Info className="w-4 h-4 text-blue-600" /> Origem da
+                    Candidatura
+                  </h5>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <p>
+                      <span className="text-blue-600 font-medium">
+                        Como soube:
+                      </span>{" "}
+                      {candidatura.como_soube ||
+                        candidatura.comoSoube ||
+                        "Não informado"}
+                    </p>
+                    {(candidatura.indicacao_nome ||
+                      candidatura.indicacaoNome) && (
+                      <p>
+                        <span className="text-blue-600 font-medium">
+                          Indicado por:
+                        </span>{" "}
+                        {candidatura.indicacao_nome ||
+                          candidatura.indicacaoNome}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {currentFase === "Prova" && (
+                <section className="bg-purple-50 p-6 rounded-xl border border-purple-100">
+                  <h5 className="font-bold text-purple-900 flex items-center gap-2 mb-4">
+                    <FileCheck className="w-5 h-5 text-purple-600" /> Resultado
+                    da Prova Técnica
+                  </h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-xs font-medium text-purple-700 mb-1">
+                        Nota do Teste
+                      </label>
+                      <input
+                        type="text"
+                        value={notaTeste}
+                        onChange={(e) => setNotaTeste(e.target.value)}
+                        placeholder="Ex: 8.5"
+                        className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-700 mb-1">
+                        Data do Teste
+                      </label>
+                      <input
+                        type="date"
+                        value={dataTeste}
+                        onChange={(e) => setDataTeste(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-purple-700 mb-1">
+                        Resultado
+                      </label>
+                      <select
+                        value={aprovacaoTeste}
+                        onChange={(e) => setAprovacaoTeste(e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
+                      >
+                        <option value="">Selecionar...</option>
+                        <option value="Aprovado">Aprovado</option>
+                        <option value="Reprovado">Reprovado</option>
+                        <option value="Pular">Pular Etapa</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-purple-700 mb-1">
+                      Observações do Teste
+                    </label>
+                    <textarea
+                      value={observacoesTeste}
+                      onChange={(e) => setObservacoesTeste(e.target.value)}
+                      rows={3}
+                      placeholder="Comentários sobre o desempenho..."
+                      className="w-full px-3 py-2 bg-white border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500 text-sm"
+                    />
+                  </div>
+                </section>
+              )}
+
+              <section>
+                <h5 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4">
+                  Resumo Profissional
+                </h5>
+                <p className="text-slate-600 leading-relaxed text-sm italic">
+                  "
+                  {experiencia !== "Não informado"
+                    ? experiencia
+                    : "Nenhum resumo cadastrado."}
+                  "
+                </p>
+              </section>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <section>
+                  <h5 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4">
+                    Habilidades
+                  </h5>
+                  <div className="flex flex-wrap gap-2">
+                    {resume.habilidades ? (
+                      (Array.isArray(resume.habilidades)
+                        ? resume.habilidades
+                        : String(resume.habilidades).split(",")
+                      ).map((h: string, i: number) => (
+                        <span
+                          key={i}
+                          className="bg-primary/5 text-primary px-3 py-1 rounded-full text-xs font-medium border border-primary/10"
+                        >
+                          {h.trim()}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-400">
+                        Nenhuma habilidade listada.
+                      </span>
+                    )}
+                  </div>
+                </section>
+
+                <section>
+                  <h5 className="font-bold text-slate-900 border-b border-slate-100 pb-2 mb-4">
+                    Idiomas
+                  </h5>
+                  <div className="space-y-2">
+                    {Array.isArray(resume.idiomas) &&
+                    resume.idiomas.length > 0 ? (
+                      resume.idiomas.map((lang: any, i: number) => (
+                        <div
+                          key={i}
+                          className="flex justify-between items-center text-sm bg-slate-50 p-2 rounded"
+                        >
+                          <span className="font-medium text-slate-700">
+                            {lang.idioma}
+                          </span>
+                          <span className="text-slate-500 text-xs">
+                            {lang.nivel}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-sm text-slate-400">
+                        Nenhum idioma listado.
+                      </span>
+                    )}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-10">
+            <section>
+              <h5 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mb-6 flex items-center gap-2">
+                <Briefcase className="w-5 h-5 text-primary" /> Experiência
+                Profissional
+              </h5>
+              <div className="space-y-6">
+                {Array.isArray(resume.experiencias) &&
+                resume.experiencias.length > 0 ? (
+                  resume.experiencias.map((exp: any, i: number) => (
+                    <div
+                      key={i}
+                      className="relative pl-8 before:content-[''] before:absolute before:left-0 before:top-2 before:bottom-0 before:w-0.5 before:bg-slate-200"
+                    >
+                      <div className="absolute left-[-4px] top-2 w-2.5 h-2.5 rounded-full bg-primary border-2 border-white"></div>
+                      <div className="flex justify-between items-start mb-1">
+                        <h6 className="font-bold text-slate-900">
+                          {exp.cargo}
+                        </h6>
+                        <span className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded">
+                          {exp.dataInicio} - {exp.atual ? "Atual" : exp.dataFim}
+                        </span>
+                      </div>
+                      <p className="text-primary text-sm font-medium mb-2">
+                        {exp.empresa}
+                      </p>
+                      <p className="text-sm text-slate-600 leading-relaxed">
+                        {exp.descricao}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 italic">
+                    Nenhuma experiência registrada.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section>
+              <h5 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mb-6 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5 text-primary" /> Formação
+                Acadêmica
+              </h5>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {resume.formacoes || resume.formacao ? (
+                  (Array.isArray(resume.formacoes || resume.formacao)
+                    ? resume.formacoes || resume.formacao
+                    : [
+                        {
+                          curso: resume.formacao,
+                          instituicao: "Não informada",
+                          grau: "",
+                          anoInicio: "",
+                          anoFim: "",
+                        },
+                      ]
+                  ).map((edu: any, i: number) => (
+                    <div
+                      key={i}
+                      className="p-4 border border-slate-200 rounded-xl bg-slate-50"
+                    >
+                      <h6 className="font-bold text-slate-900 mb-1">
+                        {edu.curso}
+                      </h6>
+                      <p className="text-primary text-sm font-medium mb-2">
+                        {edu.instituicao}
+                      </p>
+                      <div className="flex justify-between items-center text-xs text-slate-500">
+                        <span>{edu.grau}</span>
+                        <span>
+                          {edu.anoInicio} - {edu.anoFim || "Em curso"}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 italic">
+                    Nenhuma formação registrada.
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section>
+              <h5 className="text-lg font-bold text-slate-900 border-b border-slate-200 pb-2 mb-6 flex items-center gap-2">
+                <Award className="w-5 h-5 text-primary" /> Certificações
+              </h5>
+              <div className="flex flex-wrap gap-4">
+                {Array.isArray(resume.certificacoes) &&
+                resume.certificacoes.length > 0 ? (
+                  resume.certificacoes.map((cert: any, i: number) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-sm"
+                    >
+                      <div className="p-2 bg-amber-50 rounded-lg">
+                        <Award className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">
+                          {cert.nome}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {cert.instituicao} • {cert.ano}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400 italic">
+                    Nenhuma certificação registrada.
+                  </p>
+                )}
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <div className="p-6 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-white transition-colors"
+          >
+            Fechar
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="px-6 py-2 bg-primary text-white rounded-lg font-medium hover:bg-accent transition-colors flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" /> Imprimir / PDF
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function HRDashboard() {
+  const { profile } = useAuth();
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [stats, setStats] = useState({
+    vagasAbertas: 0,
+    vagasVariacao: 0,
+    candidatosTotal: 0,
+    candidatosVariacao: 0,
+    candidaturasMes: 0,
+    candidaturasVariacao: 0,
+    entrevistasSemana: 0,
+  });
+  const [newStats, setNewStats] = useState({
+    tempoMedioContratacao: 0,
+    taxaConversao: 0,
+    taxaDesistencia: 0,
+    slaRH: 0,
+    vagasSemMovimentacao: 0,
+  });
+  const [funilState, setFunilState] = useState(funilData);
+  const [volumeState, setVolumeState] = useState(volumeContratacoesData);
+  const [fonteState, setFonteState] = useState(fonteOrigemData);
+  const [motivosState, setMotivosState] = useState(motivosDeclinioData);
+  const [tempoState, setTempoState] = useState<any[]>(tempoPorEtapaData);
+  const [vagasStatusState, setVagasStatusState] = useState<any[]>([]);
+  const [candidatosVagaState, setCandidatosVagaState] = useState<any[]>([]);
+  const [cargaTrabalhoState, setCargaTrabalhoState] = useState<any[]>([]);
+  const [diversidadeState, setDiversidadeState] = useState({
+    genero: { triagem: 0, contratado: 0, triagemCount: 0, contratadoCount: 0 },
+    raca: { triagem: 0, contratado: 0, triagemCount: 0, contratadoCount: 0 },
+    pcd: { triagem: 0, contratado: 0, triagemCount: 0, contratadoCount: 0 },
+    bases: { triagem: 0, contratado: 0 },
+  });
+  const [vagasProgress, setVagasProgress] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expiredTransfers, setExpiredTransfers] = useState<any[]>([]);
+  const [isProcessingReturn, setIsProcessingReturn] = useState(false);
+
+  const checkExpiredTransfers = (vagas: any[]) => {
+    if (profile?.perfil !== "Admin") return;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const expired = vagas.filter((v) => {
+      if (!v.transferenciaAtiva || !v.transferenciaTemporaria) return false;
+      if (!v.transferenciaTemporaria.autoRetorno) return false;
+
+      const dataRetorno = v.transferenciaTemporaria.dataRetorno.toDate
+        ? v.transferenciaTemporaria.dataRetorno.toDate()
+        : new Date(v.transferenciaTemporaria.dataRetorno);
+      dataRetorno.setHours(0, 0, 0, 0);
+
+      return dataRetorno <= today;
+    });
+
+    setExpiredTransfers(expired);
+  };
+
+  const handleAutoReturn = async (vaga: any) => {
+    try {
+      setIsProcessingReturn(true);
+
+      // Update vaga
+      const { error: updateError } = await supabase
+        .from("vagas")
+        .update({
+          owner_id: vaga.transferencia_temporaria.original_owner_id,
+          owner_nome: vaga.transferencia_temporaria.original_owner_nome,
+          transferencia_ativa: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", vaga.id);
+
+      if (updateError) throw updateError;
+
+      // Log in history (simplified for now as subcollections are not direct in Supabase)
+      // In a real scenario, we'd have a separate table for transfers
+
+      // Audit log
+      try {
+        await logAudit(
+          "Retorno Automático de Proprietário",
+          "Dashboard RH",
+          `Retorno automático da vaga ${vaga.titulo} para ${vaga.transferencia_temporaria.original_owner_nome}`,
+        );
+      } catch (logError) {
+        console.warn("Erro ao registrar log:", logError);
+      }
+
+      setExpiredTransfers((prev) => prev.filter((v) => v.id !== vaga.id));
+      alert(
+        `Vaga "${vaga.titulo}" retornada com sucesso para ${vaga.transferencia_temporaria.original_owner_nome}.`,
+      );
+    } catch (error) {
+      console.error("Erro ao processar retorno automático:", error);
+      alert("Erro ao processar retorno automático.");
+    } finally {
+      setIsProcessingReturn(false);
+    }
+  };
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+
+        const now = new Date();
+        const startOfThisMonth = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          1,
+        ).toISOString();
+        const startOfLastMonth = new Date(
+          now.getFullYear(),
+          now.getMonth() - 1,
+          1,
+        ).toISOString();
+        const endOfLastMonth = new Date(
+          now.getFullYear(),
+          now.getMonth(),
+          0,
+          23,
+          59,
+          59,
+        ).toISOString();
+
+        // 4. FETCH DE DADOS (MANUAL JOIN PARA DIVERSIDADE)
+        const [
+          vagasAbertasRes,
+          candidatosMesRes,
+          funilRes,
+          vagasRes,
+          rhUsersRes,
+          candidatosTableRes,
+          tempoFasesRes,
+          candidaturasRes,
+          usersRes,
+        ] = await Promise.all([
+          supabase
+            .from("vagas")
+            .select("id")
+            .or("status.eq.Aberta,status_vaga.eq.ABERTA"),
+          supabase
+            .from("candidatos")
+            .select("id, criado_em, created_at")
+            .gte("criado_em", startOfThisMonth),
+          supabase.from("candidaturas").select("fase"),
+          supabase
+            .from("vagas")
+            .select(
+              "id, titulo, created_at, status, status_vaga, updated_at, owner_nome, owner_id, provas(nome)",
+            ),
+          supabase
+            .from("users")
+            .select("id, nome, email")
+            .eq("perfil", "RH")
+            .eq("status", "Ativo"),
+          supabase
+            .from("candidatos")
+            .select(
+              "id, criado_em, created_at, genero, raca, pcd, resume_data",
+            ),
+          supabase.from("vw_tempo_medio_por_fase").select("*"),
+          supabase
+            .from("candidaturas")
+            .select(
+              "id, vaga_id, candidato_id, fase, status, created_at, data_candidatura",
+            ),
+          supabase.from("users").select("id, resume_data"),
+        ]);
+
+        if (candidaturasRes.error) throw candidaturasRes.error;
+        if (usersRes.error) throw usersRes.error;
+
+        const candidaturasRaw = candidaturasRes.data || [];
+        const usersRaw = (usersRes.data || []) as Array<{
+          id: string;
+          resume_data?: any;
+        }>;
+        const userMap = new Map<string, (typeof usersRaw)[number]>(
+          usersRaw.map((u) => [u.id, u]),
+        );
+
+        const candidaturas = candidaturasRaw.map((c: any) => {
+          const user = userMap.get(c.candidato_id);
+          const r = user?.resume_data || {};
+
+          let genero = null;
+          let raca = null;
+          let pcd = false;
+
+          if (r && typeof r === "object") {
+            genero = r.genero || null;
+            raca = r.raca || null;
+            pcd = r.pcd === true || r.pcd === "Sim";
+          }
+
+          return {
+            ...c,
+            genero,
+            raca,
+            pcd,
+          };
+        });
+
+        if (vagasAbertasRes.error) throw vagasAbertasRes.error;
+        if (vagasRes.error) throw vagasRes.error;
+        if (candidatosMesRes.error) throw candidatosMesRes.error;
+        if (funilRes.error) throw funilRes.error;
+        if (rhUsersRes.error) throw rhUsersRes.error;
+        if (candidatosTableRes.error) throw candidatosTableRes.error;
+        if (tempoFasesRes.error) throw tempoFasesRes.error;
+
+        const candidatos = candidatosTableRes.data || [];
+        const vagas = vagasRes.data || [];
+        const rhUsers = rhUsersRes.data || [];
+        const tempoFasesRaw = tempoFasesRes.data || [];
+
+        // 1. Vagas Abertas
+        const vagasAbertas = (vagasAbertasRes.data || []).length;
+
+        // 2. Variação Vagas vs Mês Anterior
+        const vagasCriadasEsteMes = vagas.filter(
+          (v: any) =>
+            new Date(v.created_at || v.criado_em) >= new Date(startOfThisMonth),
+        ).length;
+        const vagasCriadasMesPassado = vagas.filter((v: any) => {
+          const createdAt = new Date(v.created_at || v.criado_em);
+          return (
+            createdAt >= new Date(startOfLastMonth) &&
+            createdAt <= new Date(endOfLastMonth)
+          );
+        }).length;
+        const vagasVariacao =
+          vagasCriadasMesPassado > 0
+            ? Math.round(
+                ((vagasCriadasEsteMes - vagasCriadasMesPassado) * 100) /
+                  vagasCriadasMesPassado,
+              )
+            : vagasCriadasEsteMes > 0
+              ? 100
+              : 0;
+
+        // 3. Total de Candidatos
+        const candidatosTotal = candidatos.length;
+
+        // 4. Candidatos do Mês
+        const candidatosEsteMes = (candidatosMesRes.data || []).length;
+        const candidatosMesPassado = candidatos.filter((c: any) => {
+          const createdAt = new Date(c.criado_em || c.created_at);
+          return (
+            createdAt >= new Date(startOfLastMonth) &&
+            createdAt <= new Date(endOfLastMonth)
+          );
+        }).length;
+        const candidatosVariacao =
+          candidatosMesPassado > 0
+            ? Math.round(
+                ((candidatosEsteMes - candidatosMesPassado) * 100) /
+                  candidatosMesPassado,
+              )
+            : candidatosEsteMes > 0
+              ? 100
+              : 0;
+
+        // 5. Candidaturas do Mês
+        const candidaturasEsteMesCount = candidaturas.filter(
+          (c: any) =>
+            new Date(c.created_at || c.data_candidatura) >=
+            new Date(startOfThisMonth),
+        ).length;
+        const candidaturasMesPassadoCount = candidaturas.filter((c: any) => {
+          const createdAt = new Date(c.created_at || c.data_candidatura);
+          return (
+            createdAt >= new Date(startOfLastMonth) &&
+            createdAt <= new Date(endOfLastMonth)
+          );
+        }).length;
+        const candidaturasVariacao =
+          candidaturasMesPassadoCount > 0
+            ? Math.round(
+                ((candidaturasEsteMesCount - candidaturasMesPassadoCount) *
+                  100) /
+                  candidaturasMesPassadoCount,
+              )
+            : candidaturasEsteMesCount > 0
+              ? 100
+              : 0;
+
+        // 6. Gráficos de Funil e Tempo
+        const normalizarFase = (fase: string, vaga: any) => {
+          if (!fase) return "Triagem";
+          let f = fase.trim();
+          if (f === "Inscritos" || f === "Reserva") f = "Triagem";
+          if (f === "Exame") f = "Exame Médico";
+          if (f === "Contratado") f = "Contrato";
+          const exigeProva =
+            vaga?.exige_prova === true || vaga?.exige_prova === "Sim";
+          if (f === "Prova" && !exigeProva) return "Entrevista Gestor";
+          return f;
+        };
+
+        const ETAPAS_FUNIL = [
+          "Triagem",
+          "Entrevista RH",
+          "Prova",
+          "Entrevista Gestor",
+          "Proposta",
+          "Entrega de documentação",
+          "Exame Médico",
+          "Contrato",
+        ];
+
+        const etapasDisponiveisFunil = ETAPAS_FUNIL.filter((etapa) => {
+          if (etapa === "Prova") {
+            return vagas.some(
+              (v: any) => v.exige_prova === true || v.exige_prova === "Sim",
+            );
+          }
+          return true;
+        });
+
+        const funilOrdenado = etapasDisponiveisFunil.map((fase, index) => {
+          const count = candidaturas.filter((c: any) => {
+            const vaga = vagas.find((v: any) => v.id === c.vaga_id);
+            const faseCandidato = normalizarFase(c.fase, vaga);
+            const idxCandidato = etapasDisponiveisFunil.indexOf(faseCandidato);
+            return idxCandidato >= 0 && idxCandidato >= index;
+          }).length;
+          return { name: fase, value: count };
+        });
+
+        // NOVO: Normalização para Tempo Médio (Pipeline da view)
+        const normalizarFaseTempo = (fase: string) => {
+          if (!fase) return null;
+          const f = fase.trim().toLowerCase();
+          if (f.includes("triagem")) return "Triagem";
+          if (f.includes("rh")) return "Entrevista RH";
+          if (f.includes("prova")) return "Prova";
+          if (f.includes("gestor")) return "Entrevista Gestor";
+          if (f.includes("proposta")) return "Proposta";
+          if (f.includes("document")) return "Documentação";
+          if (f.includes("exame")) return "Exame Médico";
+          if (f.includes("contrato")) return "Contrato";
+          return null;
+        };
+
+        const ordemFasesTempo = [
+          "Triagem",
+          "Entrevista RH",
+          "Prova",
+          "Entrevista Gestor",
+          "Proposta",
+          "Documentação",
+          "Exame Médico",
+          "Contrato",
+        ];
+
+        const tempoChartData = (tempoFasesRaw || [])
+          .map((item: any) => {
+            const fase = normalizarFaseTempo(item.fase);
+            if (!fase) return null;
+            return {
+              fase,
+              tempo: Number(item.tempo_medio_dias),
+            };
+          })
+          .filter((item: any) => item && item.tempo > 0);
+
+        tempoChartData.sort(
+          (a, b) =>
+            ordemFasesTempo.indexOf(a.fase) - ordemFasesTempo.indexOf(b.fase),
+        );
+
+        setFunilState(funilOrdenado);
+        setTempoState(tempoChartData);
+
+        let totalDiasContratacao = 0;
+        let countContratacao = 0;
+        let totalDiasSLA = 0;
+        let countSLA = 0;
+
+        // Nota: Métricas de tempo médio e SLA desativadas temporariamente
+        // devido à migração do histórico para a tabela candidatura_eventos.
+
+        const tempoMedioContratacao = 0;
+        const slaRH = 0;
+
+        const totalCandidaturas = candidaturas.length;
+        const contratados = candidaturas.filter((c: any) => {
+          return String(c.status || "").trim().toLowerCase() === "contratado";
+        }).length;
+        const taxaConversao =
+          totalCandidaturas > 0
+            ? Math.round((contratados / totalCandidaturas) * 100)
+            : 0;
+
+        checkExpiredTransfers(vagas);
+
+        const desistentes = candidaturas.filter((c: any) => {
+          const status = c.status;
+          return c.motivo_declinio === "Desistência" || status === "REPROVADA";
+        }).length;
+        const taxaDesistencia =
+          totalCandidaturas > 0
+            ? Math.round((desistentes / totalCandidaturas) * 100)
+            : 0;
+
+        const quinzeDiasAtras = new Date();
+        quinzeDiasAtras.setDate(quinzeDiasAtras.getDate() - 15);
+
+        const vagasSemMovimentacao = vagas.filter((v) => {
+          if (v.status !== "Aberta") return false;
+          const updatedAt = v.updated_at ? new Date(v.updated_at) : null;
+          const createdAt = v.created_at ? new Date(v.created_at) : null;
+          const lastDate = updatedAt || createdAt;
+          return lastDate && lastDate < quinzeDiasAtras;
+        }).length;
+
+        setNewStats({
+          tempoMedioContratacao,
+          taxaConversao,
+          taxaDesistencia,
+          slaRH,
+          vagasSemMovimentacao,
+        });
+
+        // Calculate Funnel Data
+        // funil already calculated above
+        /*
+        const funil = [
+          { name: 'Inscritos', value: candidaturas.length },
+          { name: 'Triagem', value: candidaturas.filter((c: any) => !c.status && (c.fase || 'Triagem') !== 'Reserva').length },
+          { name: 'Prova', value: candidaturas.filter((c: any) => {
+            const status = c.status;
+            const fase = c.fase || 'Triagem';
+            return (!status || status === 'APROVADA') && ['Prova', 'Entrevista RH', 'Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
+          }).length },
+          { name: 'Entrevista RH', value: candidaturas.filter((c: any) => {
+            const status = c.status;
+            const fase = c.fase || 'Triagem';
+            return (!status || status === 'APROVADA') && ['Entrevista RH', 'Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
+          }).length },
+          { name: 'Entrevista Gestor', value: candidaturas.filter((c: any) => {
+            const status = c.status;
+            const fase = c.fase || 'Triagem';
+            return (!status || status === 'APROVADA') && ['Entrevista Gestor', 'Exame', 'Contratado'].includes(fase);
+          }).length },
+          { name: 'Contratados', value: candidaturas.filter((c: any) => {
+            const status = c.status;
+            const fase = c.fase || 'Triagem';
+            return status === 'APROVADA' || fase === 'Contratado';
+          }).length },
+        ];
+        setFunilState(funil);
+        */
+
+        // Calculate Diversity Stats
+        const getGenero = (c: any) => (c.genero || "").trim();
+        const isMulher = (c: any) => getGenero(c) === "Feminino";
+
+        const getRaca = (c: any) => (c.raca || "").trim();
+        const isRacaDiversa = (c: any) =>
+          getRaca(c) === "Preto" || getRaca(c) === "Pardo";
+
+        const isPcd = (c: any) => c.pcd === true;
+
+        const normalizarFaseDiversidade = (fase: string) => {
+          const f = (fase || "").trim().toLowerCase();
+          if (f.includes("triagem")) return "Triagem";
+          if (f.includes("rh")) return "Entrevista RH";
+          if (f.includes("contratado") || f.includes("contrato"))
+            return "Contratado";
+          if (f.includes("encerrado")) return "Encerrado";
+          return fase || "";
+        };
+
+        const isTriagem = (fase: string) => {
+          return normalizarFaseDiversidade(fase) === "Entrevista RH";
+        };
+
+        const isContratado = (status: string, fase: string) => {
+          const s = (status || "").toUpperCase();
+          const f = normalizarFaseDiversidade(fase);
+          return (
+            f === "Contratado" ||
+            (f === "Contratado" && s === "APROVADA") ||
+            s === "CONTRATADO"
+          );
+        };
+
+        const totalTriagem = candidaturas.filter((c: any) =>
+          isTriagem(c.fase),
+        ).length;
+        const totalContratado = candidaturas.filter((c: any) =>
+          isContratado(c.status, c.fase),
+        ).length;
+
+        const mulheresTriagem = candidaturas.filter(
+          (c: any) => isTriagem(c.fase) && isMulher(c),
+        ).length;
+        const mulheresContratado = candidaturas.filter(
+          (c: any) => isContratado(c.status, c.fase) && isMulher(c),
+        ).length;
+
+        const racasTriagem = candidaturas.filter(
+          (c: any) => isTriagem(c.fase) && isRacaDiversa(c),
+        ).length;
+        const racasContratado = candidaturas.filter(
+          (c: any) => isContratado(c.status, c.fase) && isRacaDiversa(c),
+        ).length;
+
+        const pcdTriagem = candidaturas.filter(
+          (c: any) => isTriagem(c.fase) && isPcd(c),
+        ).length;
+        const pcdContratado = candidaturas.filter(
+          (c: any) => isContratado(c.status, c.fase) && isPcd(c),
+        ).length;
+
+        setDiversidadeState({
+          genero: {
+            triagem:
+              totalTriagem > 0
+                ? Math.round((mulheresTriagem / totalTriagem) * 100)
+                : 0,
+            contratado:
+              totalContratado > 0
+                ? Math.round((mulheresContratado / totalContratado) * 100)
+                : 0,
+            triagemCount: mulheresTriagem,
+            contratadoCount: mulheresContratado,
+          },
+          raca: {
+            triagem:
+              totalTriagem > 0
+                ? Math.round((racasTriagem / totalTriagem) * 100)
+                : 0,
+            contratado:
+              totalContratado > 0
+                ? Math.round((racasContratado / totalContratado) * 100)
+                : 0,
+            triagemCount: racasTriagem,
+            contratadoCount: racasContratado,
+          },
+          pcd: {
+            triagem:
+              totalTriagem > 0
+                ? Math.round((pcdTriagem / totalTriagem) * 100)
+                : 0,
+            contratado:
+              totalContratado > 0
+                ? Math.round((pcdContratado / totalContratado) * 100)
+                : 0,
+            triagemCount: pcdTriagem,
+            contratadoCount: pcdContratado,
+          },
+          bases: {
+            triagem: totalTriagem,
+            contratado: totalContratado,
+          },
+        });
+
+        // Calculate Source Data
+        const fontes = [
+          {
+            name: "LinkedIn",
+            value: candidaturas.filter((c: any) => c.origem === "LinkedIn")
+              .length,
+          },
+          {
+            name: "Indicação",
+            value: candidaturas.filter((c: any) => c.origem === "Indicação")
+              .length,
+          },
+          {
+            name: "Site DFL",
+            value: candidaturas.filter(
+              (c: any) => c.origem === "Site DFL" || !c.origem,
+            ).length,
+          },
+          {
+            name: "Gupy/Outros",
+            value: candidaturas.filter((c: any) => c.origem === "Gupy/Outros")
+              .length,
+          },
+        ];
+        setFonteState(fontes);
+
+        // Calculate Decline Reasons
+        const motivosMap: { [key: string]: number } = {
+          Salário: 0,
+          Benefícios: 0,
+          "Modelo de Trabalho": 0,
+          Outros: 0,
+        };
+        candidaturas.forEach((c: any) => {
+          if (
+            c.motivo_declinio &&
+            motivosMap[c.motivo_declinio] !== undefined
+          ) {
+            motivosMap[c.motivo_declinio]++;
+          } else if (c.motivo_declinio) {
+            motivosMap["Outros"]++;
+          }
+        });
+        const motivos = Object.keys(motivosMap).map((key) => ({
+          name: key,
+          value: motivosMap[key],
+        }));
+        setMotivosState(motivos);
+
+        // Calculate Volume Data (last 6 months)
+        const months = [
+          "Jan",
+          "Fev",
+          "Mar",
+          "Abr",
+          "Mai",
+          "Jun",
+          "Jul",
+          "Ago",
+          "Set",
+          "Out",
+          "Nov",
+          "Dez",
+        ];
+        const currentMonth = new Date().getMonth();
+        const last6Months = [];
+        for (let i = 5; i >= 0; i--) {
+          const m = (currentMonth - i + 12) % 12;
+          last6Months.push({
+            name: months[m],
+            contratacoes: 0,
+            monthIndex: m,
+          } as any);
+        }
+
+        candidaturas.forEach((c: any) => {
+          const status = c.status || "ATIVO";
+          const fase = c.fase ?? "Triagem";
+          if (
+            (status === "CONTRATADO" ||
+              fase === "Contratado" ||
+              status === "Contratado") &&
+            c.data_candidatura
+          ) {
+            const date = new Date(c.data_candidatura);
+            const m = date.getMonth();
+            const monthData = last6Months.find((lm) => lm.monthIndex === m);
+            if (monthData) monthData.contratacoes++;
+          }
+        });
+        setVolumeState(
+          last6Months.map(({ name, contratacoes }) => ({ name, contratacoes })),
+        );
+
+        // Vagas por Status
+        const vagasPorStatusMap: { [key: string]: number } = {};
+        vagas.forEach((v: any) => {
+          const status = v.status || "Desconhecido";
+          vagasPorStatusMap[status] = (vagasPorStatusMap[status] || 0) + 1;
+        });
+        const vagasPorStatusData = Object.keys(vagasPorStatusMap).map(
+          (key) => ({
+            name: key,
+            value: vagasPorStatusMap[key],
+          }),
+        );
+        setVagasStatusState(vagasPorStatusData);
+
+        // Candidatos por Vaga (Top 5 vagas com mais candidatos)
+        const candidatosPorVagaMap: { [key: string]: number } = {};
+        candidaturas.forEach((c: any) => {
+          const vaga = vagas.find((v: any) => v.id === c.vaga_id);
+          if (vaga) {
+            const titulo = vaga.titulo || "Vaga sem título";
+            candidatosPorVagaMap[titulo] =
+              (candidatosPorVagaMap[titulo] || 0) + 1;
+          }
+        });
+        const candidatosPorVagaData = Object.keys(candidatosPorVagaMap)
+          .map((key) => ({ name: key, candidatos: candidatosPorVagaMap[key] }))
+          .sort((a, b) => b.candidatos - a.candidatos)
+          .slice(0, 5); // Top 5
+        setCandidatosVagaState(candidatosPorVagaData);
+
+        // Carga de Trabalho por Recrutador (Apenas Vagas Abertas)
+        const listaVagasAbertas = vagas.filter(
+          (v: any) => v.status === "Aberta" || v.status_vaga === "ABERTA",
+        );
+
+        const cargaTrabalhoMap = listaVagasAbertas.reduce(
+          (acc: any, vaga: any) => {
+            const nome = vaga.owner_nome || "Sem responsável";
+
+            if (!acc[nome]) {
+              acc[nome] = { recrutador: nome, vagasAbertas: 0 };
+            }
+            acc[nome].vagasAbertas += 1;
+
+            return acc;
+          },
+          {},
+        );
+
+        const cargaPorRecrutador = Object.values(cargaTrabalhoMap) as any[];
+
+        const cargaTrabalhoData = cargaPorRecrutador.sort(
+          (a: any, b: any) => b.vagasAbertas - a.vagasAbertas,
+        );
+
+        setCargaTrabalhoState(cargaTrabalhoData);
+
+        // Vagas Progress
+        const progressData = vagas
+          .filter(
+            (v: any) => v.status === "Aberta" || v.status_vaga === "ABERTA",
+          )
+          .map((v: any) => {
+            const exigeProva =
+              v.exige_prova === true || v.exige_prova === "Sim";
+
+            const etapas = exigeProva
+              ? [
+                  "Entrevista RH",
+                  "Prova",
+                  "Entrevista Gestor",
+                  "Proposta",
+                  "Documentação",
+                  "Exame Médico",
+                  "Contrato",
+                ]
+              : [
+                  "Entrevista RH",
+                  "Entrevista Gestor",
+                  "Proposta",
+                  "Documentação",
+                  "Exame Médico",
+                  "Contrato",
+                ];
+
+            const maiorIndice = candidaturas
+              .filter(
+                (c: any) => c.vaga_id === v.id && c.status !== "REPROVADA",
+              )
+              .reduce((acc: number, c: any) => {
+                let fase = String(c.fase || "Triagem").trim();
+
+                if (fase === "Exame") fase = "Exame Médico";
+                if (
+                  fase === "Entrega de documentação" ||
+                  fase === "Entregar Documentação"
+                ) {
+                  fase = "Documentação";
+                }
+                if (fase === "Contratado") fase = "Contrato";
+                if (fase === "Prova" && !exigeProva) {
+                  fase = "Entrevista Gestor";
+                }
+
+                const idx = etapas.indexOf(fase);
+                return idx > acc ? idx : acc;
+              }, -1);
+
+            const etapasConcluidas = maiorIndice >= 0 ? maiorIndice + 1 : 0;
+            const etapasTotais = etapas.length;
+            const percentual = Math.min(
+              100,
+              Math.round((etapasConcluidas / etapasTotais) * 100),
+            );
+
+            return {
+              id: v.id,
+              titulo: v.titulo,
+              etapasConcluidas,
+              etapasTotais,
+              percentual,
+            };
+          });
+        setVagasProgress(progressData);
+
+        const eventosAvanco = candidaturas.filter(
+          (c: any) =>
+            c.status === "APROVADA" ||
+            (c.fase || "").trim() === "Contratado" ||
+            (c.fase || "").trim() === "Contrato",
+        );
+
+        setStats({
+          vagasAbertas,
+          vagasVariacao,
+          candidatosTotal,
+          candidatosVariacao,
+          candidaturasMes: candidaturasEsteMesCount,
+          candidaturasVariacao,
+          entrevistasSemana: candidaturas.filter((c: any) => {
+            const fase = c.fase ?? "Triagem";
+            return fase === "Entrevista RH" || fase === "Entrevista Gestor";
+          }).length,
+        });
+      } catch (error) {
+        console.error("Erro ao buscar estatísticas:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
+
+  const handleGeneratePDF = async () => {
+    if (!dashboardRef.current) return;
+
+    try {
+      setIsGeneratingPDF(true);
+
+      // Aguarda um pequeno intervalo para garantir que as animações dos gráficos terminaram
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      const [{ default: domtoimage }, { default: jsPDF }] = await Promise.all([
+        import("dom-to-image"),
+        import("jspdf"),
+      ]);
+
+      const targetNode = dashboardRef.current;
+      const width = targetNode.scrollWidth;
+      const height = targetNode.scrollHeight;
+
+      const imgData = await domtoimage.toPng(targetNode, {
+        bgcolor: "#f8fafc",
+        width: width,
+        height: height,
+        quality: 1,
+        style: {
+          transform: "scale(1)",
+          transformOrigin: "top left",
+          margin: "0",
+        },
+        filter: (node: Node) => {
+          if (node instanceof HTMLElement) {
+            return !node.classList.contains("hide-on-print");
+          }
+          return true;
+        },
+      });
+
+      const pdf = new jsPDF({
+        orientation: width > height ? "landscape" : "portrait",
+        unit: "px",
+        format: [width, height],
+      });
+
+      pdf.addImage(imgData, "PNG", 0, 0, width, height);
+      pdf.save("relatorio_dashboard.pdf");
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      alert("Ocorreu um erro ao gerar o PDF. Tente novamente.");
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      setLoading(true);
+      const [vagasRes, candidatosRes, candidaturasRes, eventosRes] =
+        await Promise.all([
+          supabase.from("vagas").select("*, provas(nome)"),
+          supabase.from("users").select("*").eq("perfil", "Candidato"),
+          supabase.from("candidaturas").select("*"),
+          supabase.from("candidatura_eventos").select("*, users(nome)"),
+        ]);
+
+      const candidatos = (candidatosRes.data || []).map((doc) => {
+        const resume = getResumeData(doc.resume_data);
+        return {
+          ID: doc.id,
+          Nome: doc.nome,
+          Email: doc.email,
+          Telefone: resume.telefone || "",
+          Cidade: resume.cidade || "",
+          Estado: resume.estado || "",
+          Data_Cadastro: doc.created_at?.split("T")[0] || "",
+        };
+      });
+
+      const vagas = (vagasRes.data || []).map((doc) => ({
+        ID: doc.id,
+        Titulo: doc.titulo,
+        Departamento: doc.departamento,
+        Local: doc.local,
+        Status: doc.status,
+        Data_Abertura: doc.created_at?.split("T")[0] || "",
+        Vagas_Disponiveis: doc.vagas_disponiveis || 1,
+      }));
+
+      const candidaturas = (candidaturasRes.data || []).map((doc) => {
+        const vagaDoc = (vagasRes.data || []).find((v) => v.id === doc.vaga_id);
+        return {
+          ID: doc.id,
+          Candidato_ID: doc.candidato_id,
+          Vaga_ID: vagaDoc ? vagaDoc.titulo : doc.vaga_id,
+          Data_Candidatura: doc.data_candidatura?.split("T")[0] || "",
+          Status_Atual: doc.status,
+          Origem: doc.origem || "Site DFL",
+        };
+      });
+
+      const etapasProcesso = [
+        { ID: 1, Nome_Etapa: "Triagem", Tipo: "Filtro" },
+        { ID: 2, Nome_Etapa: "Entrevista RH", Tipo: "Entrevista" },
+        { ID: 3, Nome_Etapa: "Prova", Tipo: "Avaliação" },
+        { ID: 4, Nome_Etapa: "Entrevista Gestor", Tipo: "Entrevista" },
+        { ID: 5, Nome_Etapa: "Proposta", Tipo: "Oferta" },
+        { ID: 6, Nome_Etapa: "Contratado", Tipo: "Finalizado" },
+      ];
+
+      const movimentacaoEtapas = (candidaturasRes.data || []).flatMap(
+        (data) => {
+          const vagaDoc = (vagasRes.data || []).find(
+            (v) => v.id === data.vaga_id,
+          );
+          const codigo_vaga = vagaDoc
+            ? vagaDoc.codigo_vaga || vagaDoc.titulo
+            : data.vaga_id;
+
+          const events = (eventosRes.data || []).filter(
+            (e: any) => e.candidatura_id === data.id,
+          );
+
+          if (events.length === 0) {
+            return [
+              {
+                Candidatura_ID: data.id,
+                Codigo_Vaga: codigo_vaga,
+                Candidato_ID: data.candidato_id,
+                Etapa: data.status || data.fase || "Triagem",
+                Data_Movimentacao:
+                  data.data_candidatura || data.created_at || "",
+                Responsavel: "Sistema",
+                Descricao: "Candidatura iniciada",
+              },
+            ];
+          }
+
+          return events.map((h: any) => ({
+            Candidatura_ID: data.id,
+            Codigo_Vaga: codigo_vaga,
+            Candidato_ID: data.candidato_id,
+            Etapa: h.tipo,
+            Data_Movimentacao: h.created_at || "",
+            Responsavel: h.users?.nome || "Sistema",
+            Descricao: h.descricao,
+          }));
+        },
+      );
+
+      const entrevistas = (candidaturasRes.data || [])
+        .filter((doc) =>
+          ["Entrevista RH", "Entrevista Gestor"].includes(doc.status),
+        )
+        .map((doc) => {
+          const vagaDoc = (vagasRes.data || []).find(
+            (v) => v.id === doc.vaga_id,
+          );
+          return {
+            Candidatura_ID: doc.id,
+            Candidato_ID: doc.candidato_id,
+            Vaga_ID: vagaDoc ? vagaDoc.titulo : doc.vaga_id,
+            Tipo: doc.status,
+            Data_Agendada: doc.data_entrevista || "Não agendada",
+          };
+        });
+
+      const ofertasPropostas = (candidaturasRes.data || [])
+        .filter((doc) => {
+          const fase = doc.fase ?? "Triagem";
+          const status = doc.status ?? "ATIVO";
+          return fase === "Proposta" || fase === "Contratado";
+        })
+        .map((doc) => {
+          const vagaDoc = (vagasRes.data || []).find(
+            (v) => v.id === doc.vaga_id,
+          );
+          return {
+            Candidatura_ID: doc.id,
+            Candidato_ID: doc.candidato_id,
+            Vaga_ID: vagaDoc ? vagaDoc.titulo : doc.vaga_id,
+            Status: doc.status,
+            Data: doc.proposta_data || "",
+          };
+        });
+
+      const motivosRecusa = (candidaturasRes.data || [])
+        .filter((doc) => {
+          const status = doc.status ?? "ATIVO";
+          return status === "REPROVADA" || status === "Desistência";
+        })
+        .map((doc) => {
+          const vagaDoc = (vagasRes.data || []).find(
+            (v) => v.id === doc.vaga_id,
+          );
+          return {
+            Candidatura_ID: doc.id,
+            Candidato_ID: doc.candidato_id,
+            Vaga_ID: vagaDoc ? vagaDoc.titulo : doc.vaga_id,
+            Motivo: doc.motivo_declinio || "Não informado",
+            Comentario: doc.observacoes || "",
+          };
+        });
+
+      const fontesRecrutamento = [
+        {
+          Nome_Fonte: "LinkedIn",
+          Total_Candidatos: candidaturas.filter((c) => c.Origem === "LinkedIn")
+            .length,
+        },
+        {
+          Nome_Fonte: "Indicação",
+          Total_Candidatos: candidaturas.filter((c) => c.Origem === "Indicação")
+            .length,
+        },
+        {
+          Nome_Fonte: "Site DFL",
+          Total_Candidatos: candidaturas.filter((c) => c.Origem === "Site DFL")
+            .length,
+        },
+        {
+          Nome_Fonte: "Gupy/Outros",
+          Total_Candidatos: candidaturas.filter(
+            (c) => c.Origem === "Gupy/Outros",
+          ).length,
+        },
+      ];
+      const diversidade = (candidatosRes.data || []).map((doc) => {
+        const resume = getResumeData(doc.resume_data);
+        return {
+          Candidato_ID: doc.id,
+          Genero: resume.genero || "Não informado",
+          Raca_Cor: resume.raca || "Não informado",
+          PCD: resume.pcd ? "Sim" : "Não",
+          Faixa_Etaria: resume.faixaEtaria || "Não informado",
+        };
+      });
+
+      // ExcelJS é carregado somente quando o usuário solicita a exportação XLSX.
+      const { default: ExcelJS } = await import("@andreeewill/exceljs");
+      const wb = new ExcelJS.Workbook();
+      wb.creator = "Recruta AÍ";
+      wb.created = new Date();
+
+      const abas = [
+        ["Candidatos", candidatos],
+        ["Vagas", vagas],
+        ["Candidaturas", candidaturas],
+        ["Etapas do Processo", etapasProcesso],
+        ["Movimentação nas Etapas", movimentacaoEtapas],
+        ["Entrevistas", entrevistas],
+        ["Ofertas e Propostas", ofertasPropostas],
+        ["Fontes Recrutamento", fontesRecrutamento],
+        ["Motivos de Recusa", motivosRecusa],
+        ["Diversidade", diversidade],
+      ] as const;
+
+      abas.forEach(([nome, dados]) => {
+        const worksheet = wb.addWorksheet(nome);
+        const rows = dados as Record<string, unknown>[];
+
+        if (rows.length > 0) {
+          worksheet.columns = Object.keys(rows[0]).map((key) => ({
+            header: key,
+            key,
+            width: Math.min(Math.max(key.length + 4, 14), 40),
+          }));
+          worksheet.addRows(rows);
+          worksheet.getRow(1).font = { bold: true };
+          worksheet.views = [{ state: "frozen", ySplit: 1 }];
+        }
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "Base_de_Dados_Recrutamento_DFL.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Erro ao exportar Excel:", error);
+      alert("Erro ao exportar dados. Verifique o console.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div
+      ref={dashboardRef}
+      className="space-y-8 bg-slate-50 p-6 -m-6 rounded-xl"
+    >
+      {/* Alertas de Transferências Expiradas */}
+      {expiredTransfers.length > 0 && profile?.perfil === "Admin" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-4 shadow-sm animate-pulse">
+          <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-sm font-bold text-amber-900">
+              Transferências Temporárias Vencidas
+            </h4>
+            <p className="text-xs text-amber-700 mt-1">
+              {expiredTransfers.length} vaga(s) possuem o prazo de retorno do
+              proprietário original expirado.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {expiredTransfers.map((vaga) => (
+                <div
+                  key={vaga.id}
+                  className="flex items-center gap-2 bg-white border border-amber-200 px-3 py-1.5 rounded-lg text-xs shadow-sm"
+                >
+                  <span className="font-medium text-slate-700">
+                    {vaga.titulo}
+                  </span>
+                  <span className="text-slate-400">|</span>
+                  <span className="text-slate-600">
+                    Retorno: {vaga.transferenciaTemporaria.originalOwnerNome}
+                  </span>
+                  <button
+                    onClick={() => handleAutoReturn(vaga)}
+                    disabled={isProcessingReturn}
+                    className="ml-2 bg-amber-600 text-white px-2 py-1 rounded hover:bg-amber-700 transition-colors disabled:opacity-50"
+                  >
+                    Processar Retorno
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Dashboard de Indicadores
+          </h1>
+          <p className="text-slate-500">
+            Visão geral da performance de recrutamento e seleção.
+          </p>
+        </div>
+        <div className="flex gap-2 hide-on-print">
+          <button
+            onClick={handleExportCSV}
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition-colors flex items-center gap-2 text-sm"
+          >
+            <Download className="w-4 h-4" /> Exportar Excel
+          </button>
+          <button
+            onClick={handleGeneratePDF}
+            disabled={isGeneratingPDF}
+            className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-accent transition-colors flex items-center gap-2 text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            <BarChart3 className="w-4 h-4" />{" "}
+            {isGeneratingPDF ? "Gerando..." : "Gerar Relatório PDF"}
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-8">
+        {/* Nível 1: KPIs Principais (Existentes) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Vagas Abertas
+              </p>
+              <Briefcase className="w-4 h-4 text-primary" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : stats.vagasAbertas}
+            </h3>
+            <p
+              className={`text-xs mt-1 flex items-center gap-1 ${stats.vagasVariacao >= 0 ? "text-emerald-600" : "text-red-600"}`}
+            >
+              {stats.vagasVariacao >= 0 ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : (
+                <TrendingDown className="w-3 h-3" />
+              )}
+              {stats.vagasVariacao >= 0 ? "+" : ""}
+              {stats.vagasVariacao}% vs último mês
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Total Candidatos
+              </p>
+              <Users className="w-4 h-4 text-indigo-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : stats.candidatosTotal}
+            </h3>
+            <p
+              className={`text-xs mt-1 flex items-center gap-1 ${stats.candidatosVariacao >= 0 ? "text-emerald-600" : "text-red-600"}`}
+            >
+              {stats.candidatosVariacao >= 0 ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : (
+                <TrendingDown className="w-3 h-3" />
+              )}
+              {stats.candidatosVariacao >= 0 ? "+" : ""}
+              {stats.candidatosVariacao}% vs último mês
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Candidaturas Mês
+              </p>
+              <Target className="w-4 h-4 text-emerald-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : stats.candidaturasMes}
+            </h3>
+            <p
+              className={`text-xs mt-1 flex items-center gap-1 ${stats.candidaturasVariacao >= 0 ? "text-emerald-600" : "text-red-600"}`}
+            >
+              {stats.candidaturasVariacao >= 0 ? (
+                <TrendingUp className="w-3 h-3" />
+              ) : (
+                <TrendingDown className="w-3 h-3" />
+              )}
+              {stats.candidaturasVariacao >= 0 ? "+" : ""}
+              {stats.candidaturasVariacao}% vs último mês
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Entrevistas Semana
+              </p>
+              <Clock className="w-4 h-4 text-amber-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : stats.entrevistasSemana}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">Candidatos agendados</p>
+          </div>
+        </div>
+
+        {/* Nível 2: Eficiência e Conversão (Novos KPIs) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Tempo de Contratação
+              </p>
+              <Clock className="w-4 h-4 text-indigo-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : `${newStats.tempoMedioContratacao}d`}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Média desde a abertura
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Taxa de Conversão
+              </p>
+              <Target className="w-4 h-4 text-emerald-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : `${newStats.taxaConversao}%`}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Candidatos contratados
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Taxa de Desistência
+              </p>
+              <TrendingUp className="w-4 h-4 text-rose-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : `${newStats.taxaDesistencia}%`}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Reprovações e desistências
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">SLA do RH</p>
+              <CheckCircle2 className="w-4 h-4 text-blue-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : `${newStats.slaRH}d`}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              Tempo até primeiro contato
+            </p>
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <div className="flex justify-between items-start mb-2">
+              <p className="text-sm font-medium text-slate-500">
+                Vagas sem Movimento
+              </p>
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900">
+              {loading ? "..." : newStats.vagasSemMovimentacao}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">
+              &gt; 15 dias sem atualização
+            </p>
+          </div>
+        </div>
+
+        {/* Nível 3: Gráficos e Análises Complementares */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Eficiência */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Eficiência: Tempo Médio por Etapa (Dias)
+            </h2>
+            {tempoState.length > 0 ? (
+              <div
+                style={{
+                  width: "100%",
+                  height: 300,
+                  minHeight: 300,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <BarChart
+                  width={640}
+                  height={300}
+                  data={tempoState}
+                  layout="vertical"
+                  margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                  <XAxis type="number" />
+                  <YAxis
+                    dataKey="fase"
+                    type="category"
+                    width={100}
+                    fontSize={12}
+                  />
+                  <Tooltip cursor={{ fill: "#f1f5f9" }} />
+                  <Bar dataKey="tempo" radius={[0, 4, 4, 0]} barSize={24}>
+                    {tempoState.map((entry: any, index: number) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
+                      />
+                    ))}
+                    <LabelList
+                      dataKey="tempo"
+                      position="right"
+                      fill="#64748b"
+                      fontSize={12}
+                    />
+                  </Bar>
+                </BarChart>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-slate-500 text-sm italic">
+                Sem dados suficientes de rastreamento para exibir médias.
+              </div>
+            )}
+          </div>
+
+          {/* Qualidade e Conversão */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Qualidade: Funil de Seleção
+            </h2>
+            {funilState.length > 0 && (
+              <div
+                style={{
+                  width: "100%",
+                  height: 300,
+                  minHeight: 300,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <BarChart
+                  width={760}
+                  height={300}
+                  data={funilState}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    fontSize={10}
+                    interval={0}
+                    angle={-25}
+                    textAnchor="end"
+                  />
+                  <YAxis domain={[0, (dataMax) => Math.ceil(dataMax * 1.15)]} />
+                  <Tooltip cursor={{ fill: "#f1f5f9" }} />
+                  <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                    {funilState.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={COLORS[index % COLORS.length]}
+                      />
+                    ))}
+                    <LabelList
+                      dataKey="value"
+                      position="top"
+                      fill="#64748b"
+                      fontSize={12}
+                    />
+                  </Bar>
+                </BarChart>
+              </div>
+            )}
+          </div>
+
+          {/* Custo e Volume */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Volume de Contratações (Últimos 6 meses)
+            </h2>
+            {volumeState.length > 0 && (
+              <div
+                style={{
+                  width: "100%",
+                  height: 300,
+                  minHeight: 300,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <LineChart
+                  width={760}
+                  height={300}
+                  data={volumeState}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" fontSize={12} />
+                  <YAxis />
+                  <Tooltip />
+                  <Line
+                    type="monotone"
+                    dataKey="contratacoes"
+                    stroke="#0ea5e9"
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      fill: "#0ea5e9",
+                      strokeWidth: 2,
+                      stroke: "#fff",
+                    }}
+                    activeDot={{ r: 6 }}
+                  >
+                    <LabelList
+                      dataKey="contratacoes"
+                      position="top"
+                      fill="#64748b"
+                      fontSize={12}
+                      offset={10}
+                    />
+                  </Line>
+                </LineChart>
+              </div>
+            )}
+          </div>
+
+          {/* Fontes e Motivos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <h2 className="text-sm font-bold text-slate-900 mb-4 text-center">
+                Fonte de Origem
+              </h2>
+              {fonteState.length > 0 && (
+                <div
+                  style={{
+                    width: "100%",
+                    height: 300,
+                    minHeight: 300,
+                    minWidth: 0,
+                    overflow: "hidden",
+                  }}
+                >
+                  <PieChart width={320} height={300}>
+                    <Pie
+                      data={fonteState}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={70}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({
+                        cx,
+                        cy,
+                        midAngle,
+                        innerRadius,
+                        outerRadius,
+                        percent,
+                      }) => {
+                        const RADIAN = Math.PI / 180;
+                        const radius = outerRadius * 1.2;
+                        const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                        const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                        return (
+                          <text
+                            x={x}
+                            y={y}
+                            fill="#64748b"
+                            textAnchor={x > cx ? "start" : "end"}
+                            dominantBaseline="central"
+                            fontSize="10"
+                          >
+                            {`${(percent * 100).toFixed(0)}%`}
+                          </text>
+                        );
+                      }}
+                      labelLine={false}
+                    >
+                      {fonteState.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </div>
+              )}
+              <div className="flex flex-wrap justify-center gap-2 mt-2">
+                {fonteState.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-1 text-xs text-slate-600"
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          PRIMARY_COLORS[i % PRIMARY_COLORS.length],
+                      }}
+                    ></div>
+                    {item.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <h2 className="text-sm font-bold text-slate-900 mb-4 text-center">
+                Motivos de Declínio
+              </h2>
+              {motivosState.length > 0 && (
+                <div style={{ width: "100%", height: 300, minHeight: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={motivosState}
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={70}
+                        dataKey="value"
+                        label={({
+                          cx,
+                          cy,
+                          midAngle,
+                          innerRadius,
+                          outerRadius,
+                          percent,
+                        }) => {
+                          const RADIAN = Math.PI / 180;
+                          const radius = outerRadius * 1.2;
+                          const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                          const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                          return (
+                            <text
+                              x={x}
+                              y={y}
+                              fill="#64748b"
+                              textAnchor={x > cx ? "start" : "end"}
+                              dominantBaseline="central"
+                              fontSize="10"
+                            >
+                              {`${(percent * 100).toFixed(0)}%`}
+                            </text>
+                          );
+                        }}
+                        labelLine={false}
+                      >
+                        {motivosState.map((entry, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={COLORS[index % COLORS.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              <div className="flex flex-wrap justify-center gap-2 mt-2">
+                {motivosState.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-1 text-xs text-slate-600"
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: COLORS[i % COLORS.length] }}
+                    ></div>
+                    {item.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Novos Gráficos: Vagas por Status e Candidatos por Vaga */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Vagas por Status
+            </h2>
+            {vagasStatusState.length > 0 && (
+              <div style={{ width: "100%", height: 300, minHeight: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={vagasStatusState}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="name" fontSize={12} />
+                    <YAxis />
+                    <Tooltip cursor={{ fill: "#f1f5f9" }} />
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
+                      {vagasStatusState.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
+                        />
+                      ))}
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        fill="#64748b"
+                        fontSize={12}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Top 5 Vagas com Mais Candidatos
+            </h2>
+            {candidatosVagaState.length > 0 && (
+              <div style={{ width: "100%", height: 300, minHeight: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={candidatosVagaState}
+                    layout="vertical"
+                    margin={{ top: 5, right: 30, left: 40, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" />
+                    <YAxis
+                      dataKey="name"
+                      type="category"
+                      width={100}
+                      fontSize={10}
+                    />
+                    <Tooltip cursor={{ fill: "#f1f5f9" }} />
+                    <Bar
+                      dataKey="candidatos"
+                      radius={[0, 4, 4, 0]}
+                      barSize={24}
+                    >
+                      {candidatosVagaState.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={COLORS[index % COLORS.length]}
+                        />
+                      ))}
+                      <LabelList
+                        dataKey="candidatos"
+                        position="right"
+                        fill="#64748b"
+                        fontSize={12}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 lg:col-span-2">
+            <h2 className="text-lg font-bold text-slate-900 mb-4">
+              Carga de Trabalho por Recrutador (Vagas Abertas)
+            </h2>
+            <div style={{ width: "100%", height: 300, minHeight: 300 }}>
+              {cargaTrabalhoState.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={cargaTrabalhoState}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="recrutador" fontSize={12} />
+                    <YAxis />
+                    <Tooltip cursor={{ fill: "#f1f5f9" }} />
+                    <Bar
+                      dataKey="vagasAbertas"
+                      radius={[4, 4, 0, 0]}
+                      barSize={40}
+                    >
+                      {cargaTrabalhoState.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={PRIMARY_COLORS[index % PRIMARY_COLORS.length]}
+                        />
+                      ))}
+                      <LabelList
+                        dataKey="vagasAbertas"
+                        position="top"
+                        fill="#64748b"
+                        fontSize={12}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-slate-500">
+                  <p>Sem dados de carga</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Diversidade */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">
+                Diversidade no Funil (Geral)
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Comparação entre candidatos atualmente na fase Entrevista RH e
+                contratações finais.
+              </p>
+            </div>
+            <Award className="w-5 h-5 text-slate-400" />
+          </div>
+
+          <div className="mb-5 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-600">
+              Base Entrevista RH:{" "}
+              <span className="font-semibold text-slate-900">
+                {diversidadeState.bases.triagem}
+              </span>
+            </div>
+            <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-slate-600">
+              Base Contratado:{" "}
+              <span className="font-semibold text-slate-900">
+                {diversidadeState.bases.contratado}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <div className="flex justify-between text-sm mb-2 gap-3">
+                <span className="font-medium text-slate-700">
+                  Gênero (Mulheres)
+                </span>
+                <span className="text-slate-500 text-right">
+                  Entrevista RH: {diversidadeState.genero.triagem}% (
+                  {diversidadeState.genero.triagemCount} de{" "}
+                  {diversidadeState.bases.triagem}) / Contratado:{" "}
+                  {diversidadeState.genero.contratado}% (
+                  {diversidadeState.genero.contratadoCount} de{" "}
+                  {diversidadeState.bases.contratado})
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Entrevista RH</span>
+                    <span>{diversidadeState.genero.triagem}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-sky-500 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.genero.triagem}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Contratado</span>
+                    <span>{diversidadeState.genero.contratado}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-indigo-500 h-2.5 rounded-full"
+                      style={{
+                        width: `${diversidadeState.genero.contratado}%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-2 gap-3">
+                <span className="font-medium text-slate-700">
+                  Raça/Etnia (Pretos e Pardos)
+                </span>
+                <span className="text-slate-500 text-right">
+                  Entrevista RH: {diversidadeState.raca.triagem}% (
+                  {diversidadeState.raca.triagemCount} de{" "}
+                  {diversidadeState.bases.triagem}) / Contratado:{" "}
+                  {diversidadeState.raca.contratado}% (
+                  {diversidadeState.raca.contratadoCount} de{" "}
+                  {diversidadeState.bases.contratado})
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Entrevista RH</span>
+                    <span>{diversidadeState.raca.triagem}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-teal-500 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.raca.triagem}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Contratado</span>
+                    <span>{diversidadeState.raca.contratado}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-emerald-500 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.raca.contratado}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-2 gap-3">
+                <span className="font-medium text-slate-700">
+                  Pessoas com Deficiência (PcD)
+                </span>
+                <span className="text-slate-500 text-right">
+                  Entrevista RH: {diversidadeState.pcd.triagem}% (
+                  {diversidadeState.pcd.triagemCount} de{" "}
+                  {diversidadeState.bases.triagem}) / Contratado:{" "}
+                  {diversidadeState.pcd.contratado}% (
+                  {diversidadeState.pcd.contratadoCount} de{" "}
+                  {diversidadeState.bases.contratado})
+                </span>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Entrevista RH</span>
+                    <span>{diversidadeState.pcd.triagem}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-amber-400 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.pcd.triagem}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span>Contratado</span>
+                    <span>{diversidadeState.pcd.contratado}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2.5">
+                    <div
+                      className="bg-amber-600 h-2.5 rounded-full"
+                      style={{ width: `${diversidadeState.pcd.contratado}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Progresso de Preenchimento das Vagas */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-slate-900">
+              Progresso de Preenchimento das Vagas
+            </h2>
+            <Target className="w-5 h-5 text-slate-400" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {vagasProgress.map((vaga) => (
+              <div
+                key={vaga.id}
+                className="space-y-3 p-4 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                <div className="flex justify-between items-start">
+                  <h3
+                    className="font-bold text-slate-900 text-sm line-clamp-1"
+                    title={vaga.titulo}
+                  >
+                    {vaga.titulo}
+                  </h3>
+                  <span className="text-xs font-medium text-slate-500">
+                    {vaga.etapasConcluidas}/{vaga.etapasTotais}
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-[10px] font-medium">
+                    <span className="text-slate-400 uppercase tracking-wider">
+                      Progresso
+                    </span>
+                    <span
+                      className={
+                        vaga.percentual < 50
+                          ? "text-red-500"
+                          : vaga.percentual < 80
+                            ? "text-amber-500"
+                            : "text-emerald-500"
+                      }
+                    >
+                      {vaga.percentual}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        vaga.percentual < 50
+                          ? "bg-red-500"
+                          : vaga.percentual < 80
+                            ? "bg-amber-500"
+                            : "bg-emerald-500"
+                      }`}
+                      style={{ width: `${vaga.percentual}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {vagasProgress.length === 0 && (
+              <div className="col-span-full py-8 text-center text-slate-400 italic text-sm">
+                Nenhuma vaga aberta no momento.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function HRGestaoVagas() {
+  const { profile } = useAuth();
+  const {
+    vagas,
+    setVagas,
+    loading: loadingVagas,
+    error: errorVagas,
+    refresh: refreshVagas,
+  } = useVagas();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [scoreMinFilter, setScoreMinFilter] = useState("");
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  } | null>({ key: "createdAt", direction: "desc" });
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>(
+    {},
+  );
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
+    null,
+  );
+  const [candidaturasStats, setCandidaturasStats] = useState<{
+    [key: string]: { total: number; ativos: number; novidades: number };
+  }>({});
+  const [maxHoursToCancel, setMaxHoursToCancel] = useState(4);
+  const [cancelModal, setCancelModal] = useState<{
+    isOpen: boolean;
+    vagaId: string;
+    vagaTitulo: string;
+  }>({ isOpen: false, vagaId: "", vagaTitulo: "" });
+  const [transferModal, setTransferModal] = useState<{
+    isOpen: boolean;
+    vaga: any;
+  }>({ isOpen: false, vaga: null });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("settings")
+          .select("*")
+          .eq("id", "email")
+          .maybeSingle();
+
+        if (data) {
+          const settingsData = data.data || data;
+          if (settingsData.regrasTempoCancelamentoVaga !== undefined) {
+            setMaxHoursToCancel(
+              Number(settingsData.regrasTempoCancelamentoVaga),
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Erro ao buscar configurações:", error);
+      }
+    };
+    fetchSettings();
+
+    // Real-time Candidaturas for stats
+    const candidaturasChannel = supabase
+      .channel("candidaturas-stats")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "candidaturas" },
+        () => {
+          fetchCandidaturasStats();
+        },
+      )
+      .subscribe();
+
+    const fetchCandidaturasStats = async () => {
+      const { data } = await supabase.from("candidaturas").select("*");
+      if (data) {
+        const stats: {
+          [key: string]: { total: number; ativos: number; novidades: number };
+        } = {};
+
+        data.forEach((cand) => {
+          const vagaId = cand.vaga_id;
+          const status = cand.status || "ATIVO";
+          const fase = cand.fase ?? "Triagem";
+
+          if (!stats[vagaId]) {
+            stats[vagaId] = { total: 0, ativos: 0, novidades: 0 };
+          }
+
+          if (cand.rh_visualizou_recrutamento !== true) {
+            stats[vagaId].novidades += 1;
+          }
+
+          const processStages = [
+            "Prova",
+            "Entrevista RH",
+            "Entrevista Gestor",
+            "Entrevista",
+            "Proposta",
+            "Entregar Documentação",
+            "Exame",
+            "Contratado",
+          ];
+
+          const enteredProcess = processStages.includes(fase);
+
+          if (enteredProcess) {
+            stats[vagaId].total += 1;
+            if (status === "ATIVO" || status === "NOVO") {
+              stats[vagaId].ativos += 1;
+            }
+          }
+        });
+        setCandidaturasStats(stats);
+      }
+    };
+    fetchCandidaturasStats();
+
+    return () => {
+      supabase.removeChannel(candidaturasChannel);
+    };
+  }, []);
+
+  const formatDateTime = (isoString: string) => {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    return date.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const handleSort = (key: string) => {
+    let direction: "asc" | "desc" = "asc";
+    if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === "asc"
+    ) {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleColumnFilterChange = (key: string, value: string) => {
+    setColumnFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const filteredVagas = vagas
+    .filter((vaga) => {
+      const matchesSearch = (vaga.titulo || "")
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      if (!matchesSearch) return false;
+
+      for (const [key, value] of Object.entries(columnFilters)) {
+        if (!value) continue;
+
+        let itemValue = "";
+        if (key === "created_at") {
+          itemValue = formatDateTime(vaga.created_at).toLowerCase();
+        } else if (key === "owner_nome") {
+          itemValue = String(vaga.owner_nome || "").toLowerCase();
+        } else {
+          itemValue = String(
+            vaga[key as keyof typeof vaga] || "",
+          ).toLowerCase();
+        }
+
+        if (!itemValue.includes(String(value).toLowerCase())) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by novidades first
+      const aNovidades = candidaturasStats[a.id]?.novidades || 0;
+      const bNovidades = candidaturasStats[b.id]?.novidades || 0;
+      if (aNovidades > 0 && bNovidades === 0) return -1;
+      if (aNovidades === 0 && bNovidades > 0) return 1;
+
+      if (!sortConfig) return 0;
+      const { key, direction } = sortConfig;
+
+      let aValue: any = a[key as keyof typeof a];
+      let bValue: any = b[key as keyof typeof b];
+
+      if (key === "created_at") {
+        aValue = new Date(a.created_at).getTime();
+        bValue = new Date(b.created_at).getTime();
+      } else if (key === "owner_nome") {
+        aValue = String(a.owner_nome || "").toLowerCase();
+        bValue = String(b.owner_nome || "").toLowerCase();
+      } else {
+        aValue = String(aValue || "").toLowerCase();
+        bValue = String(bValue || "").toLowerCase();
+      }
+
+      if (aValue < bValue) return direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+  const allowedTransitions: Record<string, string[]> = {
+    Aberta: ["Pausada", "Cancelada"],
+    Pausada: ["Aberta", "Cancelada"],
+    Cancelada: [],
+  };
+
+  const handleUpdateStatus = async (vaga: any, newStatus: string) => {
+    try {
+      if (!vaga?.id) {
+        console.error("Vaga sem ID");
+        alert("Erro: vaga inválida.");
+        return;
+      }
+
+      if (!allowedTransitions[vaga.status]?.includes(newStatus)) {
+        console.warn("Transição de status inválida", {
+          atual: vaga.status,
+          tentativa: newStatus,
+        });
+        alert(
+          `Não é permitido alterar status de "${vaga.status}" para "${newStatus}".`,
+        );
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      const { data, error } = await supabase
+        .from("vagas")
+        .update({ status: newStatus, updated_at: now })
+        .eq("id", vaga.id)
+        .select();
+
+      console.log("ID da vaga:", vaga.id);
+      console.log("Update OK:", {
+        id: vaga.id,
+        statusAnterior: vaga.status,
+        novoStatus: newStatus,
+        timestamp: now,
+      });
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        console.error("Nenhuma vaga foi atualizada. Verifique o ID.");
+        alert("Erro: vaga não encontrada para atualização.");
+        return;
+      }
+
+      // Atualizar estado local sem recarregar tudo
+      setVagas((prev) =>
+        prev.map((v) =>
+          String(v.id) === String(vaga.id)
+            ? { ...v, status: newStatus, updated_at: now }
+            : v,
+        ),
+      );
+
+      try {
+        await logAudit(
+          "Alterou Status Vaga",
+          "Gestão de Vagas",
+          `Vaga ${vaga.titulo} alterada para ${newStatus}.`,
+        );
+      } catch (logError) {
+        console.warn("Erro ao registrar log:", logError);
+      }
+    } catch (err) {
+      console.error("Erro ao atualizar status:", err);
+      alert("Erro ao atualizar status da vaga");
+    }
+  };
+
+  const handleAction = async (id: string, action: string) => {
+    try {
+      const vaga = vagas.find((v) => v.id === id);
+      if (!vaga) return;
+
+      if (action === "Cancelar") {
+        setCancelModal({ isOpen: true, vagaId: id, vagaTitulo: vaga.titulo });
+        return;
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar vaga:", error);
+      alert("Erro ao atualizar vaga. Verifique as permissões.");
+    }
+  };
+
+  const confirmCancelVaga = async () => {
+    try {
+      const vaga = vagas.find((v) => v.id === cancelModal.vagaId);
+      if (vaga) {
+        const createdTime = vaga.created_at
+          ? new Date(vaga.created_at).getTime()
+          : vaga.criado_em
+            ? new Date(vaga.criado_em).getTime()
+            : new Date().getTime();
+        const currentTime = new Date().getTime();
+        const hoursDiff = (currentTime - createdTime) / (1000 * 60 * 60);
+
+        if (hoursDiff > maxHoursToCancel) {
+          alert(
+            `Tempo para cancelamento expirado (máximo ${maxHoursToCancel} horas).`,
+          );
+          setCancelModal({ isOpen: false, vagaId: "", vagaTitulo: "" });
+          return;
+        }
+      }
+
+      const { error } = await supabase
+        .from("vagas")
+        .update({ status: "Cancelada", updated_at: new Date().toISOString() })
+        .eq("id", cancelModal.vagaId);
+
+      if (error) throw error;
+
+      try {
+        await logAudit(
+          "Alterou Status Vaga",
+          "Gestão de Vagas",
+          `Vaga ${cancelModal.vagaTitulo} alterada para Cancelada.`,
+        );
+      } catch (logError) {
+        console.warn("Erro ao registrar log:", logError);
+      }
+
+      setCancelModal({ isOpen: false, vagaId: "", vagaTitulo: "" });
+    } catch (error) {
+      console.error("Erro ao cancelar vaga:", error);
+      alert("Erro ao cancelar vaga. Verifique as permissões.");
+    }
+  };
+
+  const renderSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ArrowUpDown className="w-3 h-3 text-slate-400" />;
+    }
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-primary" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-primary" />
+    );
+  };
+
+  const renderFilterInput = (key: string, label: string) => {
+    return (
+      <div className="flex flex-col gap-1">
+        <div
+          className="flex items-center justify-between cursor-pointer group"
+          onClick={() => handleSort(key)}
+        >
+          <span>{label}</span>
+          <div className="flex items-center gap-1">
+            {renderSortIcon(key)}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveFilterColumn(activeFilterColumn === key ? null : key);
+              }}
+              className={`p-1 rounded hover:bg-slate-200 ${columnFilters[key] ? "text-primary" : "text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"}`}
+              title="Filtrar coluna"
+            >
+              <Filter className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+        {activeFilterColumn === key && (
+          <input
+            type="text"
+            placeholder={`Filtrar...`}
+            value={columnFilters[key] || ""}
+            onChange={(e) => handleColumnFilterChange(key, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 px-2 py-1 text-xs font-normal border border-slate-300 rounded focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full"
+          />
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="flex gap-4 w-full max-w-2xl">
+          <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 flex-1">
+            <Search className="w-5 h-5 text-slate-400 ml-2" />
+            <input
+              type="text"
+              placeholder="Buscar vagas..."
+              className="w-full px-2 py-1 focus:outline-none"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/rh/vagas/nova")}
+          className="bg-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-accent transition-colors flex items-center gap-2 text-sm"
+        >
+          <Plus className="w-4 h-4" /> Nova Vaga
+        </button>
+      </div>
+
+      {loadingVagas ? (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-slate-500">Carregando vagas...</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center gap-3">
+            <label htmlFor="score-min-filter" className="text-sm font-medium text-slate-700">
+              Score IA mínimo
+            </label>
+            <select
+              id="score-min-filter"
+              value={scoreMinFilter}
+              onChange={(e) => setScoreMinFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            >
+              <option value="">Todos</option>
+              <option value="40">40+</option>
+              <option value="60">60+</option>
+              <option value="80">80+</option>
+            </select>
+            {scoreMinFilter !== "" && (
+              <button
+                type="button"
+                onClick={() => setScoreMinFilter("")}
+                className="text-xs font-medium text-slate-500 hover:text-slate-700"
+              >
+                Limpar
+              </button>
+            )}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50 text-slate-700 uppercase font-medium border-b border-slate-200">
+                <tr>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("codigo_vaga", "Código")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/4">
+                    {renderFilterInput("titulo", "Cargo")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("owner_nome", "Responsável")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("local", "Local")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("tipo", "Contrato")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("salario", "Salário")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("created_at", "Criada em")}
+                  </th>
+                  <th className="px-6 py-4 align-top w-1/6">Candidatos</th>
+                  <th className="px-6 py-4 align-top w-1/6">
+                    {renderFilterInput("status", "Status")}
+                  </th>
+                  <th className="px-6 py-4 text-center align-top">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filteredVagas.map((vaga) => (
+                  <tr
+                    key={vaga.id}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="px-6 py-4 font-mono text-xs text-slate-500">
+                      {vaga.codigo_vaga || "-"}
+                    </td>
+                    <td className="px-6 py-4 font-medium text-slate-900">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/rh/vagas/${vaga.id}`}
+                            className="hover:text-primary transition-colors"
+                          >
+                            {vaga.titulo}
+                          </Link>
+                        </div>
+                        {vaga.owner_id === profile?.uid && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 w-fit">
+                            Minha Vaga
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">
+                          {String(vaga.owner_nome || "S").charAt(0)}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs">
+                            {vaga.owner_nome || "Sem proprietário"}
+                          </span>
+                          {vaga.transferencia_ativa && (
+                            <div
+                              className="flex items-center gap-1 text-[10px] text-blue-600 font-medium"
+                              title={`Proprietário temporário até ${new Date(vaga.transferencia_temporaria?.data_retorno).toLocaleDateString("pt-BR")}. Proprietário original: ${vaga.transferencia_temporaria?.original_owner_nome}`}
+                            >
+                              <Clock className="w-3 h-3" />
+                              <span>Temporário</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {vaga.local || "Não especificado"}
+                    </td>
+                    <td className="px-6 py-4">
+                      {vaga.tipo || "Não especificado"}
+                    </td>
+                    <td className="px-6 py-4">
+                      {vaga.salario || "A combinar"}
+                    </td>
+                    <td className="px-6 py-4">
+                      {formatDateTime(vaga.created_at)}
+                    </td>
+                    <td className="px-6 py-4 text-center font-medium text-slate-700">
+                      ({candidaturasStats[vaga.id]?.total || 0} /{" "}
+                      {candidaturasStats[vaga.id]?.ativos || 0})
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          vaga.status === "Aberta"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : vaga.status === "Pausada"
+                              ? "bg-amber-100 text-amber-700"
+                              : vaga.status === "Encerrada"
+                                ? "bg-slate-100 text-slate-700"
+                                : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {vaga.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-center gap-2">
+                        {(() => {
+                          const status = vaga.status || "Aberta";
+                          return (
+                            <>
+                              {profile?.perfil === "Admin" && (
+                                <button
+                                  onClick={() =>
+                                    setTransferModal({ isOpen: true, vaga })
+                                  }
+                                  className="text-indigo-500 hover:text-indigo-700"
+                                  title="Transferir Proprietário"
+                                >
+                                  <Repeat className="w-5 h-5" />
+                                </button>
+                              )}
+                              {profile?.perfil === "Admin" ||
+                              vaga.owner_id === profile?.uid ? (
+                                <>
+                                  {status === "Aberta" && (
+                                    <button
+                                      onClick={() =>
+                                        handleUpdateStatus(vaga, "Pausada")
+                                      }
+                                      className="text-amber-500 hover:text-amber-700"
+                                      title="Pausar"
+                                    >
+                                      <PauseCircle className="w-5 h-5" />
+                                    </button>
+                                  )}
+                                  {status === "Pausada" && (
+                                    <button
+                                      onClick={() =>
+                                        handleUpdateStatus(vaga, "Aberta")
+                                      }
+                                      className="text-emerald-500 hover:text-emerald-700"
+                                      title="Retornar"
+                                    >
+                                      <PlayCircle className="w-5 h-5" />
+                                    </button>
+                                  )}
+                                  {(status === "Aberta" ||
+                                    status === "Pausada") && (
+                                    <>
+                                      {(() => {
+                                        const createdTime = vaga.created_at
+                                          ? new Date(vaga.created_at).getTime()
+                                          : vaga.criado_em
+                                            ? new Date(vaga.criado_em).getTime()
+                                            : new Date().getTime();
+                                        const currentTime =
+                                          new Date().getTime();
+                                        const hoursDiff =
+                                          (currentTime - createdTime) /
+                                          (1000 * 60 * 60);
+
+                                        if (hoursDiff <= maxHoursToCancel) {
+                                          return (
+                                            <button
+                                              onClick={() =>
+                                                handleAction(
+                                                  vaga.id,
+                                                  "Cancelar",
+                                                )
+                                              }
+                                              className="text-red-500 hover:text-red-700"
+                                              title="Cancelar Vaga"
+                                            >
+                                              <XCircle className="w-5 h-5" />
+                                            </button>
+                                          );
+                                        }
+                                        return (
+                                          <button
+                                            disabled
+                                            className="text-slate-300 cursor-not-allowed"
+                                            title={`Tempo para cancelamento expirado (máximo ${maxHoursToCancel} horas).`}
+                                          >
+                                            <XCircle className="w-5 h-5" />
+                                          </button>
+                                        );
+                                      })()}
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">
+                                  Apenas proprietário
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredVagas.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-6 py-8 text-center text-slate-500"
+                    >
+                      Nenhuma vaga encontrada com os filtros atuais.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Modal */}
+      {cancelModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-slate-900 mb-4">
+              Confirmar Cancelamento
+            </h3>
+            <p className="text-slate-600 mb-6">
+              Tem certeza que deseja cancelar a vaga{" "}
+              <strong>{cancelModal.vagaTitulo}</strong>? Esta ação não poderá
+              ser desfeita.
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() =>
+                  setCancelModal({ isOpen: false, vagaId: "", vagaTitulo: "" })
+                }
+                className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={confirmCancelVaga}
+                className="px-4 py-2 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Confirmar Cancelamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {transferModal.isOpen && transferModal.vaga && (
+        <TransferOwnerModal
+          isOpen={transferModal.isOpen}
+          onClose={() => setTransferModal({ isOpen: false, vaga: null })}
+          vaga={transferModal.vaga}
+          onSuccess={() => {
+            refreshVagas();
+            window.location.reload();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export function HRNovaVaga() {
+  const navigate = useNavigate();
+  const { profile } = useAuth();
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [exigeProva, setExigeProva] = useState("Não");
+  const [provasAtivas, setProvasAtivas] = useState<any[]>([]);
+  const [versoesAtivas, setVersoesAtivas] = useState<any[]>([]);
+  const [selectedProvaId, setSelectedProvaId] = useState("");
+  const [selectedProvaVersaoId, setSelectedProvaVersaoId] = useState("");
+  const [selectedCertificacoes, setSelectedCertificacoes] = useState<string[]>(
+    [],
+  );
+  const [outraCertificacao, setOutraCertificacao] = useState("");
+  const [rhUsers, setRhUsers] = useState<any[]>([]);
+  const [selectedOwnerId, setSelectedOwnerId] = useState("");
+  const [selectedOwnerNome, setSelectedOwnerNome] = useState("");
+
+  const [formData, setFormData] = useState({
+    titulo: "",
+    departamento: "",
+    local: "",
+    tipo: "",
+    status: "Aberta" as const,
+    descricao: "",
+    requisitos: "",
+    beneficios: "",
+    salario: "",
+    cep: "",
+    endereco: "",
+    quantidade_vagas: 1,
+  });
+
+  const [departamentos, setDepartamentos] = useState<
+    { id: string | number; nome: string }[]
+  >([]);
+
+  const [certificacoesPadrao, setCertificacoesPadrao] = useState<string[]>([
+    "Outros",
+  ]);
+
+  useEffect(() => {
+    if (profile && !selectedOwnerId) {
+      setSelectedOwnerId(profile.uid);
+      setSelectedOwnerNome(profile.nome);
+    }
+  }, [profile, selectedOwnerId]);
+
+  useEffect(() => {
+    const fetchConfig = async () => {
+      try {
+        const { data: deptsData, error: deptsError } = await supabase
+          .from("departamentos")
+          .select("*")
+          .order("nome");
+
+        if (!deptsError && deptsData) {
+          setDepartamentos(deptsData);
+        }
+
+        const { data: certsData, error: certsError } = await supabase
+          .from("certificacoes")
+          .select("*")
+          .order("nome");
+
+        if (!certsError && certsData) {
+          setCertificacoesPadrao([
+            ...certsData.map((c: any) => c.nome),
+            "Outros",
+          ]);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar configurações:", error);
+      }
+    };
+    fetchConfig();
+
+    const fetchRHUsers = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, nome")
+          .in("perfil", ["RH", "Admin"]);
+
+        if (error) throw error;
+        const users = (data || []).map((u) => ({
+          uid: u.id,
+          nome: u.nome,
+        }));
+        setRhUsers(users);
+      } catch (error) {
+        console.error("Erro ao buscar usuários RH:", error);
+      }
+    };
+    fetchRHUsers();
+
+    const fetchProvasAtivas = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("provas")
+          .select("id, nome")
+          .eq("ativo", true)
+          .order("nome");
+
+        if (error) throw error;
+        setProvasAtivas(data || []);
+      } catch (error) {
+        console.error("Erro ao buscar provas ativas:", error);
+      }
+    };
+    fetchProvasAtivas();
+  }, []);
+
+  useEffect(() => {
+    const fetchVersoes = async () => {
+      if (!selectedProvaId) {
+        setVersoesAtivas([]);
+        setSelectedProvaVersaoId("");
+        return;
+      }
+      try {
+        const { data, error } = await supabase
+          .from("provas_versoes")
+          .select("id, versao")
+          .eq("prova_id", selectedProvaId)
+          .order("versao", { ascending: false });
+
+        if (error) throw error;
+        const versoes = data || [];
+        setVersoesAtivas(versoes);
+        setSelectedProvaVersaoId(versoes[0]?.id || "");
+      } catch (error) {
+        console.error("Erro ao buscar versões:", error);
+        setSelectedProvaVersaoId("");
+      }
+    };
+    fetchVersoes();
+  }, [selectedProvaId]);
+
+  const handleCertificacaoChange = (cert: string) => {
+    if (selectedCertificacoes.includes(cert)) {
+      setSelectedCertificacoes(selectedCertificacoes.filter((c) => c !== cert));
+    } else {
+      setSelectedCertificacoes([...selectedCertificacoes, cert]);
+    }
+  };
+
+  const handleInputChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    console.log("--- INICIANDO SALVAMENTO DE VAGA ---");
+    console.log("DADOS DA VAGA:", formData);
+    console.log("PROFILE:", profile);
+    console.log("OWNER:", { selectedOwnerId, selectedOwnerNome });
+
+    if (!profile?.uid) {
+      console.error("Profile UID is missing:", profile);
+      alert("Você precisa estar logado para criar uma vaga.");
+      return;
+    }
+
+    if (Number(formData.quantidade_vagas) < 1) {
+      alert("A quantidade de vagas deve ser no mínimo 1.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+
+      const codigo_vaga = `VAG-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+      const vagaData = {
+        codigo_vaga,
+        titulo: formData.titulo,
+        departamento: formData.departamento,
+        local: formData.local,
+        tipo: formData.tipo,
+        status: "Aberta", // Enforce Aberta
+        status_vaga: "ABERTA",
+        quantidade_vagas: Number(formData.quantidade_vagas),
+        quantidade_contratada: 0,
+        descricao: formData.descricao,
+        requisitos: formData.requisitos,
+        beneficios: formData.beneficios,
+        salario: formData.salario,
+        criado_por: profile?.uid,
+        owner_id: selectedOwnerId,
+        owner_nome: selectedOwnerNome,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Adicionais para o app
+        cep: formData.cep,
+        endereco: formData.endereco,
+        exige_prova: exigeProva === "Sim",
+        prova_id: exigeProva === "Sim" ? selectedProvaId : null,
+        prova_versao_id: exigeProva === "Sim" ? selectedProvaVersaoId : null,
+        certificacoes: selectedCertificacoes.includes("Outros")
+          ? [
+              ...selectedCertificacoes.filter((c) => c !== "Outros"),
+              outraCertificacao,
+            ]
+          : selectedCertificacoes,
+        secao: "Triagem",
+      };
+
+      console.log("PAYLOAD VAGA:", vagaData);
+
+      const { data: insertedData, error } = await supabase
+        .from("vagas")
+        .insert(vagaData)
+        .select();
+
+      if (error) {
+        console.error("ERRO SUPABASE INSERT:", error);
+        throw error;
+      }
+
+      console.log("VAGA INSERIDA:", insertedData);
+
+      // Log action
+      try {
+        await logAudit(
+          "Criou Vaga",
+          "Gestão de Vagas",
+          `Vaga ${formData.titulo} criada.`,
+        );
+      } catch (logError) {
+        console.warn("Erro ao registrar log:", logError);
+      }
+
+      setIsSaved(true);
+      setTimeout(() => {
+        setIsSaved(false);
+        navigate("/rh/vagas");
+      }, 2000);
+    } catch (error) {
+      console.error("Erro ao criar vaga:", error);
+      alert(
+        "Erro ao criar vaga. Verifique as permissões ou o console para mais detalhes.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl space-y-6">
+      <div className="flex items-center gap-4 mb-6">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-slate-500 hover:text-slate-900"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <h2 className="text-2xl font-bold text-slate-900">Criar Nova Vaga</h2>
+      </div>
+
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Informações Básicas */}
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
+              Informações Básicas
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Responsável pela Vaga <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                  value={selectedOwnerId}
+                  onChange={(e) => {
+                    const user = rhUsers.find((u) => u.uid === e.target.value);
+                    if (user) {
+                      setSelectedOwnerId(user.uid);
+                      setSelectedOwnerNome(user.nome);
+                    }
+                  }}
+                >
+                  <option value="">Selecione um responsável</option>
+                  {rhUsers.map((user) => (
+                    <option key={user.uid} value={user.uid}>
+                      {user.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Título da Vaga <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="text"
+                  name="titulo"
+                  value={formData.titulo || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Ex: Desenvolvedor Front-end Sênior"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Departamento / Área <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  name="departamento"
+                  value={formData.departamento || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                >
+                  <option value="">Selecione</option>
+                  {departamentos.map((dept) => (
+                    <option key={dept.id} value={dept.nome}>
+                      {dept.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Modelo de Trabalho <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  name="local"
+                  value={formData.local || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                >
+                  <option value="">Selecione</option>
+                  <option value="Presencial">Presencial</option>
+                  <option value="Híbrido">Híbrido</option>
+                  <option value="Remoto">Remoto</option>
+                </select>
+              </div>
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Endereço / Local de Trabalho{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    name="endereco"
+                    value={formData.endereco || ""}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    placeholder="Ex: Rua Exemplo, 123 - São Paulo, SP"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    CEP <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    required
+                    type="text"
+                    name="cep"
+                    value={formData.cep || ""}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    placeholder="00000-000"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Tipo de Contrato <span className="text-red-500">*</span>
+                </label>
+                <select
+                  required
+                  name="tipo"
+                  value={formData.tipo || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                >
+                  <option value="">Selecione</option>
+                  <option value="CLT">CLT</option>
+                  <option value="PJ">PJ</option>
+                  <option value="Estágio">Estágio</option>
+                  <option value="Temporário">Temporário</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Quantidade de Vagas <span className="text-red-500">*</span>
+                </label>
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  name="quantidade_vagas"
+                  value={formData.quantidade_vagas || 1}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Faixa Salarial
+                </label>
+                <input
+                  type="text"
+                  name="salario"
+                  value={formData.salario || ""}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Ex: R$ 5.000 - R$ 7.000 (Opcional)"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Descrição e Requisitos */}
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
+              Descrição e Requisitos
+            </h3>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Descrição da Vaga <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  name="descricao"
+                  value={formData.descricao || ""}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Descreva as responsabilidades e o dia a dia da função..."
+                ></textarea>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Requisitos e Qualificações{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  required
+                  name="requisitos"
+                  value={formData.requisitos || ""}
+                  onChange={handleInputChange}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Liste os requisitos técnicos e comportamentais..."
+                ></textarea>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Benefícios
+                </label>
+                <textarea
+                  name="beneficios"
+                  value={formData.beneficios || ""}
+                  onChange={handleInputChange}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Liste os benefícios oferecidos..."
+                ></textarea>
+              </div>
+            </div>
+          </div>
+
+          {/* Avaliação e Certificações */}
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200">
+              Avaliação e Certificações
+            </h3>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Necessário Prova de Avaliação?{" "}
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                    value={exigeProva}
+                    onChange={(e) => setExigeProva(e.target.value)}
+                  >
+                    <option value="Não">Não</option>
+                    <option value="Sim">Sim</option>
+                  </select>
+                </div>
+                {exigeProva === "Sim" && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Qual Prova? <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      required
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+                      value={selectedProvaId}
+                      onChange={(e) => {
+                        setSelectedProvaId(e.target.value);
+                        setSelectedProvaVersaoId("");
+                      }}
+                    >
+                      <option value="">Selecione uma prova</option>
+                      {provasAtivas.map((prova) => (
+                        <option key={prova.id} value={prova.id}>
+                          {prova.nome}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-3">
+                  Certificações Desejadas / Obrigatórias
+                </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                  {certificacoesPadrao.map((cert) => (
+                    <label
+                      key={cert}
+                      className="flex items-start gap-2 cursor-pointer group"
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1 w-4 h-4 text-primary border-slate-300 rounded focus:ring-primary"
+                        checked={selectedCertificacoes.includes(cert)}
+                        onChange={() => handleCertificacaoChange(cert)}
+                      />
+                      <span className="text-sm text-slate-700 group-hover:text-slate-900 leading-tight">
+                        {cert}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {selectedCertificacoes.includes("Outros") && (
+                  <div className="mt-3">
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      placeholder="Especifique outras certificações..."
+                      value={outraCertificacao}
+                      onChange={(e) => setOutraCertificacao(e.target.value)}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+            <p className="text-sm text-slate-500">
+              <span className="text-red-500">*</span> Campos obrigatórios
+            </p>
+            <div className="flex items-center gap-4">
+              {isSaved && (
+                <span className="text-emerald-600 font-medium text-sm flex items-center gap-1">
+                  <CheckCircle className="w-4 h-4" /> Vaga publicada com
+                  sucesso!
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="text-slate-600 px-6 py-2 rounded-lg font-medium hover:bg-slate-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                onClick={() => console.log("Botão Publicar Vaga clicado!")}
+                className="bg-primary text-white px-6 py-2 rounded-lg font-medium hover:bg-accent transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSaving ? (
+                  "Publicando..."
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" /> Publicar Vaga
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export function HRPlaceholder({ title }: { title: string }) {
+  return (
+    <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center">
+      <h2 className="text-2xl font-bold text-slate-900 mb-2">{title}</h2>
+      <p className="text-slate-500">Esta página está em construção.</p>
+    </div>
+  );
+}
+
+export function HRCandidatos() {
+  const [selectedVaga, setSelectedVaga] = useState<string | null>(null);
+  const [filterEducation, setFilterEducation] = useState("Todos");
+  const [scoreMinFilter, setScoreMinFilter] = useState("");
+  const [selectedCandidates, setSelectedCandidates] = useState<string[]>([]);
+  const [selectedCandidato, setSelectedCandidato] = useState<any>(null);
+  const [selectedCandidaturaId, setSelectedCandidaturaId] = useState<
+    string | null
+  >(null);
+
+  // Sorting and filtering state for Vagas table
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  } | null>({ key: "criadaEm", direction: "desc" });
+  const [columnFilters, setColumnFilters] = useState<{ [key: string]: string }>(
+    {},
+  );
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(
+    null,
+  );
+
+  // Sorting state for Candidatos table
+  const [candidatosSortConfig, setCandidatosSortConfig] = useState<{
+    key: string;
+    direction: "asc" | "desc";
+  } | null>(null);
+
+
+  const [candidaturas, setCandidaturas] = useState<any[]>([]);
+  const [candidatos, setCandidatos] = useState<any[]>([]);
+  const [vagas, setVagas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const { profile } = useAuth();
+
+  const fetchData = async () => {
+    try {
+      const [vagasRes, candidaturasRes] = await Promise.all([
+        supabase.from("vagas").select("*, provas(nome)"),
+        supabase.from("candidaturas").select("*"),
+      ]);
+
+      const candidaturasData = candidaturasRes.data || [];
+      setCandidaturas(candidaturasData);
+
+      const vagasData = (vagasRes.data || []).map((vData) => {
+        const cCount =
+          candidaturasData?.filter((c) => {
+            const fase = String(c.fase || "Triagem")
+              .trim()
+              .toLowerCase();
+            return (
+              c.vaga_id === vData.id &&
+              fase === "triagem" &&
+              c.status !== "REPROVADA"
+            );
+          }).length || 0;
+        const novidadesCount = candidaturasData.filter((c) => {
+          const fase = String(c.fase || "Triagem")
+            .trim()
+            .toLowerCase();
+          return (
+            vData.id === c.vaga_id &&
+            fase === "triagem" &&
+            !c.visualizado &&
+            c.status !== "REPROVADA"
+          );
+        }).length;
+        return {
+          ...vData,
+          id: vData.id,
+          codigo_vaga: vData.codigo_vaga || null,
+          cargo: vData.titulo,
+          criadaEm: vData.created_at || "",
+          status: vData.status,
+          candidaturas: cCount,
+          exigeProva: vData.exige_prova,
+          provas: vData.provas,
+          novidades: novidadesCount,
+          ownerId: vData.owner_id,
+        };
+      });
+      setVagas(vagasData.filter((v) => v.candidaturas > 0));
+
+      const candidaturasTriagem = candidaturasData.filter((c) => {
+        const fase = String(c.fase || "Triagem")
+          .trim()
+          .toLowerCase();
+        return fase === "triagem" && c.status !== "REPROVADA";
+      });
+      const candidatoIds = Array.from(
+        new Set(candidaturasTriagem.map((c) => c.candidato_id)),
+      );
+
+      const [candidatosRes, iaDataRes] = await Promise.all([
+        supabase
+          .from("candidatos")
+          .select("id,user_id,nome,resume_data")
+          .in("id", candidatoIds),
+        supabase
+          .from("analise_ia_candidato")
+          .select("candidatura_id,status")
+          .in("candidatura_id", candidaturasTriagem.map((c) => c.id)),
+      ]);
+      const candidatosDb = candidatosRes.data || [];
+      const iaData = iaDataRes.data || [];
+
+      const userIds = Array.from(
+        new Set(candidatosDb.map((c) => c.user_id).filter(Boolean)),
+      );
+      const { data: usersData } = userIds.length
+        ? await supabase
+            .from("users")
+            .select("id,uid,nome,email,resume_data")
+            .in("id", userIds)
+        : { data: [] as any[] };
+
+      const candidatosData = candidaturasTriagem.map((cData) => {
+        const candidatoDb: any =
+          candidatosDb.find((c) => c.id === cData.candidato_id) || {};
+        const userData: any =
+          (usersData || []).find((u) => u.id === candidatoDb.user_id) || {};
+        const resumeData = getResumeData(
+          userData.resume_data || candidatoDb.resume_data,
+        );
+        const iaScore: any = iaData.find(
+          (ia) => ia.candidatura_id === cData.id,
+        );
+
+        return {
+          id: cData.id,
+          vagaId: cData.vaga_id,
+          nome: userData.nome || candidatoDb.nome || "Desconhecido",
+          formacao: resumeData.formacao || "Não informada",
+          status: cData.status,
+          fase: cData.fase || "Triagem",
+          dataCandidatura: cData.data_candidatura || "",
+          idade: calcularIdade(
+            resumeData.dataNascimento || resumeData.data_nascimento,
+          ),
+          localizacao: getLocalizacao(resumeData),
+          candidato: { ...candidatoDb, ...userData },
+          visualizado: cData.visualizado,
+          rhVisualizouRecrutamento: cData.rh_visualizou_recrutamento,
+          score_total: cData.score_ia ?? null,
+          ai_status: iaScore?.status || (cData.score_ia != null ? "completed" : "pending"),
+        } as any;
+      });
+      setCandidatos(candidatosData);
+    } catch (error) {
+      console.error("Erro ao carregar dados do RH:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const formatDateTime = (isoString: string) => {
+    if (!isoString) return "-";
+    const date = new Date(isoString);
+    return date.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const handleSort = (key: string) => {
+    let direction: "asc" | "desc" = "asc";
+    if (
+      sortConfig &&
+      sortConfig.key === key &&
+      sortConfig.direction === "asc"
+    ) {
+      direction = "desc";
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleCandidatosSort = (key: string) => {
+    let direction: "asc" | "desc" = "asc";
+    if (
+      candidatosSortConfig &&
+      candidatosSortConfig.key === key &&
+      candidatosSortConfig.direction === "asc"
+    ) {
+      direction = "desc";
+    }
+    setCandidatosSortConfig({ key, direction });
+  };
+
+  const renderCandidatosSortIcon = (key: string) => {
+    if (!candidatosSortConfig || candidatosSortConfig.key !== key) {
+      return <ArrowUpDown className="w-3 h-3 text-slate-400" />;
+    }
+    return candidatosSortConfig.direction === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-primary" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-primary" />
+    );
+  };
+
+  const handleColumnFilterChange = (key: string, value: string) => {
+    setColumnFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const filteredVagas = vagas
+    .filter((vaga) => {
+      const matchesSearch = vaga.cargo
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      if (!matchesSearch) return false;
+
+      for (const [key, value] of Object.entries(columnFilters)) {
+        if (!value) continue;
+
+        let itemValue = String(
+          vaga[key as keyof typeof vaga] || "",
+        ).toLowerCase();
+        if (key === "criadaEm") {
+          itemValue = formatDateTime(vaga.criadaEm).toLowerCase();
+        }
+
+        if (!itemValue.includes(String(value).toLowerCase())) {
+          return false;
+        }
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // Sort by novidades first
+      if ((a.novidades || 0) > 0 && !(b.novidades > 0)) return -1;
+      if (!(a.novidades > 0) && (b.novidades || 0) > 0) return 1;
+
+      if (!sortConfig) return 0;
+      const { key, direction } = sortConfig;
+
+      let aValue: any = a[key as keyof typeof a];
+      let bValue: any = b[key as keyof typeof b];
+
+      if (key === "criadaEm") {
+        aValue = new Date(a.criadaEm).getTime();
+        bValue = new Date(b.criadaEm).getTime();
+      } else {
+        aValue = String(aValue).toLowerCase();
+        bValue = String(bValue).toLowerCase();
+      }
+
+      if (aValue < bValue) return direction === "asc" ? -1 : 1;
+      if (aValue > bValue) return direction === "asc" ? 1 : -1;
+      return 0;
+    });
+
+  const renderSortIcon = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <ArrowUpDown className="w-3 h-3 text-slate-400" />;
+    }
+    return sortConfig.direction === "asc" ? (
+      <ArrowUp className="w-3 h-3 text-primary" />
+    ) : (
+      <ArrowDown className="w-3 h-3 text-primary" />
+    );
+  };
+
+  const renderFilterInput = (key: string, label: string) => {
+    return (
+      <div className="flex flex-col gap-1">
+        <div
+          className="flex items-center justify-between cursor-pointer group"
+          onClick={() => handleSort(key)}
+        >
+          <span>{label}</span>
+          <div className="flex items-center gap-1">
+            {renderSortIcon(key)}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveFilterColumn(activeFilterColumn === key ? null : key);
+              }}
+              className={`p-1 rounded hover:bg-slate-200 ${columnFilters[key] ? "text-primary" : "text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity"}`}
+              title="Filtrar coluna"
+            >
+              <Filter className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+        {activeFilterColumn === key && (
+          <input
+            type="text"
+            placeholder={`Filtrar...`}
+            value={columnFilters[key] || ""}
+            onChange={(e) => handleColumnFilterChange(key, e.target.value)}
+            onClick={(e) => e.stopPropagation()}
+            className="mt-1 px-2 py-1 text-xs font-normal border border-slate-300 rounded focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full"
+          />
+        )}
+      </div>
+    );
+  };
+
+  const scoreMin = scoreMinFilter === "" ? null : Number(scoreMinFilter);
+  const filteredCandidatos = selectedVaga
+    ? candidatos.filter(
+        (c) =>
+          c.vagaId === selectedVaga &&
+          (filterEducation === "Todos" || c.formacao === filterEducation) &&
+          (scoreMin === null ||
+            (c.score_total != null && Number(c.score_total) >= scoreMin)),
+      )
+    : [];
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedCandidates(filteredCandidatos.map((c) => c.id));
+    } else {
+      setSelectedCandidates([]);
+    }
+  };
+
+  const handleSelectCandidate = (id: string) => {
+    if (selectedCandidates.includes(id)) {
+      setSelectedCandidates(selectedCandidates.filter((cId) => cId !== id));
+    } else {
+      setSelectedCandidates([...selectedCandidates, id]);
+    }
+  };
+
+  const handleAction = async (action: "Aprovar" | "Reprovar" | "Reserva") => {
     if (selectedCandidates.length === 0) return;
 
     const vaga = vagas.find((v) => v.id === selectedVaga);
@@ -666,9 +5186,7 @@ function CandidateProfileModal({
               console.error("Falha ao consultar candidatura da ação em massa:", id, fetchError);
               return { id, ok: false as const, reason: "consulta" };
             }
-            if (!currentData) {
-              return { id, ok: false as const, reason: "indisponível" };
-            }
+            if (!currentData) return { id, ok: false as const, reason: "indisponível" };
 
             const currentFase = currentData.fase || currentData.status || "Triagem";
             const stages = getStages(vaga);
@@ -729,8 +5247,6 @@ function CandidateProfileModal({
                 profile?.id,
               );
             } catch (historyError) {
-              // O estágio já foi gravado pela RPC. Reportamos a falha de histórico
-              // separadamente, sem contabilizar a transição como se tivesse falhado.
               historyFailures.push(id);
               console.error("Transição concluída, mas falhou o histórico:", id, historyError);
             }
@@ -768,9 +5284,7 @@ function CandidateProfileModal({
         console.warn("Transições processadas, mas falhou a auditoria da ação em massa:", logError);
       }
 
-      // Mantém selecionadas somente as candidaturas que precisam de nova tentativa.
       setSelectedCandidates(failed.map((item) => item.id));
-
       if (failed.length === 0 && historyFailures.length === 0) {
         alert(`Ação aplicada a ${succeeded.length} candidatos.`);
       } else {
