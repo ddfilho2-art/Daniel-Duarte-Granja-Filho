@@ -672,7 +672,7 @@ function CandidateProfileModal({
         newStatus = "RESERVA";
       }
 
-      if (newFase === "Contratado") newStatus = "APROVADA";
+      if (newFase === "Contratado") newStatus = "Contratado";
 
       const payload = {
         fase: newFase,
@@ -1883,9 +1883,7 @@ export function HRDashboard() {
 
         const totalCandidaturas = candidaturas.length;
         const contratados = candidaturas.filter((c: any) => {
-          const status = c.status;
-          const fase = c.fase || "Triagem";
-          return status === "APROVADA" || fase === "Contratado";
+          return String(c.status || "").trim().toLowerCase() === "contratado";
         }).length;
         const taxaConversao =
           totalCandidaturas > 0
