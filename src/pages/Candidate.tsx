@@ -1651,9 +1651,15 @@ export function CandidateVagas() {
 
         if (error) throw error;
 
-        let finalVagas = data || [];
+        let finalVagas = (data || []).filter((vaga) => {
+          const total = Number(vaga.quantidade_vagas);
+          const contratadas = Number(vaga.quantidade_contratada || 0);
+          // Before the migration is applied, keep legacy rows visible; after it,
+          // hide vacancies whose contracted headcount has been reached.
+          return !Number.isFinite(total) || total < 1 || contratadas < total;
+        });
 
-        if (profile?.uid && tenant?.id && finalVagas.length > 0) {
+        if (profile?.uid && tenant?.id && finalVagas.length > 0)
           const candidate = await loadCurrentCandidate(tenant.id, profile.uid);
           if (candidate) {
             const { data: candidaturas } = await supabase
@@ -1757,8 +1763,13 @@ export function CandidateVagas() {
       selectedVaga.status || selectedVaga.status_vaga || "",
     ).toUpperCase();
 
-    if (vagaStatus !== "ABERTA") {
-      alert("Esta vaga não está disponível para candidatura");
+    const totalVagas = Number(selectedVaga.quantidade_vagas);
+    const contratadas = Number(selectedVaga.quantidade_contratada || 0);
+    if (
+      vagaStatus !== "ABERTA" ||
+      (Number.isFinite(totalVagas) && totalVagas > 0 && contratadas >= totalVagas)
+    ) {
+      alert("Esta vaga não está mais disponível para candidatura. A quantidade de posições pode ter sido preenchida.");
       return;
     }
 
@@ -1881,9 +1892,16 @@ export function CandidateVagas() {
       setModalType("success");
     } catch (error: any) {
       console.error("Erro ao se candidatar:", error);
-      alert(
-        `Erro ao realizar candidatura: ${error.message || "Tente novamente."}`,
-      );
+      const code = String(error?.message || "");
+      const message =
+        code === "vacancy_not_available" || code === "vacancy_headcount_reached"
+          ? "Esta vaga não está mais disponível para candidatura. A quantidade de posições pode ter sido preenchida."
+          : code === "already_applied"
+            ? "Você já se candidatou a esta vaga."
+            : code === "resume_incomplete"
+              ? "Seu currículo ainda não está completo."
+              : error.message || "Tente novamente.";
+      alert(`Erro ao realizar candidatura: ${message}`);
     } finally {
       setIsApplying(false);
     }
