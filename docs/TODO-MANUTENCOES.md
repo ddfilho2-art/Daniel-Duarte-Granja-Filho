@@ -859,3 +859,22 @@ Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-con
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
+
+
+## Manutenção integrada — Lote 17: ciclo de vida clínico (2026-10-11)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Revisar os principais caminhos de escrita da interface clínica | Concluído — revisão estática | OccupationalHealth.tsx e ClinicOperations.tsx usam RPCs nos fluxos revisados; isso não substitui inventário integral de todos os escritores |
+| Revogar UPDATE direto em medical_referrals para clientes autenticados | Implementado — não validado | Migration 20261011160000_harden_medical_referral_writes_and_transitions.sql; confirmar todos os escritores e grants efetivos antes de aplicar |
+| Endurecer sequência de status clínico | Implementado — não validado | referred → scheduled → attended → result_reported → completed; saltos, regressões e alteração após completed rejeitados |
+| Exigir data e local para agendamento | Implementado — não validado | Validação no backend da RPC update_medical_referral |
+| Exigir resultado explícito e autorização para registrar resultado | Implementado — não validado | Resultado não pode ficar pending; somente administrador clínico ou médico atribuído pode registrar resultado |
+| Corrigir lista de exames admissionais para usuário com papel de scheduler e médico | Implementado — não validado | A visão ampla operacional prevalece quando o usuário também é scheduler; médico sem papel administrativo só vê os próprios exames |
+| Inventariar todos os escritores em clientes, Edge Functions e integrações | Em progresso — 40% | Páginas principais revisadas; inventário completo de funções Edge/jobs/consumidores externos ainda pendente |
+| Revisar grants/RLS e owner das RPCs SECURITY DEFINER | Em progresso — 50% | Migration e contratos revisados estaticamente; ainda não confirmado em banco de homologação |
+| Identificar dados clínicos legados incompatíveis com a sequência | Não iniciado — 0% | Somente relatório; nenhuma alteração automática de dados |
+| Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar antes de concluir a implementação integrada |
+| Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita; deploy continua manual |
+
+Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md).
