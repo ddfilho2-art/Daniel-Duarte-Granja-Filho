@@ -784,3 +784,17 @@ Documento: [status do Lote 10](maintenance/2026-10-11-lote10-excecoes-fifo.md).
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [status do Lote 11](maintenance/2026-10-11-lote11-agendamento-cancelamento-complementares.md).
+
+
+## Manutenção — 2026-10-11 — Lote 12: relatório macro de faturamento
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Diferenciar itens faturáveis, em rascunho e faturados | Implementado no código — não validado | RPC get_occupational_health_billing_macro_report_v2 |
+| Separar valor em rascunho, faturado e ajustes | Implementado no código — não validado | Relatório por empresa/período |
+| UI e exportação CSV | Implementado no código — não validado | ClinicBilling consome a RPC v2 |
+| Reconciliação e isolamento por tenant | Adiado para a etapa final | Conferir com ciclos e itens detalhados |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 12](maintenance/2026-10-11-lote12-relatorio-macro-faturamento.md).
