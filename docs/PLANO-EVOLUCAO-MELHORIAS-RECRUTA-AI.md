@@ -439,3 +439,15 @@ Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11
 - **Ajustes motivados pelo primeiro type-check:** corrigida condição sem chaves na lista de vagas do candidato; contratos de resolveAuthorizedHomePath; tipo da importação lazy de TenantClinicChat; EventoTipo com DESISTÊNCIA e retorno booleano do registro de evento; estado calendarTimezone; confiabilidade das ações individuais/em massa.
 - **Status geral dos lotes 16–19:** Implementado em código; **não validado integralmente**. Não houve aplicação de migration no Supabase remoto e nenhum E2E funcional de banco/clínica foi executado.
 - Próxima etapa obrigatória: executar [o plano integrado dos Lotes 16–19](maintenance/2026-10-11-validacao-integrada-lotes16-19.md) em ambiente de homologação depois de aprovar a aplicação das migrations.
+
+
+## Registro de liberação dos Lotes 16–19 — 2026-10-11
+
+A revisão integrada foi mergeada em `main` e as migrations correspondentes foram aplicadas no Supabase de produção por ordem explícita do responsável, sem ambiente separado de homologação. O histórico remoto passou de 110 para 138 migrations registradas, incluindo a migration adicional `20261011180000_revoke_trigger_function_execute.sql`.
+
+- **Concluído:** type-check e build na CI do PR; replay local de toda a cadeia de migrations; merge do PR #10; aplicação e verificação no catálogo remoto das tabelas, colunas, RPCs e grants principais.
+- **Em progresso — validação funcional pendente:** transições de candidatura, desistência/auditoria, contratação condicionada ao exame admissional apto, concorrência de headcount, fila clínica, atribuição médica, exames complementares, faturamento e relatórios.
+- **Pendente:** deploy manual da Vercel pelo responsável e smoke tests com fixtures de desenvolvimento. A consulta imediatamente anterior à aplicação retornou zero registros em vagas, candidaturas, encaminhamentos clínicos e contratos clínicos; não houve E2E funcional contra dados reais.
+- **Pendente:** triagem de avisos remanescentes do linter de segurança. As tabelas novas de clínica/faturamento consultadas não concedem acesso direto às roles de cliente, mas ainda há findings RLS sem policy e warnings de funções SECURITY DEFINER que precisam ser avaliados separadamente.
+
+Referência operacional atualizada: [Plano de liberação main + Supabase](maintenance/2026-10-11-plano-liberacao-main-supabase.md). O histórico anterior deste roadmap registra o estado antes da aplicação remota; este registro mais recente o atualiza sem afirmar que os fluxos estejam funcionalmente homologados.
