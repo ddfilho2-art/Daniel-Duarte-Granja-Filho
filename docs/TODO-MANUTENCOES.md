@@ -742,3 +742,17 @@ Documento: [status do Lote 7](maintenance/2026-10-11-lote7-catalogo-servicos.md)
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita; produção intocada |
 
 Documento: [status do Lote 8](maintenance/2026-10-11-lote8-integridade-historico-faturamento.md).
+
+
+## Manutenção — 2026-10-11 — Lote 9: contexto operacional por clínica
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| RPC de clínicas operacionais associadas | Implementado no código — não validado | list_my_clinic_operational_tenants retorna apenas associações ativas e perfil permitido |
+| Seletor de clínica para equipe/médico | Implementado no código — não validado | Contexto explícito em ClinicOperations |
+| Ocultar abas administrativas para perfil sem permissão | Implementado no código — não validado | Catálogo/faturamento só aparecem para clinic_admin na clínica selecionada |
+| Testes negativos por perfil/tenant | Adiado para a etapa final | Exercitar RPC diretamente, inclusive tentativa de tenant cruzado |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 9](maintenance/2026-10-11-lote9-contexto-operacional-clinica.md).
