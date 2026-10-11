@@ -812,3 +812,18 @@ Documento: [status do Lote 12](maintenance/2026-10-11-lote12-relatorio-macro-fat
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [status do Lote 13](maintenance/2026-10-11-lote13-fila-escopada-por-clinica.md).
+
+
+## Manutenção — 2026-10-11 — Lote 14: desistência de candidatura controlada por RH
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| RPC autorizada por tenant/papel | Implementado no código — não validado | rpc_cancelar_candidatura_rh exige RH/admin autorizado e justificativa |
+| Encerramento com motivo e auditoria | Implementado no código — não validado | Status Desistência, fase Encerrado, motivo e audit log |
+| Ação específica na interface RH | Implementado no código — não validado | Formulário separado de reprovação |
+| Proteger contratado/estados terminais | Implementado no código — não validado | RPC bloqueia contratado, reprovado e desistência repetida |
+| Testes de segurança e headcount | Adiado para a etapa final | Incluir acesso sem papel, tenant cruzado e contador derivado |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 14](maintenance/2026-10-11-lote14-desistencia-candidatura-rh.md).
