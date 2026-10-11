@@ -4,7 +4,7 @@
 
 - PR de consolidação: [#10](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/pull/10) — **mergeado** por squash em `d50153b097ad6d03258a9573709d78a65654d41f`.
 - Branch: `maintenance/lote-1-integridade-clinica-contratacao-20261010`.
-- HEAD atual de `main`: `845f577f955719ebce73841471d0ddf65fe4ac1d` (`fix(security): restrict trigger functions to trigger execution`).
+- Commit de aplicação mais recente: `845f577f955719ebce73841471d0ddf65fe4ac1d` (`fix(security): restrict trigger functions to trigger execution`). Os commits posteriores na `main` atualizaram documentação de liberação, base de conhecimento, TODO e roadmap, sem alteração do código da aplicação.
 - Type-check e build: passaram na CI do PR no commit `20944bdce5e7b50aa3c06671f5595e5e6b1dd9f9`. O commit posterior em `main` adicionou apenas uma migration SQL; não houve alteração de código de interface.
 - Replay da cadeia completa de migrations em Supabase local: **passou** na CI do PR, incluindo inicialização local e aplicação de toda a cadeia versionada.
 - Supabase de produção `dmzagrakkduddofkqjhg`: histórico consultado contém **138 migrations**. O conjunto clínico/contratação/faturamento foi aplicado e confirmado na listagem remota; o registro mais recente é `20261011162121` (`revoke_trigger_function_execute`). Tabelas, colunas e RPCs esperadas foram conferidas no catálogo.
