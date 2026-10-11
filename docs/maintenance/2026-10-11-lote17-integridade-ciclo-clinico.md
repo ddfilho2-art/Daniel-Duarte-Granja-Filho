@@ -15,7 +15,7 @@ Ampliar a manutenção de integridade para além da candidatura, cobrindo a oper
 - src/pages/OccupationalHealth.tsx usa list_my_medical_referrals para leitura e update_medical_referral para mudanças de estado.
 - src/pages/ClinicOperations.tsx usa RPCs para listar fila por clínica, assumir exame, devolver à fila, priorizar e consultar encaminhamentos.
 - As Edge Functions apply-to-vacancy, tenant-clinic-chat-storage e storage-authorize foram inspecionadas quanto a UPDATEs diretos em medical_referrals; nenhum foi localizado nos caminhos revisados.
-- A política histórica medical_referrals_update_policy permite UPDATE para membros clínicos ativos. Uma política RLS isolada não impede alteração direta por um membro autorizado pela política; os campos operacionais devem ser alterados por caminhos de negócio controlados.
+- A policy histórica medical_referrals_update_policy permite UPDATE em termos de RLS para membros clínicos ativos, mas a migration fundacional 20260808090000 já revogava todos os privilégios de tabela de public.medical_referrals para PUBLIC, anon e authenticated e concedia acesso de tabela ao service_role. Assim, a revisão não prova que havia bypass de UPDATE direto ativo. O REVOKE explícito deste lote torna a intenção mais clara e adiciona defesa em profundidade.
 - list_clinic_referrals_for_complementary_exam filtrava somente os exames do médico quando o mesmo usuário também tinha papel de scheduler. Isso ocultava parte da visão operacional de usuários com papéis combinados.
 
 ## Alterações realizadas
@@ -35,7 +35,7 @@ A RPC update_medical_referral agora aceita apenas a progressão:
 3. attended → result_reported
 4. result_reported → completed
 
-São rejeitados saltos, regressões e alterações após completed. O agendamento exige data e local. Registrar resultado exige perfil autorizado (administrador clínico ou médico atribuído) e resultado diferente de pending. O resultado e a alteração continuam registrados na auditoria.
+São rejeitados saltos, regressões e alterações após completed. O agendamento exige data e local. Registrar resultado exige perfil autorizado (administrador clínico ou médico atribuído) e resultado diferente de pending. A conclusão operacional exige resultado previamente informado e preserva o resultado original. A interface oferece a ação Concluir atendimento depois de result_reported. O resultado e a alteração continuam registrados na auditoria.
 
 ### 3. Papéis combinados na listagem clínica
 
@@ -46,7 +46,7 @@ A listagem de exames admissionais para exames complementares permite que o sched
 - A revogação de UPDATE ainda não foi testada contra todas as funções, jobs e integrações.
 - A sequência estrita pode revelar encaminhamentos legados já existentes fora de ordem. Não corrigir dados legados automaticamente.
 - Não foi confirmado em runtime o owner efetivo das funções SECURITY DEFINER.
-- A policy RLS histórica não foi removida; o privilégio de tabela é a barreira adicional. Rever grants e policies no banco de homologação antes de aplicar.
+- A policy RLS histórica não foi removida; a migration fundacional já revogava os privilégios de tabela para os papéis de cliente. Rever grants, policies e owner das RPCs no banco de homologação antes de aplicar.
 - A revisão estática dos principais componentes e de algumas Edge Functions não equivale a um inventário completo de todos os escritores.
 - Nenhum build, type-check, teste automatizado ou E2E foi executado nesta etapa.
 - A migration não foi aplicada ao Supabase remoto; não houve merge, PR ou deploy.
