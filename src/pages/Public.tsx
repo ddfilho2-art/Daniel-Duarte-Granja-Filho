@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   Search,
@@ -1230,6 +1230,7 @@ export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const loginAttemptInProgressRef = useRef(false);
   const [candidateRegistrationRequired, setCandidateRegistrationRequired] = useState(false);
   const navigate = useNavigate();
   const {
@@ -1248,6 +1249,7 @@ export function Login() {
     registerCandidateForTenant,
   } = useAuth();
   const { isTenantRoute } = useTenant();
+  const isLoginBusy = loading || authLoading || profileLoading || tenantMembershipLoading || authorizationLoading;
 
   useEffect(() => {
     if (
@@ -1300,6 +1302,8 @@ export function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loginAttemptInProgressRef.current || isLoginBusy) return;
+    loginAttemptInProgressRef.current = true;
     setLoading(true);
     setError("");
 
@@ -1327,6 +1331,7 @@ export function Login() {
       setError(err.message || "Não foi possível entrar.");
     } finally {
       setLoading(false);
+      loginAttemptInProgressRef.current = false;
     }
   };
 
@@ -1398,11 +1403,11 @@ export function Login() {
             </div>
 
             <button
-              disabled={loading}
+              disabled={isLoginBusy || loginAttemptInProgressRef.current}
               type="submit"
               className="w-full rounded-lg bg-primary px-4 py-2.5 font-medium text-white transition-colors hover:bg-accent disabled:opacity-50"
             >
-              {loading ? "Entrando..." : "Entrar"}
+              {isLoginBusy || loginAttemptInProgressRef.current ? "Entrando..." : "Entrar"}
             </button>
           </form>
 
