@@ -924,3 +924,30 @@ Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11
 | Merge / PR / deploy | Não iniciado | Dependem de autorização explícita; deploy continua manual |
 
 Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-10-11-validacao-integrada-lotes16-19.md).
+
+
+## Marco de liberação — Lotes 16–19 no main e Supabase (2026-10-11)
+
+| Etapa | Status atual | Evidência / próximo critério |
+|---|---|---|
+| PR #10 e merge em `main` | **Concluído** | PR #10 mergeado; commit de merge `d50153b097ad6d03258a9573709d78a65654d41f` |
+| Type-check e build | **Concluído na CI do PR** | Passaram no commit validado antes do merge; o commit posterior na main acrescentou apenas migration SQL |
+| Replay completo de migrations em Supabase local | **Concluído na CI do PR** | Erros históricos de SQL corrigidos; cadeia completa foi aplicada no banco descartável da CI |
+| Aplicação das migrations no Supabase remoto | **Concluído** | Projeto `dmzagrakkduddofkqjhg`; histórico consultado contém 138 registros, incluindo 27 migrations do lote e a migration adicional de revogação de EXECUTE em funções de trigger |
+| Verificação de objetos e grants críticos | **Concluído — revisão estática do catálogo** | Tabelas/colunas/RPCs esperadas presentes; tabelas novas de clínica/faturamento consultadas sem grants diretos para roles de cliente |
+| Triagem final dos avisos do linter de segurança | **Pendente** | Permanecem findings RLS sem policy em 14 tabelas e warnings de SECURITY DEFINER; distinguir tabelas deliberadamente acessíveis apenas por RPC de itens que exijam correção |
+| Deploy manual da Vercel | **Aguardando ação do responsável** | Pode publicar a revisão atual de `main`; não foi disparado deploy automático por esta manutenção |
+| Smoke tests funcionais após deploy | **Pendente** | Executar os cenários abaixo e registrar evidências/defeitos reais antes de declarar os Lotes 16–19 validados |
+
+### Checklist de smoke tests pós-deploy
+
+- [ ] Login/logout, sessão e rota inicial para candidato, RH, administrador de empresa, secretaria clínica, médico e administrador da clínica.
+- [ ] Cadastro de candidato e confirmação por e-mail; código de seis dígitos e reenvio; criação/edição de usuário RH.
+- [ ] Persistência do logo da empresa e isolamento entre duas empresas/tenants.
+- [ ] Criar/usar uma vaga de teste: inscrição, candidatura visualizada, ações individuais e em massa, reserva, reprovação e desistência auditável.
+- [ ] Contratação só com exame admissional apto e vaga não cancelada; verificar headcount e bloqueio de novas candidaturas ao atingir a quantidade.
+- [ ] Clínica: fila disponível, atribuição atômica a um médico, diferença de visibilidade médico versus secretaria/admin, agendamento com data/local, resultado, conclusão e exame complementar.
+- [ ] Faturamento: serviço/catálogo, preço do contrato, ciclo/itens, relatório macro, filtros e trilha de correções.
+- [ ] Conferir console e rede por respostas 400/401/403/500; revisar logs de Supabase e corrigir apenas defeitos reproduzidos.
+
+**Limitação conhecida:** na consulta anterior às migrations, vagas, candidaturas, encaminhamentos e contratos clínicos estavam sem registros. Os smoke tests podem exigir a criação de fixtures de desenvolvimento e não devem ser interpretados como testes de dados de produção existentes.
