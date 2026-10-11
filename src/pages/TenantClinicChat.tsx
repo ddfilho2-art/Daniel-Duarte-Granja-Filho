@@ -52,6 +52,7 @@ export function TenantClinicChat({ isClinic = false }: { isClinic?: boolean }) {
   const [checkingSlots, setCheckingSlots] = useState(false);
   const [savingAppointment, setSavingAppointment] = useState(false);
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [calendarTimezone, setCalendarTimezone] = useState("America/Sao_Paulo");
   const [contracts, setContracts] = useState<ContractOption[]>([]);
   const [jobs, setJobs] = useState<JobOption[]>([]);
   const [referrals, setReferrals] = useState<ReferralOption[]>([]);

@@ -295,6 +295,15 @@ function ReferralRow({
                 </button>
               </>
             )}
+            {referral.status === "result_reported" && (
+              <button
+                disabled={isSaving}
+                onClick={() => void onUpdate(referral, "completed", referral.fitness_result)}
+                className="rounded border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 disabled:opacity-50"
+              >
+                Concluir atendimento
+              </button>
+            )}
           </div>
         </td>
       </tr>
@@ -372,6 +381,7 @@ export function OccupationalHealthPortal() {
           </div>
           <div className="flex flex-wrap gap-2">
             <Link to="/saude-ocupacional/conversas" className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white">Conversas com empresas</Link>
+            <Link to="/saude-ocupacional/operacoes" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Operação clínica</Link>
             {canManageUsers && <Link to="/saude-ocupacional/usuarios" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Gestão de Usuários</Link>}
             <button onClick={() => void load()} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700">Atualizar</button>
           </div>

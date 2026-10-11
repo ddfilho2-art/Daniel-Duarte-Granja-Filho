@@ -1,13 +1,13 @@
 import { supabase } from './supabase';
 
-export type EventoTipo = 'APROVADA' | 'REPROVADA' | 'RESERVA' | 'MENSAGEM' | 'PROVA' | 'FASE' | 'STATUS' | 'COMENTARIO';
+export type EventoTipo = 'APROVADA' | 'REPROVADA' | 'RESERVA' | 'DESISTÊNCIA' | 'MENSAGEM' | 'PROVA' | 'FASE' | 'STATUS' | 'COMENTARIO';
 
 export async function logCandidaturaEvento(
   candidaturaId: string,
   tipo: EventoTipo,
   descricao: string,
   usuarioId?: string
-) {
+): Promise<boolean> {
   try {
     let currentUserId = usuarioId;
     if (!currentUserId) {
@@ -25,8 +25,11 @@ export async function logCandidaturaEvento(
 
     if (error) {
       console.warn('Erro ao registrar evento de candidatura:', error.message);
+      return false;
     }
+    return true;
   } catch (error: any) {
     console.warn('Erro ao registrar evento de candidatura:', error);
+    return false;
   }
 }

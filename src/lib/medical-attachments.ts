@@ -113,14 +113,14 @@ export async function getMedicalAttachmentUrl(
 }
 
 /**
- * Lists attachments for a given referral using direct RPC / table query.
+ * Lists attachment metadata through the server-side authorization boundary.
+ * Direct table access is intentionally not granted to authenticated clients.
  */
 export async function listReferralAttachments(referralId: string) {
-  const { data, error } = await supabase
-    .from("medical_referral_attachments")
-    .select("id, original_name, mime_type, byte_size, storage_path, sender_side, created_at")
-    .eq("referral_id", referralId)
-    .order("created_at", { ascending: true });
+  const { data, error } = await supabase.rpc(
+    "list_medical_referral_attachments",
+    { p_referral_id: referralId },
+  );
 
   if (error) throw new Error("Não foi possível listar os anexos.");
   return data || [];

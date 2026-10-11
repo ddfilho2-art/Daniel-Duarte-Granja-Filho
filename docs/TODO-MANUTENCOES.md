@@ -605,3 +605,322 @@ Matriz criada: [MATRIZ-IMPACTO-TECNICO-RECRUTA-AI.md](MATRIZ-IMPACTO-TECNICO-REC
 ### Complemento da auditoria de chat/agenda — 2026-10-10
 
 A matriz registra mais três pontos a tratar antes de publicar o lote empresa–clínica: a RPC de reserva pode retornar uma reserva por chave idempotente sem verificar que ela pertence à mesma conversa; a filtragem de conteúdo clínico no chat é heurística e não pode ser tratada como controle de confidencialidade; e uma constraint de vínculo de encaminhamento é tautológica e não valida integridade. Corrigir e incluir testes de reuso de chave entre conversas, acesso cruzado e envio de conteúdo sensível antes da release.
+
+
+## Lote 1 — integridade clínica e contratação (2026-10-10)
+
+**Status geral: Em progresso — 40%.** Implementação inicial isolada na branch `maintenance/lote-1-integridade-clinica-contratacao-20261010`. O percentual reflete código/documentação versionados, não validação funcional.
+
+- [x] Criar migration com campos de quantidade de vagas e contador derivado de contratações.
+- [x] Incluir guardas transacionais no banco para limite de candidaturas/contratações e aptidão do exame admissional.
+- [x] Ajustar a ordem dos locks da RPC de candidatura para reduzir risco de deadlock sob concorrência.
+- [x] Filtrar vagas preenchidas no portal do candidato e tratar a rejeição por headcount com mensagem amigável.
+- [x] Remover acesso clínico implícito de administrador global nas políticas de encaminhamentos e anexos.
+- [x] Criar RPC autorizada para metadados dos anexos e ajustar frontend para usá-la.
+- [x] Registrar matriz de testes e limites conhecidos em [documento do Lote 1](maintenance/2026-10-10-lote1-integridade-clinica-contratacao.md).
+- [ ] Executar revisão estática final da migration e compatibilidade com os caminhos legados de status/fase.
+- [ ] Executar lint, type-check, build e suíte de testes do repositório.
+- [ ] Aplicar migration em homologação (não no projeto de produção) e testar concorrência com sessões separadas.
+- [ ] Validar permissões efetivas para RH, clínica, médico, administrador global e tenant cruzado.
+- [x] Inspecionar a tela de criação: já possui campo `quantidade_vagas` (mínimo 1) e envia contador inicial zero.
+- [ ] Validar persistência do headcount em homologação e revisar todos os escritores de `candidaturas.status`.
+- [ ] Registrar evidências dos testes, corrigir falhas e só então solicitar revisão para merge.
+- [ ] Manter migration remota, publicação de Edge Functions e deploy Vercel bloqueados até autorização explícita.
+
+**Importante:** nenhum código foi mesclado em `main`; nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; nenhum deploy foi realizado. Os testes ainda não foram executados.
+
+
+## Manutenção — 2026-10-10 — Lote 2: fila clínica, médicos e FIFO
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Adicionar papel explícito de médico ao enum de tenant | Implementado no código; não validado | `20261010200000_add_clinic_doctor_role.sql`; migration separada para evitar uso do enum recém-adicionado na mesma transação |
+| Criar FIFO original e backfill | Implementado no código; não validado | `fifo_original_at` preenchido com `referred_at/created_at` e protegido contra alteração |
+| Criar atribuição exclusiva de encaminhamento | Implementado no código; não validado | RPC `claim_medical_referral` com lock de linha e registro de histórico |
+| Devolver encaminhamento à fila sem perder posição | Implementado no código; não validado | RPC exige justificativa, limpa atribuição e preserva timestamp FIFO |
+| Prioridade excepcional com justificativa | Implementado no código; não validado | RPC `set_medical_referral_priority`; perfil autorizado provisório `clinic_admin` |
+| Restringir fila disponível e exames do médico | Implementado no código; não validado | RPCs de fila mínima e lista de exames atribuídos ao usuário atual |
+| Restringir acesso a encaminhamentos e anexos por médico | Implementado no código; não validado | `can_access_medical_referral` considera atribuição e papel médico ativo |
+| Permitir agendamento pela secretaria e médico atribuído | Implementado no código; não validado | `update_medical_referral` alterada; integração direta com agenda Google ainda pendente |
+| Criar documento do Lote 2 | Concluído | `docs/maintenance/2026-10-10-lote2-fila-clinica-medicos-fifo.md` |
+| Executar testes, build e type-check | Adiado para a etapa final | A pedido do usuário, nenhuma validação técnica/funcional será considerada concluída neste momento |
+| Criar plano integrado de testes | Planejado para a etapa final | Cobrir concorrência, FIFO, perfis, isolamento, anexos, agenda e regressões |
+| Aplicar migrations no Supabase remoto | Não iniciado | Exige autorização explícita do usuário |
+| Merge para main / deploy Vercel | Não iniciado | Deploy Vercel manual; não executar sem autorização explícita |
+
+
+## Manutenção — 2026-10-10 — Lote 3: exames complementares
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Criar catálogo de exames por clínica | Implementado no código; não validado | `occupational_health_exam_catalog`, com código único por clínica, nome, descrição e ativo/inativo |
+| Criar itens complementares associados ao admissional | Implementado no código; não validado | `medical_referral_complementary_exams` aponta para um encaminhamento e item de catálogo |
+| Solicitar exame complementar | Implementado no código; não validado | RPC verifica encaminhamento admissional ativo, atribuição do médico/admin e catálogo da mesma clínica |
+| Agendar exame complementar | Implementado no código; não validado | RPC permite secretaria/equipe clínica ou médico atribuído e exige data futura |
+| Registrar realização | Implementado no código; não validado | RPC restrita ao médico atribuído ou administrador clínico |
+| Cancelar com justificativa | Implementado no código; não validado | RPC exige motivo e grava ator/data |
+| UI de catálogo e complementares | Não iniciado | Integrar frontend aos RPCs após a base de dados e contratos de autorização estarem definidos |
+| Preços por contrato e faturamento | Não iniciado | Próximo lote de implementação |
+| Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
+| Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
+
+
+## Manutenção — 2026-10-10 — Lote 4: preços e faturamento da clínica
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Definir tipo de serviço faturável | Implementado no código; não validado | Catálogo distingue admissional, complementar e outro serviço |
+| Preço por contrato e vigência | Implementado no código; não validado | Tabela de preços por contrato/serviço, vigência e trigger contra sobreposição |
+| Ciclo de cobrança por período | Implementado no código; não validado | Ciclo em rascunho/fechado/emitido/pago/anulado |
+| Gerar itens a partir de serviços realizados | Implementado no código; não validado | Snapshots de nome, data e preço; ausência de preço vigente bloqueia geração |
+| Impedir cobrança duplicada | Implementado no código; não validado | Índice único por origem faturável ativa |
+| Fechar período e congelar valores | Implementado no código; não validado | RPC fecha ciclo e inclui itens de rascunho |
+| Registrar boleto/fatura externa e pagamento | Implementado no código; não validado | Referência externa, vencimento, data de emissão e pagamento |
+| Ajustes/estornos auditáveis | Implementado no código; não validado | Ajustes positivos/negativos pós-fechamento e reversão justificada apenas em rascunho |
+| Relatório macro por clínica/período | Implementado no código; não validado | RPC agrega admissionais, complementares por status, itens faturáveis, ajustes e ciclos por status/contrato |
+| Relatório detalhado e exportação | Em aberto | RPCs de itens/ciclos estão versionadas; falta UI, reconciliação e exportação CSV/XLSX/PDF |
+| Integração bancária/geração de boleto | Aguardando decisão de escopo | Base atual registra emissão externa; não gera boleto nem chama provedor |
+| Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
+| Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
+
+
+## Manutenção — 2026-10-11 — Lote 5: interface de operação clínica
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Página de operação clínica e rota protegida | Implementado no código — não validado | `src/pages/ClinicOperations.tsx`, rota `/saude-ocupacional/operacoes` e atalho no portal |
+| Fila FIFO, atribuição e devolução justificada | Implementado no código — não validado | UI usa RPCs clínicas; conferir autorização efetiva na validação integrada |
+| Solicitação, agendamento e registro de exame complementar | Implementado no código — não validado | UI conecta catálogo, encaminhamento e fluxo operacional |
+| Permissões e experiência por perfil | Em progresso | Refinar mensagens/visibilidade para médico, equipe clínica e administrador |
+| Testes/build/type-check | Adiado para a etapa final | Não executar antes do plano integrado |
+| Migrations remotas / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 5](maintenance/2026-10-10-lote5-interface-clinica-status.md).
+
+## Manutenção — 2026-10-11 — Lote 6: interface de contratos e faturamento
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| RPC segura de listagem de contratos da clínica | Implementado no código — não validado | Migration `20261010230000_occupational_health_billing_read_rpcs.sql` |
+| RPC segura de consulta de preços por contrato | Implementado no código — não validado | Sem liberar acesso direto às tabelas financeiras |
+| Cadastro de preços e vigência | Implementado no código — não validado | Revisar política de histórico/versionamento; sobreposição de vigências é bloqueada pela base |
+| Criação de ciclos e geração de itens | Implementado no código — não validado | Ciclo por contrato e período; preço ausente bloqueia geração conforme RPC existente |
+| Conferência, fechamento, fatura externa e pagamento | Implementado no código — não validado | Integração bancária/geração de boleto não incluída |
+| Ajustes e reversão de item em rascunho | Implementado no código — não validado | Justificativa exigida pelas RPCs existentes |
+| Relatório macro por empresa e exportação CSV | Implementado no código — não validado | Exportação CSV do relatório e dos itens; XLSX/PDF pendentes |
+| Plano integrado de testes | Planejado para a etapa final | Incluir segurança por clínica/tenant, concorrência, preços, vigências, duplicidade, fechamento, ajustes, relatório e regressão |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase por orientação do usuário |
+| Aplicar migrations, publicar funções, merge ou deploy | Não iniciado | Produção intocada; requer autorização explícita |
+
+Documento: [status do Lote 6](maintenance/2026-10-11-lote6-interface-faturamento-clinica.md). O status é de implementação versionada, não de validação. Nenhum teste/build/type-check foi executado.
+
+
+## Manutenção — 2026-10-11 — Lote 7: catálogo de serviços faturáveis
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Cadastro/edição de serviço | Implementado no código — não validado | RPC save_occupational_health_service_catalog_item |
+| Classificação admissional/complementar/outro | Implementado no código — não validado | Tipo faturável devolvido pela RPC de catálogo |
+| Bloqueio de mudança de tipo após uso/preço | Implementado no código — não validado | Evita reinterpretar serviço já usado no fluxo ou faturamento |
+| Seleção explícita da clínica na UI | Implementado no código — não validado | Aba Catálogo de serviços em ClinicOperations |
+| Segurança por tenant e papel | Implementado no código — não validado | Confirmar com testes negativos ao final |
+| Build, type-check e testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Produção intocada; exige autorização explícita |
+
+Documento: [status do Lote 7](maintenance/2026-10-11-lote7-catalogo-servicos.md).
+
+
+## Manutenção — 2026-10-11 — Lote 8: integridade do histórico de faturamento
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Registrar o preço de origem em cada item faturável | Implementado no código — não validado | Nova coluna contract_price_id e geração com vínculo ao preço usado |
+| Manter faturáveis os serviços realizados antes da inativação do catálogo | Implementado no código — não validado | Geração de itens considera vigência/preço, não o estado ativo atual do catálogo |
+| Bloquear alteração retroativa de preços já usados | Implementado no código — não validado | Permite somente encurtamento seguro de vigência |
+| Proteger nome/código/tipo do catálogo após uso ou preço | Implementado no código — não validado | RPC de catálogo com bloqueio de alteração histórica |
+| Revisão e testes integrados | Adiado para a etapa final | Cobrir períodos, preços históricos, inativação, duplicidade, concorrência e regressões |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita; produção intocada |
+
+Documento: [status do Lote 8](maintenance/2026-10-11-lote8-integridade-historico-faturamento.md).
+
+
+## Manutenção — 2026-10-11 — Lote 9: contexto operacional por clínica
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| RPC de clínicas operacionais associadas | Implementado no código — não validado | list_my_clinic_operational_tenants retorna apenas associações ativas e perfil permitido |
+| Seletor de clínica para equipe/médico | Implementado no código — não validado | Contexto explícito em ClinicOperations |
+| Ocultar abas administrativas para perfil sem permissão | Implementado no código — não validado | Catálogo/faturamento só aparecem para clinic_admin na clínica selecionada |
+| Testes negativos por perfil/tenant | Adiado para a etapa final | Exercitar RPC diretamente, inclusive tentativa de tenant cruzado |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 9](maintenance/2026-10-11-lote9-contexto-operacional-clinica.md).
+
+
+## Manutenção — 2026-10-11 — Lote 10: exceções justificadas à fila FIFO
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Listagem administrativa da fila por clínica | Implementado no código — não validado | RPC list_clinic_priority_queue, somente encaminhamentos não atribuídos e não cancelados |
+| Definir/remover prioridade excepcional | Implementado no código — não validado | UI conecta set_medical_referral_priority |
+| Justificativa e auditoria | Implementado no código — não validado | RPC exige justificativa e mantém FIFO original |
+| Testes negativos de permissão e tenant | Adiado para a etapa final | Validar por RPC, não apenas por visibilidade de UI |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Requer autorização explícita |
+
+Documento: [status do Lote 10](maintenance/2026-10-11-lote10-excecoes-fifo.md).
+
+
+## Manutenção — 2026-10-11 — Lote 11: agendamento e cancelamento de complementares
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Agendamento com confirmação explícita | Implementado no código — não validado | Selecionar data/hora e confirmar via RPC |
+| Cancelamento justificado de exame não realizado | Implementado no código — não validado | RPC existente grava motivo e auditoria |
+| Exibição do motivo de cancelamento | Implementado no código — não validado | Listagem de exames complementares |
+| Testes de transição e permissões | Adiado para a etapa final | Confirmar bloqueio de cancelamento de exame realizado e acesso por perfil |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 11](maintenance/2026-10-11-lote11-agendamento-cancelamento-complementares.md).
+
+
+## Manutenção — 2026-10-11 — Lote 12: relatório macro de faturamento
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Diferenciar itens faturáveis, em rascunho e faturados | Implementado no código — não validado | RPC get_occupational_health_billing_macro_report_v2 |
+| Separar valor em rascunho, faturado e ajustes | Implementado no código — não validado | Relatório por empresa/período |
+| UI e exportação CSV | Implementado no código — não validado | ClinicBilling consome a RPC v2 |
+| Reconciliação e isolamento por tenant | Adiado para a etapa final | Conferir com ciclos e itens detalhados |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 12](maintenance/2026-10-11-lote12-relatorio-macro-faturamento.md).
+
+
+## Manutenção — 2026-10-11 — Lote 13: fila escopada por clínica
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Fila disponível filtrada pela clínica selecionada | Implementado no código — não validado | RPC list_available_medical_referrals_for_clinic |
+| Exames atribuídos filtrados pelo médico atual e clínica | Implementado no código — não validado | RPC list_my_assigned_medical_referrals_for_clinic |
+| Seletor de encaminhamentos complementares por clínica | Implementado no código — não validado | RPC list_clinic_referrals_for_complementary_exam |
+| Testes de tenant cruzado e perfis | Adiado para a etapa final | Incluir médico em múltiplas clínicas e casos atribuídos a terceiros |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 13](maintenance/2026-10-11-lote13-fila-escopada-por-clinica.md).
+
+
+## Manutenção — 2026-10-11 — Lote 14: desistência de candidatura controlada por RH
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| RPC autorizada por tenant/papel | Implementado no código — não validado | rpc_cancelar_candidatura_rh exige RH/admin autorizado e justificativa |
+| Encerramento com motivo e auditoria | Implementado no código — não validado | Status Desistência, fase Encerrado, motivo e audit log |
+| Ação específica na interface RH | Implementado no código — não validado | Formulário separado de reprovação |
+| Proteger contratado/estados terminais | Implementado no código — não validado | RPC bloqueia contratado, reprovado e desistência repetida |
+| Testes de segurança e headcount | Adiado para a etapa final | Incluir acesso sem papel, tenant cruzado e contador derivado |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 14](maintenance/2026-10-11-lote14-desistencia-candidatura-rh.md).
+
+
+## Manutenção — 2026-10-11 — Lote 15: status canônico de contratação e headcount
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Status final de RH ao contratar | Concluído — não validado | `src/pages/HR.tsx` envia status `Contratado` na fase final |
+| Indicador do dashboard | Concluído — não validado | Conta apenas candidaturas com status canônico `Contratado` |
+| Reconciliar estados legados fase/status divergentes | Não iniciado | Inventariar registros antes de propor correção de dados; não alterar produção |
+| Testar bloqueio por exame apto e headcount | Adiado para etapa final | Depende de ambiente autorizado e migration aplicada em homologação |
+| Testar concorrência, desistência e regressão de dashboard | Adiado para etapa final | Incluir no plano integrado; não executar nesta fase |
+| Build/type-check/testes | Adiado para etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-contratacao-headcount.md).
+
+
+## Manutenção — 2026-10-11 — Lote 16: transições de candidatura pela RPC protegida
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Endurecer RPC e trigger de tabela | Concluído — não validado | Migration versiona RPC autorizada, trigger de integridade fase/status e guarda de auditoria atômica para desistência |
+| Modal de perfil de RH | Concluído — não validado | Usa `rpc_atualizar_candidatura_processo` |
+| Ações em massa e individuais | Concluído — não validado | Usam RPC; status canônico, reprovação comum encerrada, exceção de `Exame` retorna à `Entrevista RH`, última etapa `Contrato` convertida em contratação |
+| Salvamento de entrevista | Concluído — não validado | Usa RPC existente com status canônico corrigido |
+| Encaminhamento para exame | Concluído — não validado | Transição de fase usa RPC e trata erro; decisão final da fase legada `Exame` permanece protegida pelo exame admissional apto no banco |
+| Inventário de escrita de fase/status nos clientes e Edge Functions | Concluído no código — não validado | `HR.tsx` centraliza transições na RPC; atualização direta remanescente em RH é somente `visualizado`; `Candidate.tsx` tem um UPDATE de candidatura comentado (não executável); `Public.tsx`, `HRDetalheVaga.tsx` e `HRRelatorios.tsx` não alteram fase/status de candidaturas; funções Edge de candidatura inspecionadas não mostraram UPDATE direto de fase/status. Policies/ACLs de candidaturas e medical_referrals revisadas estaticamente nos Lotes 17–18; falta revisão global das policies/RLS e das integrações externas não representadas nesses arquivos |
+| Reconciliação de estados legados | Não iniciado | Apenas identificar e reportar; não modificar dados sem plano aprovado |
+| Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar nesta fase, conforme orientação |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
+
+
+## Manutenção integrada — Lote 17: ciclo de vida clínico (2026-10-11)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Revisar os principais caminhos de escrita da interface clínica | Concluído — revisão estática | OccupationalHealth.tsx e ClinicOperations.tsx usam RPCs nos fluxos revisados; isso não substitui inventário integral de todos os escritores |
+| Revogar UPDATE direto em medical_referrals para clientes autenticados | Implementado — não validado | Migration 20261011160000_harden_medical_referral_writes_and_transitions.sql; confirmar todos os escritores e grants efetivos antes de aplicar |
+| Endurecer sequência de status clínico | Implementado — não validado | referred → scheduled → attended → result_reported → completed; saltos, regressões e alteração após completed rejeitados |
+| Exigir data e local para agendamento | Implementado — não validado | Validação no backend da RPC update_medical_referral |
+| Exigir resultado explícito e autorização para registrar resultado | Implementado — não validado | Resultado não pode ficar pending; somente administrador clínico ou médico atribuído pode registrar resultado |
+| Concluir atendimento após resultado | Implementado — não validado | Interface inclui ação após result_reported; RPC exige resultado existente e preserva aptidão registrada |
+| Corrigir lista de exames admissionais para usuário com papel de scheduler e médico | Implementado — não validado | A visão ampla operacional prevalece quando o usuário também é scheduler; médico sem papel administrativo só vê os próprios exames |
+| Incluir médico responsável na listagem geral de encaminhamentos | Implementado — não validado | RPC list_my_medical_referrals inclui apenas encaminhamentos atribuídos ao médico ativo e omite e-mail na visão médica; equipes administrativas mantêm a visão da clínica |
+| Inventariar todos os escritores em clientes, Edge Functions e integrações | Em progresso — 40% | Páginas principais revisadas; inventário completo de funções Edge/jobs/consumidores externos ainda pendente |
+| Revisar grants/RLS e owner das RPCs SECURITY DEFINER | Em progresso — 65% | Policies e ACLs das tabelas-alvo revisadas estaticamente; owner/grants efetivos ainda não confirmados no banco de homologação |
+| Identificar dados clínicos legados incompatíveis com a sequência | Não iniciado — 0% | Somente relatório; nenhuma alteração automática de dados |
+| Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar antes de concluir a implementação integrada |
+| Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita; deploy continua manual |
+
+Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md).
+
+
+## Manutenção integrada — Lote 18: superfície de escrita de candidaturas (2026-10-11)
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Criar RPC autorizada para marcar candidatura visualizada | Implementado — não validado | RPC verifica autenticação, vaga/tenant, tenant corrente e papel autorizado |
+| Substituir UPDATE direto em HR.tsx | Implementado — não validado | Cliente chama rpc_marcar_candidatura_visualizada |
+| Revogar UPDATE direto em candidaturas para clientes | Implementado — não validado | Migration 20261011170000_harden_candidatura_client_write_surface.sql; depende de confirmar escritores e owner das RPCs |
+| Confirmar todos os escritores diretos e consumidores externos | Em progresso — 60% | Escrita direta remanescente localizada no cliente foi substituída; inventário de todos os consumidores externos pendente |
+| Testar leitura visualizada e fluxos críticos de candidatura | Adiado para etapa final | Sem build/testes nesta fase |
+| Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita |
+
+Documento: [Lote 18 — superfície de escrita de candidaturas](maintenance/2026-10-11-lote18-superficie-escrita-candidaturas.md).
+
+
+## Manutenção integrada — Lote 19: confiabilidade das ações de RH (2026-10-11)
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Ação em massa com resultado independente por candidatura | Implementado — não validado | Cada candidatura retorna sucesso/falha; não interromper nem ocultar atualizações confirmadas de outros itens |
+| Preservar seleção das candidaturas que falharam | Implementado — não validado | Só as falhas permanecem selecionadas para nova tentativa |
+| Separar falha de histórico da falha de transição | Implementado — não validado | Transição confirmada conta como sucesso; falha de histórico aparece em aviso/log |
+| Ação individual consistente com o resultado real | Implementado — não validado | Consulta apresenta erro; Reserva usa fase Banco de Talentos; auditoria/histórico não mascara transição confirmada |
+| Validar TypeScript/build e cenários de sucesso/parcial/falha | Aguardando etapa integrada final | Não executado durante a implementação |
+| Confirmar indicadores após processamento em lote | Aguardando etapa integrada final | Comparar contagens da interface e do banco em ambiente autorizado |
+
+Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11-lote19-confiabilidade-acoes-rh.md).
+
+
+## Marco de validação integrada — 2026-10-11
+
+| Verificação | Status | Evidência / limitação |
+|---|---|---|
+| Type-check TypeScript | Concluído — passou na CI | Commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f |
+| Build Vite de produção | Concluído — passou na CI | Mesmo run; sem deploy |
+| Revisar e corrigir erros reportados pelo primeiro type-check | Concluído — passou na CI após correções | Candidate.tsx, App.tsx, Public.tsx, TenantClinicChat.tsx, eventos de candidatura e ações RH |
+| Revisão estática das policies/ACLs das tabelas-alvo | Concluído — estática | Não comprova privilégios/owners efetivos no banco remoto |
+| Validar migrations em banco de homologação | Não iniciado | Requer ambiente de homologação autorizado; migrations não foram aplicadas remotamente |
+| E2E integração candidato → RH → exame → contratação | Pendente | Rodar somente após homologar schema/migrations; não usar o workflow antigo que faz checkout explícito de main para validar esta branch |
+| Verificar concorrência de headcount e atribuição clínica | Pendente | Fixtures isoladas e testes controlados necessários |
+| Merge / PR / deploy | Não iniciado | Dependem de autorização explícita; deploy continua manual |
+
+Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-10-11-validacao-integrada-lotes16-19.md).

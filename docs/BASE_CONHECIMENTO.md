@@ -179,3 +179,53 @@ Foram preservados os controles existentes: identidade do ator igual a auth.uid()
 - Consulta SQL confirmou que PNG e WebP são aceitos pelo padrão e JPG continua rejeitado.
 - O arquivo de migration versionado inicialmente precisa ser alinhado ao padrão final [.] antes de ser aplicado em outro ambiente.
 - Ainda não validado: sessão autenticada de upload, criação do rascunho, publicação e leitura no portal. Não declarar funcionalidade concluída ponta a ponta até esse teste.
+
+
+## 2026-10-11 — Integridade de candidaturas, fluxo clínico e ações em massa
+
+### Regra operacional
+
+- Transições de fase/status de candidatura devem passar por RPC autorizada e ser protegidas também no banco.
+- Acesso direto de cliente a escrita de tabelas de negócio deve ser minimizado; marcar candidatura como visualizada usa RPC específica.
+- Encaminhamento clínico segue estados canônicos `referred → scheduled → attended → result_reported → completed`. O resultado de aptidão é distinto da conclusão administrativa do atendimento.
+- Uma ação em massa não pode ser apresentada como sucesso total quando apenas parte das candidaturas foi atualizada.
+
+### Diagnóstico estático e solução versionada
+
+- A policy histórica de UPDATE em `candidaturas` permitia ao próprio candidato estar no conjunto de linhas elegíveis e não restringia, por coluna, os campos passíveis de tentativa de atualização. O Lote 18 adiciona uma barreira por privilégio de tabela para os clientes e move a marcação de leitura do RH para a RPC `rpc_marcar_candidatura_visualizada`.
+- A RPC `rpc_atualizar_candidatura_processo` e o trigger de transição protegem coerência de fase/status, estados terminais, tenant e autorização. A desistência usa operação dedicada e auditoria transacional.
+- A revisão da migration fundacional clínica mostrou que `medical_referrals` já tinha privilégios de tabela revogados para `PUBLIC`, `anon` e `authenticated`; a revogação explícita do Lote 17 é defesa em profundidade, não prova de bypass anterior.
+- A RPC clínica `update_medical_referral` foi endurecida para exigir transição válida, data e local no agendamento, resultado explícito, e preservação do resultado ao concluir. A interface ganhou a ação “Concluir atendimento”.
+- A ação em massa de RH usava um `Promise.all` em que erros de um item ou do histórico podiam confundir o resultado do lote. Agora cada candidatura devolve um resultado independente: as transições bem-sucedidas são refletidas no estado da interface, falhas permanecem selecionadas para nova tentativa e falhas de histórico/auditoria são reportadas separadamente.
+- A ação individual passa a tratar erro de consulta explicitamente, distingue falha da transição de falha do histórico e alinha “Reserva” à fase `Banco de Talentos`.
+
+### Referências versionadas
+
+- `supabase/migrations/20261011150000_harden_candidatura_process_transition.sql`
+- `supabase/migrations/20261011160000_harden_medical_referral_writes_and_transitions.sql`
+- `supabase/migrations/20261011170000_harden_candidatura_client_write_surface.sql`
+- `src/pages/HR.tsx`
+- `src/pages/OccupationalHealth.tsx`
+- `docs/maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md`
+- `docs/maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md`
+- `docs/maintenance/2026-10-11-lote18-superficie-escrita-candidaturas.md`
+
+### Situação / validação
+
+**Implementado em código — não validado.** As migrations não foram aplicadas ao Supabase remoto. Nenhum build, type-check, teste automatizado ou E2E foi executado durante implementação. A etapa integrada final deve confirmar owners/grants reais das RPCs SECURITY DEFINER, escritores externos, RLS, estados legados, concorrência de contratação e os cenários de sucesso/parcial/falha de ações em massa. Não marcar como validado apenas porque os arquivos foram escritos.
+
+
+### Validação de build e correções encontradas — 2026-10-11
+
+A primeira execução da CI de manutenção falhou no type-check. O log revelou e levou à correção dos seguintes problemas:
+
+- src/pages/Candidate.tsx: bloco condicional da lista de vagas não tinha chaves e causava erros de sintaxe; o bloco foi corrigido.
+- src/App.tsx e src/pages/Public.tsx: chamadas a resolveAuthorizedHomePath omitiram isPlatformMasterAdmin, obrigatório no contrato de autorização; o campo foi incluído.
+- src/App.tsx: o helper lazyNamed apagava o tipo de props da tela clínica; a importação lazy de TenantClinicChat foi tipada diretamente para aceitar isClinic.
+- src/lib/events.ts e src/pages/HR.tsx: o tipo EventoTipo não aceitava DESISTÊNCIA; o tipo foi alinhado. A função logCandidaturaEvento agora retorna boolean para que a interface distinga persistência do histórico de falha na transição.
+- src/pages/TenantClinicChat.tsx: calendarTimezone e setCalendarTimezone eram usados sem estado declarado; estado com padrão America/Sao_Paulo foi adicionado.
+- src/pages/HR.tsx: ações individual/em massa agora relatam resultados parciais; reserva individual e em massa usam a mesma fase Banco de Talentos.
+
+A execução posterior da CI de manutenção concluiu com sucesso type-check e build no commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f. Essa evidência cobre compilação e empacotamento da aplicação, não a execução das migrations ou testes contra o banco real.
+
+**Pendência não resolvida por build:** confirmar owner/grants efetivos das RPCs SECURITY DEFINER e executar o plano integrado em banco de homologação. Não marcar os lotes 16–19 como validados somente com CI verde.

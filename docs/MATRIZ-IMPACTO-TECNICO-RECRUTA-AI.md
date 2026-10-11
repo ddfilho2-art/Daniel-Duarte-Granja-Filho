@@ -70,3 +70,19 @@ A leitura adicional das migrations do lote empresa–clínica identificou três 
 3. **Constraint redundante de vínculo de encaminhamento.** `tenant_clinic_conversations_referral_pair` testa `medical_referral_id IS NULL OR medical_referral_id IS NOT NULL`, uma condição sempre verdadeira. Ela não valida vínculo algum e pode ser removida ou substituída por regra real quando o modelo de conversa/exame for ajustado.
 
 Esses achados aumentam o escopo do lote de release do chat/agenda: testar reuso de chave entre conversas, autorização em ambos os lados, conteúdo não permitido e anexos privados. Nenhuma migration foi aplicada e nenhuma função foi alterada nesta rodada.
+
+
+## Atualização de implementação — Lote 1 (2026-10-10)
+
+Foi aberta uma branch isolada para implementação inicial: `maintenance/lote-1-integridade-clinica-contratacao-20261010`.
+
+Arquivos versionados:
+- `supabase/migrations/20261010190000_lote1_integridade_clinica_contratacao.sql`
+- `src/lib/medical-attachments.ts`
+- `docs/maintenance/2026-10-10-lote1-integridade-clinica-contratacao.md`
+
+O código inicial acrescenta contagem de vagas/contratações, guardas transacionais para nova candidatura e contratação apta, ordem consistente de locks por vaga, filtro/mensagem de vagas preenchidas no portal do candidato, autorização clínica baseada em vínculo ativo e RPC autorizada para metadados dos anexos. Isso é **implementação inicial em branch, ainda não validada**. Não representa conclusão do Lote 1.
+
+Pendências críticas: confirmar valores canônicos de status; revisar todos os escritores de fase/status; auditar compatibilidade da UX de headcount; validar a migration em ambiente isolado; executar testes de concorrência e regressão; verificar efeitos das políticas RLS sobre todos os fluxos legítimos. O vínculo legado ainda é textual e o isolamento por médico/FIFO não foi implementado neste lote.
+
+Nenhuma migration foi aplicada ao projeto Supabase remoto, nenhuma função foi publicada e não houve merge ou deploy.

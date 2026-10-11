@@ -216,7 +216,7 @@ begin
   select v_candidatura.id,v_candidate.id,v_vaga.id,v_vaga.tenant_id,
     v_request_key,coalesce(v_claim->>'status','queued');
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.rpc_registrar_candidato(p_tenant_id uuid DEFAULT NULL::uuid)
@@ -339,7 +339,7 @@ begin
   return query
   select v_candidate.id, v_tenant_id, v_membership.status;
 end;
-$function$
+$function$;
 
 
 revoke all on function public.rpc_registrar_candidato(uuid) from public, anon;

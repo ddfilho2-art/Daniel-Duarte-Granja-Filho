@@ -470,7 +470,7 @@ begin
     ''previous_user_id'', p_previous_user_id,
     ''tenant_status'', v_tenant_status
   );
-end;'
+end;';
 
 revoke all on function public.record_tenant_admin_operation(uuid, uuid, text, uuid, uuid, timestamptz, text)
   from public, anon, authenticated;

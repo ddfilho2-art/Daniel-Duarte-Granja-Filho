@@ -1,6 +1,6 @@
 # Plano de evolução e melhorias — Recruta AÍ
 
-- **Última atualização:** 2026-10-10
+- **Última atualização:** 2026-10-11
 - **Repositório:** `ddfilho2-art/Daniel-Duarte-Granja-Filho`
 - **Ambiente de produção:** https://daniel-duarte-granja-filho.vercel.app
 - **Escopo desta etapa:** consolidar regras, planejar e avaliar impactos; não implementar funcionalidades.
@@ -140,22 +140,22 @@ Esta rodada foi uma leitura de código/migrations no GitHub. Não houve execuç�
 | ID | Atividade | Status / progresso | Feito até agora | Falta fazer / critério de conclusão |
 |---|---|---|---|---|
 | B1 | Uma vaga por cargo com quantidade de posições e candidaturas independentes | **Não iniciado — 0%** | Especificação funcional prévia registrada em `docs/maintenance/2026-10-10-multiple-openings-per-requisition.md`. | Concluir auditoria A1/A5; implementar apenas após matriz de impacto e plano de migração. |
-| B2 | Contabilizar posição somente ao registrar contratação | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Definir transição canônica, idempotência, reversão auditável e contagem consistente em transações concorrentes. |
-| B3 | Candidato inapto não preenche a posição; vaga continua aberta | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Mapear estados de resultado médico e de candidatura; garantir que inaptidão não marque contratação nem feche vaga, e que o RH receba apenas informação autorizada. |
-| B4 | Bloquear novas candidaturas ao atingir o headcount | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Aplicar bloqueio no backend/banco em todos os caminhos de inscrição; testar concorrência, reabertura e alteração autorizada de quantidade. |
-| B5 | Cancelamento de candidatura pelo RH autorizado | **Não iniciado — 0%** | Regra aprovada e descrita neste plano. | Identificar ações atuais e reforçar validação de papel, tenant, histórico e distinção de cancelamento de exame/agendamento. |
+| B2 | Contabilizar posição somente ao registrar contratação | **Em progresso — 80% (implementação; não validada)** | Migration do Lote 1 define status canônico `Contratado`, trigger transacional de limite/aptidão e contador derivado; Lote 15 alinha a interface e o dashboard ao status canônico. | Revisar caminhos restantes de escrita, estados legados e reversão auditável; validar concorrência somente na etapa autorizada de testes. |
+| B3 | Candidato inapto não preenche a posição; vaga continua aberta | **Em progresso — 80% (implementação; não validada)** | Trigger do Lote 1 exige encaminhamento admissional apto, não cancelado, vinculado à candidatura e empresa antes de status `Contratado`. | Conferir estados legados e todos os caminhos de atualização; validar cenários apto/inapto e privacidade do retorno ao RH na etapa integrada. |
+| B4 | Bloquear novas candidaturas ao atingir o headcount | **Em progresso — 80% (implementação; não validada)** | Migration do Lote 1 adiciona quantitativos, backfill, locks e bloqueio no banco; fluxo de candidatura e transição de contratação compartilham o lock por vaga. | Revisar criação/edição de vaga, estados históricos, aumento/redução autorizada e confirmar concorrência em testes posteriores. |
+| B5 | Cancelamento de candidatura pelo RH autorizado | **Em progresso — 85% (implementação; não validada)** | Lote 14 implementa `rpc_cancelar_candidatura_rh` com papel/tenant, justificativa, auditoria e bloqueio de estados terminais. | Validar valores legados, permissões efetivas e regressão com headcount. |
 | B6 | Relatórios de posições preenchidas e disponíveis | **Não iniciado — 0%** | Requisito identificado. | Definir métricas derivadas do estado transacional e reconciliar com dados existentes; validar com cenários de contratação e reversão. |
 
 ### Fase C — Operação da Saúde Ocupacional
 
 | ID | Atividade | Status / progresso | Feito até agora | Falta fazer / critério de conclusão |
 |---|---|---|---|---|
-| C1 | Fila clínica compartilhada e atribuição atômica | **Não iniciado — 0%** | Requisitos de negócio consolidados; tela atual de encaminhamentos inspecionada superficialmente. | Confirmar modelo existente; implementar claim concorrente seguro, retirada da fila dos outros médicos e lista “meus exames”. |
-| C2 | FIFO original após devolução | **Não iniciado — 0%** | Regra aprovada. | Persistir timestamp original imutável e eventos de devolução/atribuição; testar retorno múltiplo e ordenação. |
-| C3 | Prioridade excepcional com justificativa | **Não iniciado — 0%** | Regra aprovada; perfil autorizado ainda precisa ser confirmado. | Definir permissão, motivo obrigatório, início/fim e auditoria; testar impacto na ordenação sem modificar timestamp original. |
-| C4 | Permissões diferenciadas de médico e secretaria | **Não iniciado — 0%** | Modelo de papéis descrito nos requisitos. | Concluir auditoria A4; restringir no banco/backend os dados disponíveis e atribuídos, com testes de acesso negado. |
-| C5 | Secretaria e médico responsável podem agendar | **Não iniciado — 0%** | Migration inicial de agenda identificada. | Concluir A3; vincular corretamente agendamento ao encaminhamento e responsável, prevenir conflitos e testar reagendamento/cancelamento. |
-| C6 | Catálogo de exames complementares associado ao admissional | **Não iniciado — 0%** | Tipos de exame e necessidade de múltiplos itens documentados. | Desenhar cadastro configurável, relação por encaminhamento, status de solicitação/agendamento/realização e controle de prestador. |
+| C1 | Fila clínica compartilhada e atribuição atômica | **Em progresso — 45%** | Migration versionada com papel `doctor`, atribuição exclusiva por lock da linha, RPC de fila disponível e RPC de exames atribuídos ao próprio médico. | Revisar compatibilidade com as funções existentes e, na etapa final, executar testes concorrentes e de isolamento por perfil. |
+| C2 | FIFO original após devolução | **Em progresso — 55%** | `fifo_original_at` versionado com backfill, proteção contra alteração, histórico de atribuição/devolução e preservação do timestamp ao retornar à fila. | Na etapa final, testar devoluções repetidas, ordenação e exceções de prioridade. |
+| C3 | Prioridade excepcional com justificativa | **Em progresso — 50%** | RPC de prioridade versionada com justificativa obrigatória e trilha de auditoria; autorização provisória restrita a `clinic_admin` até confirmação de outro perfil. | Confirmar o perfil autorizado e validar a ordenação sem alterar o FIFO original. |
+| C4 | Permissões diferenciadas de médico e secretaria | **Em progresso — 40%** | Papel `doctor`, listagem mínima da fila disponível, listagem dos exames próprios e autorização de encaminhamento/anexo por atribuição versionados. | Revisar todos os caminhos de leitura e anexos e executar testes negativos por perfil/tenant na etapa final. |
+| C5 | Secretaria e médico responsável podem agendar | **Em progresso — 15%** | A atualização do encaminhamento passa a permitir agenda pela equipe administrativa da clínica ou pelo médico responsável atribuído. A tabela de agenda Google existente ainda é separada e não foi vinculada diretamente ao encaminhamento neste lote. | Integrar agenda ao encaminhamento e ao responsável médico, prevenindo conflitos e preservando histórico de reagendamento/cancelamento. |
+| C6 | Catálogo de exames complementares associado ao admissional | **Em progresso — 45%** | Migration versionada para catálogo configurável por clínica e itens individuais ligados ao encaminhamento, com status de solicitação/agendamento/realização/cancelamento e trilha de atores. | Criar UI e integração de fluxo; relacionar preços por contrato e faturamento em lote separado; validar permissões e isolamento na etapa final. |
 | C7 | Anexos e documentos clínicos com acesso mínimo | **Não iniciado — 0%** | Há código prévio de anexos privados vinculado a encaminhamentos, ainda não validado integralmente. | Auditar policies e Edge Functions; testar leitura/download por médico não responsável, empresa errada e usuário sem vínculo. |
 
 ### Fase D — Relatórios e faturamento
@@ -164,10 +164,10 @@ Esta rodada foi uma leitura de código/migrations no GitHub. Não houve execuç�
 |---|---|---|---|---|
 | D1 | Relatório macro de exames por clínica/período | **Não iniciado — 0%** | Requisito registrado. | Definir métricas, filtros e fonte de verdade; reconciliar totais com os itens detalhados. |
 | D2 | Detalhamento por empresa | **Não iniciado — 0%** | Requisito registrado. | Incluir itens que compõem o total, datas, tipo, status, preço e situação de cobrança com controle de acesso. |
-| D3 | Cadastro de preços por contrato/empresa e vigência | **Não iniciado — 0%** | Requisito registrado. | Auditar contratos existentes e definir histórico de preço para que alterações futuras não reescrevam cobranças passadas. |
-| D4 | Fechamento de período e memória de cobrança | **Não iniciado — 0%** | Requisito registrado. | Definir elegibilidade de cobrança, fechamento, itens duplicados, ajustes, estornos e trilha de auditoria. |
-| D5 | Geração/registro de boletos | **Não iniciado — 0%** | Necessidade operacional identificada; integração externa ainda não decidida. | Após decisão A7, definir se será exportação para emissão externa ou integração com provedor/banco; nunca armazenar segredos em frontend. |
-| D6 | Exportação e reconciliação dos relatórios | **Não iniciado — 0%** | Requisito registrado. | Definir formatos CSV/XLSX/PDF e testar se macro e detalhamento fecham os mesmos totais, sem exposição clínica indevida. |
+| D3 | Cadastro de preços por contrato/empresa e vigência | **Em progresso — 45%** | Tabelas e RPC versionadas para preços por contrato/serviço, vigência e prevenção de sobreposição; snapshots protegem os valores históricos. | Integrar UI, revisar fluxos de preço e validar vigência/histórico na etapa final. |
+| D4 | Fechamento de período e memória de cobrança | **Em progresso — 40%** | Ciclos, geração de itens, snapshots, bloqueio de duplicidade, fechamento, ajustes auditáveis e reversão de rascunho versionados. | Integrar interface/exportação e validar reconciliação, fechamento e correções pós-fechamento. |
+| D5 | Geração/registro de boletos | **Em progresso — 20%** | Base permite registrar referência externa, vencimento e pagamento; geração de boleto e integração bancária não foram implementadas, aguardando decisão de escopo. | Decidir exportação vs integração com provedor/banco e implementar após aprovação explícita do escopo. |
+| D6 | Exportação e reconciliação dos relatórios | **Em progresso — 10%** | RPCs versionadas para listar ciclos e itens com valores/ajustes e dados operacionais mínimos. Não há exportação nem relatório macro reconciliado. | Implementar relatórios macro/detalhados e exportação CSV/XLSX/PDF; validar reconciliação na etapa final. |
 
 ### Fase E — Validação, documentação e entrega
 
@@ -245,3 +245,197 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - [Especificação anterior: múltiplas posições por vaga](maintenance/2026-10-10-multiple-openings-per-requisition.md)
 - [Fluxo empresa–clínica](maintenance/2026-10-10-employer-clinic-workflow.md)
 - [TODO de manutenções](TODO-MANUTENCOES.md)
+
+
+| 2026-10-10 | Iniciada implementação isolada do Lote 1 em branch de manutenção: migration de headcount/contratação e autorização clínica, RPC segura para metadados de anexos, atualização do frontend e matriz de testes. Status 35%, ainda sem build/testes/homologação; Supabase remoto e Vercel não foram alterados. |
+
+
+### Atualização — Lote 2: fila clínica e FIFO (2026-10-10)
+
+- Branch: `maintenance/lote-1-integridade-clinica-contratacao-20261010`.
+- Status geral do lote: **em progresso — implementação versionada; validações adiadas para a etapa final**.
+- Criadas migrations separadas para adicionar o papel `doctor` e implementar fila clínica, atribuição exclusiva, FIFO imutável, devolução justificada, prioridade auditada e listagens com escopo de acesso.
+- A RPC de atualização do encaminhamento foi restringida: secretaria/equipe administrativa e médico responsável podem manter o agendamento; resultado de aptidão é reservado ao médico atribuído ou administrador clínico.
+- Nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; não houve merge para `main` nem deploy Vercel.
+- O plano de testes integrado será elaborado e executado na etapa final, conforme orientação do usuário. Até lá, o código permanece **não validado**.
+
+
+### Atualização — Lote 3: exames complementares (2026-10-10)
+
+- Migration versionada: `20261010210000_complementary_exam_catalog_and_workflow.sql`.
+- Documento: [Lote 3 — exames complementares](maintenance/2026-10-10-lote3-exames-complementares.md).
+- Implementação inclui catálogo por clínica, itens individuais por encaminhamento, solicitação, agendamento, registro operacional de realização e cancelamento com justificativa.
+- O lote ainda não tem UI, preço por contrato nem faturamento; não está validado. Os testes serão planejados e executados na etapa final.
+
+
+### Atualização — Lote 4: faturamento da clínica (2026-10-10)
+
+- Migration: `supabase/migrations/20261010220000_occupational_health_billing_foundation.sql`.
+- Documento: [Lote 4 — faturamento da Saúde Ocupacional](maintenance/2026-10-10-lote4-faturamento-clinica.md).
+- Implementada a fundação de preço contratual com vigência, ciclos e itens de cobrança com snapshots, prevenção de duplicidade, fechamento, referência de emissão externa, pagamento, ajustes e reversão em rascunho.
+- Integração de boleto/banco permanece não implementada até decisão de escopo; UI e exportações também pendentes.
+- Validação adiada para a etapa final; migrations ainda não aplicadas ao Supabase remoto.
+
+
+### Atualização — Lote 5 e Lote 6: interface clínica e faturamento (2026-10-11)
+
+- **Lote 5 — Em progresso, implementação versionada e não validada:** página de operações clínicas com fila FIFO e fluxo de exames complementares, rota protegida e atalho no portal Saúde Ocupacional. Evidência: [status do Lote 5](maintenance/2026-10-10-lote5-interface-clinica-status.md).
+- **Lote 6 — Em progresso, implementação versionada e não validada:** interface de contratos/preços, vigência de preços, ciclos de cobrança, itens, fechamento, referência de fatura externa, pagamento, ajustes, reversão de rascunho, relatório macro e exportação CSV. Evidência: [status do Lote 6](maintenance/2026-10-11-lote6-interface-faturamento-clinica.md).
+- Migration adicional: `20261010230000_occupational_health_billing_read_rpcs.sql`, com RPCs protegidas para listar contratos da clínica e preços por contrato. Não foi aplicada ao banco remoto.
+- Percentual de implementação dos lotes 5/6: **aproximadamente 70% do escopo de interface previsto**, sem equivalência a validação técnica ou funcional. Ainda faltam revisão de versionamento histórico de preços, exportações XLSX/PDF, refinamento de permissões/experiência por perfil e eventual decisão de integração de boleto/banco.
+- **Validações seguem adiadas por orientação do usuário:** não executar build, type-check, testes automatizados ou validação funcional neste momento. O plano integrado de testes será criado ao final do desenvolvimento.
+- Nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; não houve merge para `main`, criação de PR ou deploy Vercel. Deploy permanece manual e depende de autorização explícita.
+
+
+### Atualização — Lote 7: catálogo de serviços faturáveis (2026-10-11)
+
+- **Status:** em progresso; código versionado, não validado.
+- Adicionada a RPC `save_occupational_health_service_catalog_item` para cadastrar/editar catálogo com tipo faturável (admissional, complementar ou outro), descrição e situação ativa/inativa, exigindo perfil administrativo da clínica.
+- A RPC de listagem passa a retornar o tipo faturável. A interface adiciona aba de catálogo e seletor explícito de clínica, evitando assumir a primeira clínica do usuário.
+- A mudança de tipo é bloqueada quando o serviço já possui preço, item faturável ou uso operacional; a base impede mais de um item admissional ativo por clínica.
+- Evidência: [Lote 7 — catálogo de serviços](maintenance/2026-10-11-lote7-catalogo-servicos.md).
+- Nenhum build/teste/type-check foi executado. A migration não foi aplicada ao Supabase remoto; sem merge, PR ou deploy. O plano integrado de testes permanece para a etapa final.
+
+
+### Atualização — Lote 8: integridade do histórico de preços e faturamento (2026-10-11)
+
+- **Status:** em progresso; migration versionada, não validada.
+- Cada novo item de faturamento registra o preço contratual de origem, além dos snapshots de valor/data/descrição.
+- A geração de cobrança continua considerando serviços realizados antes de o item de catálogo ser inativado, desde que o preço esteja vigente na data do serviço.
+- Preços já utilizados ficam protegidos contra mudança de valor/início de vigência; permite-se encurtar a vigência com salvaguardas para não excluir serviços já faturados. Código/nome/tipo do catálogo ficam protegidos contra alteração depois de preço/uso.
+- Evidência: [Lote 8 — integridade do histórico](maintenance/2026-10-11-lote8-integridade-historico-faturamento.md).
+- Nenhuma validação técnica/funcional foi executada; nenhuma migration foi aplicada ao Supabase remoto; sem merge, PR ou deploy. O plano integrado de testes continua reservado à etapa final.
+
+
+### Atualização — Lote 9: contexto operacional e escopo de interface por perfil (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Nova RPC `list_my_clinic_operational_tenants` fornece apenas clínicas ativas em que o usuário tem associação operacional ativa (administrador, equipe clínica ou médico), incluindo sinalizador de administração.
+- A tela de operações permite selecionar o contexto de clínica para fila/exames e mostra catálogo/faturamento apenas quando o usuário é administrador daquela clínica. O acesso continua protegido pelas RPCs do banco; ocultar uma aba não é tratado como controle de segurança suficiente.
+- Evidência: [Lote 9 — contexto operacional](maintenance/2026-10-11-lote9-contexto-operacional-clinica.md).
+- Testes negativos de acesso cruzado e chamadas diretas às RPCs ficam para a etapa integrada final. Nenhum teste/build/type-check foi executado; banco remoto e Vercel permanecem intocados.
+
+
+### Atualização — Lote 10: exceções justificadas à fila FIFO (2026-10-11)
+
+- **Status:** em progresso; código versionado, não validado.
+- Criada RPC administrativa para listar encaminhamentos não atribuídos da clínica selecionada e adicionar/remover exceção de prioridade.
+- A interface exige justificativa ao priorizar e apresenta a justificativa já registrada ao administrador. A RPC existente registra auditoria/histórico; a posição FIFO original permanece intacta.
+- Evidência: [Lote 10 — exceções FIFO](maintenance/2026-10-11-lote10-excecoes-fifo.md).
+- Testes de autorização, tenant cruzado e preservação FIFO serão parte do plano integrado ao final. Nenhum teste/build/type-check foi executado; sem migration remota, merge ou deploy.
+
+
+### Atualização — Lote 11: agendamento e cancelamento de exames complementares (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- O agendamento agora exige selecionar data/hora e confirmar explicitamente, evitando chamar a RPC a cada alteração parcial do campo.
+- A interface permite cancelar exame complementar não realizado com justificativa e apresenta o motivo registrado; a RPC mantém as restrições por perfil e a trilha de auditoria.
+- Evidência: [Lote 11 — agendamento e cancelamento](maintenance/2026-10-11-lote11-agendamento-cancelamento-complementares.md).
+- Testes de transição, data/hora e autorização ficam para a etapa integrada final. Nenhum build/teste/type-check foi executado; banco remoto e Vercel seguem intocados.
+
+
+### Atualização — Lote 12: relatório macro com status financeiros separados (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Nova RPC get_occupational_health_billing_macro_report_v2 separa contagem de itens faturáveis, itens em rascunho e itens incluídos em ciclos fechados, além de valores em rascunho, faturados e ajustes.
+- A interface por empresa/período foi atualizada para mostrar essas distinções e exportá-las em CSV.
+- Evidência: [Lote 12 — relatório macro](maintenance/2026-10-11-lote12-relatorio-macro-faturamento.md).
+- A validação de reconciliação de totais, períodos e isolamento de tenant fica para o plano integrado final. Nenhum teste/build/type-check foi executado; sem publicação remota.
+
+
+### Atualização — Lote 13: fila e encaminhamentos escopados por clínica (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Fila disponível, exames atribuídos e seletor de encaminhamentos complementares agora consultam RPCs com a clínica selecionada, evitando misturar dados operacionais entre clínicas.
+- Médico vê somente seus próprios encaminhamentos atribuídos na seção “Meus exames”; a fila disponível contém somente casos ainda não atribuídos e dados operacionais mínimos.
+- Evidência: [Lote 13 — fila por clínica](maintenance/2026-10-11-lote13-fila-escopada-por-clinica.md).
+- Isolamento multi-clínica e acesso por papel serão testados na etapa final. Nenhum teste/build/type-check foi executado; sem aplicação de migrations remotas ou deploy.
+
+
+### Atualização — Lote 14: desistência de candidatura por RH (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Nova RPC `rpc_cancelar_candidatura_rh` exige papel autorizado no tenant da vaga, justificativa, vínculo candidatura/vaga e bloqueia desistência de candidato já contratado ou terminal.
+- A interface de RH recebeu ação separada para encerrar candidatura por desistência; não é a mesma operação que reprovar, cancelar exame complementar ou cancelar agendamento.
+- O status de desistência não conta como vaga preenchida; o contador continua considerando somente `Contratado`.
+- Evidência: [Lote 14 — desistência por RH](maintenance/2026-10-11-lote14-desistencia-candidatura-rh.md).
+- Compatibilidade de estados legados e controles de autorização serão testados na etapa final. Nenhum teste/build/type-check foi executado; sem aplicação de migration remota, merge ou deploy.
+
+
+### Atualização — Lote 15: status canônico de contratação e headcount (2026-10-11)
+
+- **Status:** concluído — não validado (correção de interface e documentação).
+- A ação de RH agora envia status `Contratado` ao alcançar a fase `Contratado`, em vez de `APROVADA`, para acionar as proteções transacionais do banco já versionadas no Lote 1.
+- O indicador de contratações do dashboard passa a contar exclusivamente status `Contratado`, alinhado ao contador de posições preenchidas.
+- Não foram alterados dados legados nem a migration do Lote 1. Estados antigos com fase `Contratado` e status `APROVADA` permanecem pendentes de reconciliação aprovada.
+- Evidência: [Lote 15 — status canônico de contratação](maintenance/2026-10-11-lote15-status-canonico-contratacao-headcount.md).
+- Nenhum teste, build, type-check ou E2E foi executado. Nenhuma migration remota, merge, PR ou deploy foi realizado.
+
+
+### Atualização — Lote 16: transições de candidatura pela RPC protegida (2026-10-11)
+
+- **Status:** implementação concluída — não validada.
+- Criada a migration `20261011150000_harden_candidatura_process_transition.sql` para reforçar `rpc_atualizar_candidatura_processo`: autorização no tenant corrente (incluindo a permissão existente de `is_platform_master_admin()`), bloqueio de estados terminais, consistência entre fase/status de contratação e reprovação, e execução restrita a `authenticated`. A mesma autorização foi replicada no trigger de proteção contra UPDATE direto.
+- Os principais caminhos de RH em `src/pages/HR.tsx` — modal, ação em massa, ação individual, salvamento de entrevista e encaminhamento para exame — agora usam a RPC para transições de fase/status.
+- Corrigidos os caminhos que ainda marcavam a fase `Contratado` como status `APROVADA`.
+- Ajustado o fim do fluxo: a etapa visível `Contrato` é seguida da fase/status canônico `Contratado` na aprovação final, inclusive em ações em massa.
+- O caminho legado da fase `Exame` também encaminha à decisão final canônica; o trigger do banco continua sendo a autoridade para exigir exame admissional apto. A reprovação nessa fase retorna para `Entrevista RH`, preservando o comportamento indicado na interface.
+- **Inventário estático de clientes e Edge Functions:** concluído; não foram identificadas escritas executáveis diretas de fase/status fora da RPC nos caminhos revisados. `HR.tsx` mantém escrita direta apenas para campos de visualização/leitura; `Candidate.tsx` contém um UPDATE legado comentado. **Limite pendente:** a revisão estática das policies/ACLs das tabelas-alvo candidaturas e medical_referrals foi feita nos Lotes 17–18; ainda falta a revisão global de todas as policies/RLS, triggers e consumidores externos. Não considerar validado até executar a bateria de testes autorizada.
+- Testes/build/type-check/E2E permanecem adiados para o plano de validação final. A migration não foi aplicada remotamente e não houve merge/PR/deploy.
+- Evidência: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
+
+- Complemento de integridade do Lote 16: trigger de tabela impede alterações de fase/status por usuário sem papel RH autorizado, bloqueia reabertura de estados terminais, exige justificativa/auditoria para desistência e torna atômico o registro de auditoria com a transição. A migration continua não validada e não aplicada remotamente.
+
+
+## Lote 17 — Integridade do ciclo de vida clínico e fechamento de escrita direta (2026-10-11)
+
+**Status geral: Em progresso — 70%.** A revisão estática e a primeira versão da migration foram concluídas; a integração e a validação em ambiente continuam pendentes. Este percentual não significa validação de segurança em runtime.
+
+- **Concluído — análise estática dos caminhos principais:** src/pages/OccupationalHealth.tsx atualiza encaminhamentos pela RPC update_medical_referral; src/pages/ClinicOperations.tsx usa RPCs para fila, atribuição, devolução e priorização. Não foi encontrado UPDATE direto nesses caminhos de interface revisados. Edge Functions apply-to-vacancy, tenant-clinic-chat-storage e storage-authorize foram inspecionadas quanto a escritas de medical_referrals; não foi localizada escrita direta nesses caminhos.
+- **Concluído — migration versionada:** supabase/migrations/20261011160000_harden_medical_referral_writes_and_transitions.sql.
+- **Implementado, não validado — reforço explícito de privilégios:** a migration revoga UPDATE em medical_referrals para PUBLIC, anon e authenticated. A revisão da migration fundacional encontrou que a ACL já revogava todos os privilégios de tabela desses papéis e concedia acesso de tabela ao service_role; portanto, o novo REVOKE reforça/documenta a barreira, mas não deve ser descrito como correção comprovada de um bypass ativo. O owner das RPCs ainda precisa ser confirmado.
+- **Implementado, não validado — máquina de estados clínica:** referred → scheduled → attended → result_reported → completed; rejeita saltos, regressões e alterações após completed. Agendamento exige data/local; resultado exige aptidão explícita e perfil clínico autorizado.
+- **Implementado, não validado — listagens e conclusão por papel:** secretaria/equipe com papel de scheduler mantém a visão operacional da clínica mesmo quando o mesmo usuário também tem papel de médico; médico sem papel administrativo continua limitado aos próprios exames. A RPC list_my_medical_referrals também foi ajustada para retornar ao médico apenas os encaminhamentos atribuídos a ele e omitir o e-mail do candidato na visão do médico, mantendo o contato para a equipe administrativa autorizada. A interface ganhou a ação Concluir atendimento depois do registro do resultado; concluir não sobrescreve o resultado médico.
+- **Pendente — inventário completo de escritores:** confirmar todos os componentes, Edge Functions, integrações e jobs que eventualmente atualizem medical_referrals diretamente. Se algum escritor legítimo for encontrado, migrá-lo para RPC antes de aplicar a migration.
+- **Pendente — compatibilidade dos estados legados:** identificar encaminhamentos que já estejam em estados que não seguem a sequência estrita; não corrigir registros automaticamente.
+- **Pendente — revisão final de grants/RLS e owner efetivo das RPCs:** a revogação de UPDATE pressupõe que as RPCs SECURITY DEFINER executem com owner autorizado a escrever na tabela.
+- **Pendente — testes integrados:** não executar build, type-check, testes automatizados ou E2E antes da etapa final definida. A migration não foi aplicada ao Supabase remoto.
+
+Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](maintenance/2026-10-11-lote17-integridade-ciclo-clinico.md).
+
+
+## Lote 18 — Superfície de escrita de candidaturas (2026-10-11)
+
+**Status geral: Em progresso — 60%.** A RPC e a troca do único UPDATE direto executável identificado na interface foram versionadas; faltam validação integrada e confirmação de todos os consumidores externos.
+
+- **Implementado, não validado:** criada a RPC rpc_marcar_candidatura_visualizada, que confirma candidatura, vínculo com vaga/tenant, tenant corrente e papel RH/administrador antes de marcar visualizado, rh_visualizou_recrutamento e updated_at.
+- **Implementado, não validado:** o UPDATE direto em src/pages/HR.tsx foi substituído pela RPC.
+- **Implementado, não validado:** a migration revoga UPDATE direto em public.candidaturas para PUBLIC, anon e authenticated, centralizando alterações executáveis de negócio em RPCs SECURITY DEFINER.
+- **Revisão estática prévia:** não foram encontrados outros UPDATEs executáveis de fase/status nos caminhos de cliente e Edge Functions inspecionados; o UPDATE antigo de Candidate.tsx está comentado. O inventário deve ser reconfirmado antes de aplicar.
+- **Pendente:** confirmar todas as funções/jobs externos que escrevem candidaturas, owner/ACL das RPCs, grants e políticas RLS efetivas. Nenhum teste/build/type-check foi executado.
+- **Pendente:** validar que a tela RH consegue marcar visualização e que candidatura, desistência, contratação, contagem de vagas e fila de análise continuam operacionais.
+
+Migration: supabase/migrations/20261011170000_harden_candidatura_client_write_surface.sql.
+
+
+## Lote 19 — Consistência das ações individuais e em massa de RH (2026-10-11)
+
+**Status: Implementado em código — não validado.**
+
+- A ação em massa agora processa cada candidatura com resultado independente; uma falha em uma candidatura não cancela o acompanhamento das demais.
+- Atualizações confirmadas são refletidas na tela; falhas permanecem selecionadas para nova tentativa.
+- Falha no registro de histórico é reportada separadamente da transição que já foi confirmada pela RPC.
+- A ação individual deixa de silenciar erro de leitura, trata falha do histórico separadamente e move Reserva para a fase canônica Banco de Talentos.
+- **Pendente:** confirmar por build/type-check e E2E o narrowing TypeScript, cenários com todas as operações bem-sucedidas, falha parcial, falha de histórico e retry.
+- **Pendente:** validar que contagens e relatórios após ação em massa correspondem ao estado real no banco; nenhuma mudança de dado foi feita manualmente.
+
+Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11-lote19-confiabilidade-acoes-rh.md).
+
+
+## Marco de validação de código — 2026-10-11
+
+- **Type-check:** aprovado pela GitHub Actions no commit de código 70cfc6865a7fb74370c972e6205add9deed17f6f.
+- **Build Vite de produção:** aprovado no mesmo run, sem deploy.
+- **Ajustes motivados pelo primeiro type-check:** corrigida condição sem chaves na lista de vagas do candidato; contratos de resolveAuthorizedHomePath; tipo da importação lazy de TenantClinicChat; EventoTipo com DESISTÊNCIA e retorno booleano do registro de evento; estado calendarTimezone; confiabilidade das ações individuais/em massa.
+- **Status geral dos lotes 16–19:** Implementado em código; **não validado integralmente**. Não houve aplicação de migration no Supabase remoto e nenhum E2E funcional de banco/clínica foi executado.
+- Próxima etapa obrigatória: executar [o plano integrado dos Lotes 16–19](maintenance/2026-10-11-validacao-integrada-lotes16-19.md) em ambiente de homologação depois de aprovar a aplicação das migrations.

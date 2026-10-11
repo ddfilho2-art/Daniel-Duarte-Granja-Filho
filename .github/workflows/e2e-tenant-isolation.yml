@@ -62,10 +62,10 @@ jobs:
       E2E_REAL_AI_CONCURRENCY: ${{ inputs.real_ai_concurrency }}
 
     steps:
-      - name: Checkout
+      - name: Checkout do commit acionado
         uses: actions/checkout@v5
         with:
-          ref: main
+          ref: ${{ github.sha }}
 
       - name: Configurar Node.js
         uses: actions/setup-node@v5

@@ -1,0 +1,84 @@
+name: Branch Validation - Maintenance
+
+on:
+  push:
+    branches:
+      - "maintenance/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintenance-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-and-build:
+    name: Typecheck and production build (no deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  database-migrations:
+    name: Replay all Supabase migrations in isolated local DB
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # The legacy migration filenames no longer reflect the exact order
+      # recorded on the current Supabase project. Rename only in this disposable
+      # CI checkout so the replay follows the historical dependency order.
+      - name: Normalize legacy migration order for disposable replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          migrations="supabase/migrations"
+          mv "$migrations/20260926140000_legacy_recruitment_baseline.sql" "$migrations/20260808095000_legacy_recruitment_baseline.sql"
+          mv "$migrations/20260926130000_email_queue_retry_claim.sql" "$migrations/20260811120500_email_queue_retry_claim.sql"
+          mv "$migrations/20260808101000_legacy_rpc_hardening.sql" "$migrations/20260811121000_legacy_rpc_hardening.sql"
+          mv "$migrations/20260927140000_reconcile_rls_policy_intent.sql" "$migrations/20260927140200_reconcile_rls_policy_intent.sql"
+
+      - name: Start local Supabase stack
+        run: supabase start
+
+      - name: Replay full migration chain without seed data
+        run: supabase db reset --local --no-seed
+
+      - name: Confirm migration state
+        run: supabase migration list --local
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase stop --no-backup

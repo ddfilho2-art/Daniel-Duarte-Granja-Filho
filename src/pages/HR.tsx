@@ -137,6 +137,10 @@ const ETAPAS_PROCESSO = [
 const getProximaFase = (faseAtual: string, vaga?: any) => {
   const exigeProva = vaga?.exige_prova === true || vaga?.exige_prova === "Sim";
 
+  // The legacy "Exame" action is explicitly labeled as the hiring decision.
+  // The database still requires a linked, non-cancelled fit admission exam.
+  if (faseAtual === "Exame") return "Contratado";
+
   if (faseAtual === "Prova" && !exigeProva) {
     return "Entrevista Gestor";
   }
@@ -153,7 +157,8 @@ const getProximaFase = (faseAtual: string, vaga?: any) => {
 
   let proxima = etapasFiltradas[index + 1];
 
-  return proxima || "Finalizado";
+  // A última etapa configurada é "Contrato"; concluir sua aprovação registra a contratação real.
+  return proxima || "Contratado";
 };
 
 const getStages = (vaga: any) => {
@@ -302,6 +307,8 @@ function CandidateProfileModal({
   const [aiEvaluation, setAiEvaluation] = useState<any>(null);
   const [isReferring, setIsReferring] = useState(false);
   const [referralSuccess, setReferralSuccess] = useState(false);
+  const [showWithdrawForm, setShowWithdrawForm] = useState(false);
+  const [withdrawReason, setWithdrawReason] = useState("");
 
   // Scroll para o topo quando o modal abre
   useEffect(() => {
@@ -663,14 +670,19 @@ function CandidateProfileModal({
         newFase = getProximaFase(dbCurrentFase, vaga);
         newStatus = "APROVADA";
       } else if (action === "Reprovar") {
-        newFase = "Encerrado";
-        newStatus = "REPROVADA";
+        if (dbCurrentFase === "Exame") {
+          newFase = "Entrevista RH";
+          newStatus = "APROVADA";
+        } else {
+          newFase = "Encerrado";
+          newStatus = "REPROVADA";
+        }
       } else if (action === "Reserva") {
         newFase = dbCurrentFase;
         newStatus = "RESERVA";
       }
 
-      if (newFase === "Contratado") newStatus = "APROVADA";
+      if (newFase === "Contratado") newStatus = "Contratado";
 
       const payload = {
         fase: newFase,
@@ -687,13 +699,18 @@ function CandidateProfileModal({
 
       console.log("Payload enviado (CandidateProfileModal):", payload);
 
-      const { data, error: updateError } = await supabase
-        .from("candidaturas")
-        .update(payload)
-        .eq("id", candidaturaId)
-        .select();
+      const { data, error: updateError } = await supabase.rpc(
+        "rpc_atualizar_candidatura_processo",
+        {
+          p_id: candidaturaId,
+          p_fase: payload.fase,
+          p_status: payload.status,
+          p_visualizado: payload.visualizado,
+          p_updated_at: payload.updated_at,
+        },
+      );
 
-      console.log("Resposta (CandidateProfileModal):", data, updateError);
+      console.log("Resposta (CandidateProfileModal RPC):", data, updateError);
 
       if (updateError) throw updateError;
 
@@ -837,6 +854,46 @@ function CandidateProfileModal({
     }
   };
 
+  const handleWithdrawCandidatura = async () => {
+    if (!candidaturaId || withdrawReason.trim().length < 5) return;
+    setIsProcessing(true);
+    try {
+      const { error } = await supabase.rpc("rpc_cancelar_candidatura_rh", {
+        p_id: candidaturaId,
+        p_reason: withdrawReason.trim(),
+      });
+      if (error) throw error;
+
+      try {
+        const historyLogged = await logCandidaturaEvento(
+          candidaturaId,
+          "DESISTÊNCIA",
+          `Candidatura encerrada por RH. Motivo: ${withdrawReason.trim()}`,
+          profile?.id,
+        );
+        if (!historyLogged) {
+          console.warn("A auditoria do banco foi gravada, mas o histórico visual não foi atualizado.");
+        }
+      } catch (historyError) {
+        console.warn("A auditoria do banco foi gravada, mas o histórico visual não foi atualizado:", historyError);
+      }
+
+      setCandidatura((current: any) => current
+        ? { ...current, status: "Desistência", fase: "Encerrado", motivo_declinio: withdrawReason.trim() }
+        : current);
+      setShowWithdrawForm(false);
+      setWithdrawReason("");
+      if (onActionComplete) onActionComplete();
+      alert("Candidatura encerrada por desistência. A posição só é considerada preenchida quando o status é Contratado.");
+      onClose();
+    } catch (error) {
+      console.error("Erro ao encerrar candidatura por desistência:", error);
+      alert(error instanceof Error ? error.message : "Não foi possível encerrar a candidatura.");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -907,6 +964,49 @@ function CandidateProfileModal({
                             ? "Reprovar (Retorna p/ Entrevista RH)"
                             : "Reprovar"}
                       </button>
+                      {!["contratado", "desistência", "desistencia", "reprovada"].includes(String(currentStatus || "").trim().toLowerCase()) && !["contratado", "encerrado", "finalizado"].includes(String(currentFase || "").trim().toLowerCase()) && (
+                        <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                          {!showWithdrawForm ? (
+                            <button
+                              onClick={() => setShowWithdrawForm(true)}
+                              disabled={isProcessing}
+                              className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-medium text-amber-900 disabled:opacity-50"
+                            >
+                              Encerrar candidatura por desistência
+                            </button>
+                          ) : (
+                            <>
+                              <label className="block text-sm font-medium text-amber-950">
+                                Motivo do encerramento (obrigatório)
+                                <textarea
+                                  value={withdrawReason}
+                                  onChange={(event) => setWithdrawReason(event.target.value)}
+                                  maxLength={1000}
+                                  rows={3}
+                                  className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                                  placeholder="Registre o motivo da desistência/encerramento."
+                                />
+                              </label>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => void handleWithdrawCandidatura()}
+                                  disabled={isProcessing || withdrawReason.trim().length < 5}
+                                  className="flex-1 rounded-lg bg-amber-700 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                                >
+                                  Confirmar encerramento
+                                </button>
+                                <button
+                                  onClick={() => { setShowWithdrawForm(false); setWithdrawReason(""); }}
+                                  disabled={isProcessing}
+                                  className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                                >
+                                  Voltar
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
                       <button
                         onClick={() => handleAction("Reserva")}
                         disabled={isProcessing || currentStatus === "RESERVA"}
@@ -946,11 +1046,17 @@ function CandidateProfileModal({
                               });
                               if (rpcError) throw rpcError;
                               // Advance phase to Exame Médico
-                              await supabase.from("candidaturas").update({
-                                fase: "Exame Médico",
-                                status: "APROVADA",
-                                updated_at: new Date().toISOString(),
-                              }).eq("id", candidaturaId);
+                              const { error: transitionError } = await supabase.rpc(
+                                "rpc_atualizar_candidatura_processo",
+                                {
+                                  p_id: candidaturaId,
+                                  p_fase: "Exame Médico",
+                                  p_status: "APROVADA",
+                                  p_visualizado: true,
+                                  p_updated_at: new Date().toISOString(),
+                                },
+                              );
+                              if (transitionError) throw transitionError;
                               setReferralSuccess(true);
                               setTimeout(() => { setReferralSuccess(false); onActionComplete?.(); }, 2000);
                             } catch (err: any) {
@@ -1801,9 +1907,7 @@ export function HRDashboard() {
 
         const totalCandidaturas = candidaturas.length;
         const contratados = candidaturas.filter((c: any) => {
-          const status = c.status;
-          const fase = c.fase || "Triagem";
-          return status === "APROVADA" || fase === "Contratado";
+          return String(c.status || "").trim().toLowerCase() === "contratado";
         }).length;
         const taxaConversao =
           totalCandidaturas > 0
@@ -5065,103 +5169,138 @@ export function HRCandidatos() {
   const handleAction = async (action: "Aprovar" | "Reprovar" | "Reserva") => {
     if (selectedCandidates.length === 0) return;
 
+    const vaga = vagas.find((v) => v.id === selectedVaga);
+    const attemptedIds = [...selectedCandidates];
+    const historyFailures: string[] = [];
+
     try {
-      const vaga = vagas.find((v) => v.id === selectedVaga);
+      // Processa cada candidatura isoladamente. Uma falha não cancela a espera
+      // pelos demais itens nem faz o frontend ocultar atualizações já confirmadas.
+      const outcomes = await Promise.all(
+        attemptedIds.map(async (id) => {
+          try {
+            const { data: currentData, error: fetchError } = await supabase
+              .from("candidaturas")
+              .select("*")
+              .eq("id", id)
+              .maybeSingle();
 
-      const updatedCandidates = await Promise.all(
-        selectedCandidates.map(async (id) => {
-          const { data: currentData, error: fetchError } = await supabase
-            .from("candidaturas")
-            .select("*")
-            .eq("id", id)
-            .maybeSingle();
-
-          if (fetchError || !currentData) return null;
-
-          const currentFase =
-            currentData.fase || currentData.status || "Triagem";
-          const stages = getStages(vaga);
-
-          let newFase = currentFase;
-          let newStatus = null;
-
-          if (action === "Aprovar") {
-            const currentIndex = stages.findIndex((s) => s.id === currentFase);
-            if (currentIndex >= 0 && currentIndex < stages.length - 1) {
-              newFase = stages[currentIndex + 1].id;
+            if (fetchError) {
+              console.error("Falha ao consultar candidatura da ação em massa:", id, fetchError);
+              return { id, ok: false as const, reason: "consulta" };
             }
-            newStatus = "APROVADA";
-          } else if (action === "Reprovar") {
-            newFase = "Encerrado";
-            newStatus = "REPROVADA";
-          } else if (action === "Reserva") {
-            newFase = "Banco de Talentos";
-            newStatus = "RESERVA";
+            if (!currentData) return { id, ok: false as const, reason: "indisponível" };
+
+            const currentFase = currentData.fase || currentData.status || "Triagem";
+            const stages = getStages(vaga);
+            let newFase = currentFase;
+            let newStatus = currentData.status || "ATIVO";
+
+            if (action === "Aprovar") {
+              const currentIndex = stages.findIndex((s) => s.id === currentFase);
+              if (currentFase === "Exame") {
+                newFase = "Contratado";
+                newStatus = "Contratado";
+              } else if (currentIndex >= 0 && currentIndex < stages.length - 1) {
+                newFase = stages[currentIndex + 1].id;
+                newStatus = "APROVADA";
+              } else if (currentIndex === stages.length - 1) {
+                newFase = "Contratado";
+                newStatus = "Contratado";
+              } else {
+                newStatus = "APROVADA";
+              }
+            } else if (action === "Reprovar") {
+              if (currentFase === "Exame") {
+                newFase = "Entrevista RH";
+                newStatus = "APROVADA";
+              } else {
+                newFase = "Encerrado";
+                newStatus = "REPROVADA";
+              }
+            } else {
+              newFase = "Banco de Talentos";
+              newStatus = "RESERVA";
+            }
+
+            if (newFase === "Contratado") newStatus = "Contratado";
+            if (newStatus === "REPROVADA") newFase = "Encerrado";
+
+            const { error: updateError } = await supabase.rpc(
+              "rpc_atualizar_candidatura_processo",
+              {
+                p_id: id,
+                p_fase: newFase,
+                p_status: newStatus,
+                p_visualizado: true,
+                p_updated_at: new Date().toISOString(),
+              },
+            );
+
+            if (updateError) {
+              console.error("Falha ao atualizar candidatura na ação em massa:", id, updateError);
+              return { id, ok: false as const, reason: "atualização" };
+            }
+
+            try {
+              const historyLogged = await logCandidaturaEvento(
+                id,
+                action.toUpperCase() as any,
+                `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
+                profile?.id,
+              );
+              if (!historyLogged) throw new Error("candidatura_event_history_not_persisted");
+            } catch (historyError) {
+              historyFailures.push(id);
+              console.error("Transição concluída, mas falhou o histórico:", id, historyError);
+            }
+
+            return { id, ok: true as const, newStatus };
+          } catch (itemError) {
+            console.error("Falha inesperada em item da ação em massa:", id, itemError);
+            return { id, ok: false as const, reason: "erro inesperado" };
           }
-
-          if (newFase === "Contratado") newStatus = "APROVADA";
-
-          const payload = {
-            status: newStatus,
-            fase: newFase,
-            visualizado: true,
-            updated_at: new Date().toISOString(),
-          };
-
-          console.log("Payload enviado (handleAction):", payload);
-
-          const { data, error: updateError } = await supabase
-            .from("candidaturas")
-            .update(payload)
-            .eq("id", id)
-            .select();
-
-          console.log("Resposta (handleAction):", data, updateError);
-
-          if (updateError) throw updateError;
-
-          // Registrar evento de histórico
-          await logCandidaturaEvento(
-            id,
-            action.toUpperCase() as any,
-            `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
-            profile?.id,
-          );
-
-          return { id, newStatus };
         }),
       );
 
-      const validUpdates = updatedCandidates.filter(Boolean);
+      const succeeded = outcomes.filter((item) => item.ok);
+      const failed = outcomes.filter((item) => !item.ok);
+      const succeededIds = new Set(succeeded.map((item) => item.id));
 
-      setCandidatos(
-        candidatos.filter((c) => !validUpdates.find((u) => u?.id === c.id)),
-      );
-      setVagas(
-        vagas.map((v) =>
-          v.id === selectedVaga
-            ? {
-                ...v,
-                candidaturas: Math.max(0, v.candidaturas - validUpdates.length),
-              }
-            : v,
-        ),
-      );
+      setCandidatos((current) => current.filter((candidate) => !succeededIds.has(candidate.id)));
+      if (succeeded.length > 0) {
+        setVagas((current) =>
+          current.map((v) =>
+            v.id === selectedVaga
+              ? { ...v, candidaturas: Math.max(0, v.candidaturas - succeeded.length) }
+              : v,
+          ),
+        );
+      }
 
       try {
         await logAudit(
           "Ação em Massa",
           "Candidatos",
-          `Ação ${action} aplicada a ${validUpdates.length} candidatos.`,
+          `Ação ${action}: ${succeeded.length} concluídas, ${failed.length} falharam, ${historyFailures.length} sem histórico.`,
         );
       } catch (logError) {
-        console.warn("Erro ao registrar log:", logError);
+        console.warn("Transições processadas, mas falhou a auditoria da ação em massa:", logError);
       }
-      alert(`Ação aplicada a ${validUpdates.length} candidatos.`);
-      setSelectedCandidates([]);
+
+      setSelectedCandidates(failed.map((item) => item.id));
+      if (failed.length === 0 && historyFailures.length === 0) {
+        alert(`Ação aplicada a ${succeeded.length} candidatos.`);
+      } else {
+        alert(
+          `Resultado parcial: ${succeeded.length} candidaturas atualizadas; ${failed.length} falharam.` +
+          (historyFailures.length > 0 ? ` O histórico falhou em ${historyFailures.length} candidatura(s); verifique os logs.` : "") +
+          (failed.length > 0 ? " As candidaturas que falharam permaneceram selecionadas para nova tentativa." : ""),
+        );
+      }
     } catch (error) {
-      console.error("Erro ao aplicar ação em massa:", error);
-      alert("Erro ao aplicar ação. Tente novamente.");
+      console.error("Erro ao preparar ação em massa:", error);
+      alert("Não foi possível concluir a ação em massa. Verifique a conexão e tente novamente.");
     }
   };
 
@@ -5169,6 +5308,7 @@ export function HRCandidatos() {
     id: string,
     action: "Aprovar" | "Reprovar" | "Reserva",
   ) => {
+    let historyFailed = false;
     try {
       const { data: currentData, error: fetchError } = await supabase
         .from("candidaturas")
@@ -5176,96 +5316,96 @@ export function HRCandidatos() {
         .eq("id", id)
         .maybeSingle();
 
-      if (fetchError || !currentData) return;
+      if (fetchError) throw fetchError;
+      if (!currentData) {
+        alert("Candidatura não encontrada ou sem permissão para acessá-la.");
+        return;
+      }
 
       const currentFase = currentData.fase ?? "Triagem";
-      const currentStatus = currentData.status ?? "ATIVO";
       const vaga = vagas.find((v) => v.id === selectedVaga);
-
       let newFase = currentFase;
-      let newStatus = currentStatus;
+      let newStatus = currentData.status ?? "ATIVO";
 
       if (action === "Aprovar") {
         newFase = getProximaFase(currentFase, vaga);
-        newStatus = newFase === "Contratado" ? "APROVADA" : "ATIVO";
+        newStatus = newFase === "Contratado" ? "Contratado" : "ATIVO";
       } else if (action === "Reprovar") {
-        newStatus = "REPROVADA";
-      } else if (action === "Reserva") {
+        if (currentFase === "Exame") {
+          newStatus = "APROVADA";
+          newFase = "Entrevista RH";
+        } else {
+          newStatus = "REPROVADA";
+          newFase = "Encerrado";
+        }
+      } else {
         newStatus = "RESERVA";
+        newFase = "Banco de Talentos";
       }
-
-      console.log(
-        "Ação:",
-        action,
-        "Fase Atual:",
-        currentFase,
-        "Nova Fase:",
-        newFase,
-        "Novo Status:",
-        newStatus,
-      );
 
       if (
         newFase === currentFase &&
         newStatus === currentData.status &&
         action === "Aprovar"
       ) {
-        // Se já está na última fase e clicou aprovar, talvez queira apenas marcar como aprovado
-        newStatus = "APROVADA";
+        newStatus = newFase === "Contratado" ? "Contratado" : "APROVADA";
       }
 
       if (newFase === currentFase && newStatus === currentData.status) {
-        console.log("Nenhuma mudança detectada, abortando update.");
+        alert("A candidatura já está nessa situação; nenhuma alteração foi necessária.");
         return;
       }
 
-      const payload = {
-        status: newStatus,
-        fase: newFase,
-        visualizado: true,
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("Payload enviado (handleSingleAction):", payload);
-
-      const { data, error: updateError } = await supabase
-        .from("candidaturas")
-        .update(payload)
-        .eq("id", id)
-        .select();
-
-      console.log("Resposta (handleSingleAction):", data, updateError);
-
+      const { error: updateError } = await supabase.rpc(
+        "rpc_atualizar_candidatura_processo",
+        {
+          p_id: id,
+          p_fase: newFase,
+          p_status: newStatus,
+          p_visualizado: true,
+          p_updated_at: new Date().toISOString(),
+        },
+      );
       if (updateError) throw updateError;
 
-      // Registrar evento de histórico
-      await logCandidaturaEvento(
-        id,
-        action.toUpperCase() as any,
-        `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
-        profile?.id,
-      );
+      try {
+        const historyLogged = await logCandidaturaEvento(
+          id,
+          action.toUpperCase() as any,
+          `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
+          profile?.id,
+        );
+        if (!historyLogged) throw new Error("candidatura_event_history_not_persisted");
+      } catch (historyError) {
+        historyFailed = true;
+        console.error("Transição concluída, mas falhou o histórico:", id, historyError);
+      }
 
-      setCandidatos(candidatos.filter((c) => c.id !== id));
-      setVagas(
-        vagas.map((v) =>
+      setCandidatos((current) => current.filter((candidate) => candidate.id !== id));
+      setVagas((current) =>
+        current.map((v) =>
           v.id === selectedVaga
             ? { ...v, candidaturas: Math.max(0, v.candidaturas - 1) }
             : v,
         ),
       );
+
       try {
         await logAudit(
           "Ação Individual",
           "Candidatos",
-          `Ação ${action} aplicada a 1 candidato.`,
+          `Ação ${action} aplicada a 1 candidato; fase final: ${newFase}; status: ${newStatus}.`,
         );
       } catch (logError) {
-        console.warn("Erro ao registrar log:", logError);
+        console.warn("Transição concluída, mas falhou a auditoria da ação individual:", logError);
+      }
+
+      if (historyFailed) {
+        alert("A candidatura foi atualizada, mas o histórico não foi gravado. Verifique os logs antes de encerrar a manutenção.");
       }
     } catch (error) {
-      console.error("Erro ao aplicar ação:", error);
-      alert("Erro ao aplicar ação. Tente novamente.");
+      console.error("Erro ao aplicar ação individual:", error);
+      alert("Não foi possível atualizar a candidatura. Nenhuma alteração foi confirmada nesta operação; verifique a situação antes de tentar novamente.");
     }
   };
 
@@ -5414,14 +5554,11 @@ export function HRCandidatos() {
                             // Marcar como visualizado se for NOVO
                             if (!c.visualizado) {
                               try {
-                                await supabase
-                                  .from("candidaturas")
-                                  .update({
-                                    visualizado: true,
-                                    rh_visualizou_recrutamento: true,
-                                    updated_at: new Date().toISOString(),
-                                  })
-                                  .eq("id", c.id);
+                                const { error: markViewedError } = await supabase.rpc(
+                                  "rpc_marcar_candidatura_visualizada",
+                                  { p_id: c.id },
+                                );
+                                if (markViewedError) throw markViewedError;
 
                                 // Atualizar estado local
                                 setCandidatos((prev) =>
@@ -6275,7 +6412,8 @@ export function HREntrevistas() {
         }
       }
 
-      if (nextFase === "Contratado") nextStatus = "APROVADA";
+      if (nextFase === "Contratado") nextStatus = "Contratado";
+      if (nextStatus === "REPROVADA") nextFase = "Encerrado";
 
       const payload = {
         fase: nextFase,

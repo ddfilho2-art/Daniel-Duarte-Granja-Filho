@@ -50,7 +50,7 @@ create table if not exists public.analise_ia_candidato (
   error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint analise_ia_input_hash_nonempty check (length(trim(input_hash)) >= 16),
+  constraint analise_ia_input_hash_nonempty check (length(trim(input_hash)) >= 16)
 );
 
 create index if not exists idx_analise_ia_candidato_candidatura

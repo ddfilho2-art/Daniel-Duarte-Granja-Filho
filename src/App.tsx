@@ -38,7 +38,8 @@ const OccupationalHealthPortal = lazyNamed(
   () => import("./pages/OccupationalHealth"),
   "OccupationalHealthPortal",
 );
-const TenantClinicChat = lazyNamed(() => import("./pages/TenantClinicChat"), "TenantClinicChat");
+const ClinicOperations = lazyNamed(() => import("./pages/ClinicOperations"), "ClinicOperations");
+const TenantClinicChat = React.lazy(() => import("./pages/TenantClinicChat").then((module) => ({ default: module.TenantClinicChat })));
 const ClinicUserManagement = lazyNamed(() => import("./pages/ClinicUserManagement"), "ClinicUserManagement");
 
 const MasterDashboard = lazyNamed(() => import("./pages/Master"), "MasterDashboard");
@@ -262,6 +263,7 @@ const ProtectedRoute = ({
           roles: tenantRoles,
           clinicRoles,
           canAdministerTenant,
+          isPlatformMasterAdmin,
         }) || "/";
 
       console.log(
@@ -325,6 +327,8 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+
+            <Route path="/saude-ocupacional/operacoes" element={<ProtectedRoute allowedProfiles={["Clinica"]}><ClinicOperations /></ProtectedRoute>} />
 
             <Route
               path="/saude-ocupacional/conversas"
