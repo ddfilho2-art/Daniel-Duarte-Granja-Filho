@@ -1,0 +1,43 @@
+name: Branch Validation - Maintenance
+
+on:
+  push:
+    branches:
+      - "maintenance/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintenance-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-and-build:
+    name: Typecheck and production build (no deploy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
