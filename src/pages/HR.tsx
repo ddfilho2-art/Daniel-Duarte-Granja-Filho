@@ -5545,14 +5545,11 @@ export function HRCandidatos() {
                             // Marcar como visualizado se for NOVO
                             if (!c.visualizado) {
                               try {
-                                await supabase
-                                  .from("candidaturas")
-                                  .update({
-                                    visualizado: true,
-                                    rh_visualizou_recrutamento: true,
-                                    updated_at: new Date().toISOString(),
-                                  })
-                                  .eq("id", c.id);
+                                const { error: markViewedError } = await supabase.rpc(
+                                  "rpc_marcar_candidatura_visualizada",
+                                  { p_id: c.id },
+                                );
+                                if (markViewedError) throw markViewedError;
 
                                 // Atualizar estado local
                                 setCandidatos((prev) =>
