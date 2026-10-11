@@ -713,3 +713,18 @@ Documento: [status do Lote 5](maintenance/2026-10-10-lote5-interface-clinica-sta
 | Aplicar migrations, publicar funções, merge ou deploy | Não iniciado | Produção intocada; requer autorização explícita |
 
 Documento: [status do Lote 6](maintenance/2026-10-11-lote6-interface-faturamento-clinica.md). O status é de implementação versionada, não de validação. Nenhum teste/build/type-check foi executado.
+
+
+## Manutenção — 2026-10-11 — Lote 7: catálogo de serviços faturáveis
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Cadastro/edição de serviço | Implementado no código — não validado | RPC save_occupational_health_service_catalog_item |
+| Classificação admissional/complementar/outro | Implementado no código — não validado | Tipo faturável devolvido pela RPC de catálogo |
+| Bloqueio de mudança de tipo após uso/preço | Implementado no código — não validado | Evita reinterpretar serviço já usado no fluxo ou faturamento |
+| Seleção explícita da clínica na UI | Implementado no código — não validado | Aba Catálogo de serviços em ClinicOperations |
+| Segurança por tenant e papel | Implementado no código — não validado | Confirmar com testes negativos ao final |
+| Build, type-check e testes | Adiado para a etapa final | Não executar nesta fase |
+| Aplicar migration / merge / deploy | Não iniciado | Produção intocada; exige autorização explícita |
+
+Documento: [status do Lote 7](maintenance/2026-10-11-lote7-catalogo-servicos.md).
