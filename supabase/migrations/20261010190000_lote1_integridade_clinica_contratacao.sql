@@ -184,6 +184,10 @@ begin
     end if;
   end if;
 
+  if tg_op = 'UPDATE' and old.vaga_id is distinct from new.vaga_id then
+    raise exception using errcode = '23514', message = 'application_vacancy_change_forbidden';
+  end if;
+
   if v_vacancy_id is null then
     if tg_op = 'DELETE' then return old; else return new; end if;
   end if;
