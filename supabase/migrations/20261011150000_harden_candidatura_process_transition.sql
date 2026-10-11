@@ -170,6 +170,21 @@ begin
        or nullif(trim(coalesce(new.motivo_declinio, '')), '') is null then
       raise exception using errcode = '22023', message = 'withdrawal_requires_closed_phase_and_reason';
     end if;
+
+    -- The dedicated withdrawal RPC writes its audit record before the update.
+    -- A direct table update cannot silently manufacture a withdrawal without audit.
+    if not exists (
+      select 1
+      from public.tenant_audit_logs l
+      where l.tenant_id = new.tenant_id
+        and l.actor_id = auth.uid()
+        and l.action = 'recruitment.candidatura.withdrawn_by_hr'
+        and l.resource_type = 'candidatura'
+        and l.resource_id = new.id::text
+        and l.details->>'reason' = new.motivo_declinio
+    ) then
+      raise exception using errcode = '42501', message = 'candidatura_withdrawal_audit_required';
+    end if;
   elsif v_new_fase in ('encerrado', 'finalizado') and v_new_status <> 'reprovada' then
     raise exception using errcode = '22023', message = 'closed_phase_requires_rejection_or_dedicated_operation';
   end if;
@@ -186,5 +201,98 @@ drop trigger if exists trg_guard_candidatura_transition_write on public.candidat
 create trigger trg_guard_candidatura_transition_write
 before update of fase, status on public.candidaturas
 for each row execute function public.guard_candidatura_transition_write();
+
+-- Make withdrawal audit atomic with the state transition: the table guard requires
+-- the audit record to exist before status/fase become terminal.
+create or replace function public.rpc_cancelar_candidatura_rh(
+  p_id text,
+  p_reason text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $function$
+declare
+  v_actor uuid := (select auth.uid());
+  v_candidatura public.candidaturas%rowtype;
+  v_vaga public.vagas%rowtype;
+  v_old_status text;
+  v_old_fase text;
+  v_reason text := trim(coalesce(p_reason, ''));
+begin
+  if v_actor is null then
+    raise exception using errcode = '42501', message = 'authentication_required';
+  end if;
+  if length(v_reason) < 5 or length(v_reason) > 1000 then
+    raise exception using errcode = '22023', message = 'candidatura_withdrawal_reason_required';
+  end if;
+
+  select * into v_candidatura
+  from public.candidaturas c
+  where c.id::text = p_id
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'candidatura_not_found';
+  end if;
+
+  select * into v_vaga
+  from public.vagas v
+  where v.id::text = v_candidatura.vaga_id::text
+    and v.tenant_id = v_candidatura.tenant_id
+  for update;
+  if not found then
+    raise exception using errcode = 'P0002', message = 'candidatura_vacancy_not_found';
+  end if;
+
+  if v_candidatura.tenant_id is distinct from public.current_tenant_id()
+     or not public.has_tenant_role(v_vaga.tenant_id, array[
+       'tenant_admin'::public.tenant_role,
+       'tenant_admin_substitute'::public.tenant_role,
+       'hr'::public.tenant_role
+     ]) then
+    raise exception using errcode = '42501', message = 'authorized_hr_required_for_candidatura_withdrawal';
+  end if;
+
+  if lower(trim(coalesce(v_candidatura.status, ''))) in
+       ('contratado', 'desistência', 'desistencia', 'reprovada', 'cancelada')
+     or lower(trim(coalesce(v_candidatura.fase, ''))) in ('contratado', 'encerrado', 'finalizado') then
+    raise exception using errcode = '55000', message = 'candidatura_is_already_terminal_or_hired';
+  end if;
+
+  v_old_status := v_candidatura.status;
+  v_old_fase := v_candidatura.fase;
+
+  -- Insert first so the BEFORE UPDATE trigger can require the matching audit
+  -- record. Any subsequent failure rolls this insert back with the transaction.
+  insert into public.tenant_audit_logs(
+    tenant_id, actor_id, action, resource_type, resource_id, details
+  ) values (
+    v_vaga.tenant_id, v_actor, 'recruitment.candidatura.withdrawn_by_hr',
+    'candidatura', v_candidatura.id::text,
+    jsonb_build_object(
+      'vaga_id', v_vaga.id,
+      'previous_status', v_old_status,
+      'previous_phase', v_old_fase,
+      'reason', v_reason
+    )
+  );
+
+  update public.candidaturas
+  set status = 'Desistência',
+      fase = 'Encerrado',
+      motivo_declinio = v_reason,
+      updated_at = now()
+  where id::text = p_id;
+
+  return jsonb_build_object(
+    'id', v_candidatura.id,
+    'status', 'Desistência',
+    'fase', 'Encerrado'
+  );
+end;
+$function$;
+
+revoke all on function public.rpc_cancelar_candidatura_rh(text, text) from public, anon;
+grant execute on function public.rpc_cancelar_candidatura_rh(text, text) to authenticated;
 
 commit;
