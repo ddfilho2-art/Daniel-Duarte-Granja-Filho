@@ -416,3 +416,17 @@ Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](mai
 - **Pendente:** validar que a tela RH consegue marcar visualização e que candidatura, desistência, contratação, contagem de vagas e fila de análise continuam operacionais.
 
 Migration: supabase/migrations/20261011170000_harden_candidatura_client_write_surface.sql.
+
+
+## Lote 19 — Consistência das ações individuais e em massa de RH (2026-10-11)
+
+**Status: Implementado em código — não validado.**
+
+- A ação em massa agora processa cada candidatura com resultado independente; uma falha em uma candidatura não cancela o acompanhamento das demais.
+- Atualizações confirmadas são refletidas na tela; falhas permanecem selecionadas para nova tentativa.
+- Falha no registro de histórico é reportada separadamente da transição que já foi confirmada pela RPC.
+- A ação individual deixa de silenciar erro de leitura, trata falha do histórico separadamente e move Reserva para a fase canônica Banco de Talentos.
+- **Pendente:** confirmar por build/type-check e E2E o narrowing TypeScript, cenários com todas as operações bem-sucedidas, falha parcial, falha de histórico e retry.
+- **Pendente:** validar que contagens e relatórios após ação em massa correspondem ao estado real no banco; nenhuma mudança de dado foi feita manualmente.
+
+Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11-lote19-confiabilidade-acoes-rh.md).
