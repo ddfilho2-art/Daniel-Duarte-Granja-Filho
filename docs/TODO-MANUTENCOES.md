@@ -605,3 +605,23 @@ Matriz criada: [MATRIZ-IMPACTO-TECNICO-RECRUTA-AI.md](MATRIZ-IMPACTO-TECNICO-REC
 ### Complemento da auditoria de chat/agenda — 2026-10-10
 
 A matriz registra mais três pontos a tratar antes de publicar o lote empresa–clínica: a RPC de reserva pode retornar uma reserva por chave idempotente sem verificar que ela pertence à mesma conversa; a filtragem de conteúdo clínico no chat é heurística e não pode ser tratada como controle de confidencialidade; e uma constraint de vínculo de encaminhamento é tautológica e não valida integridade. Corrigir e incluir testes de reuso de chave entre conversas, acesso cruzado e envio de conteúdo sensível antes da release.
+
+
+## Lote 1 — integridade clínica e contratação (2026-10-10)
+
+**Status geral: Em progresso — 35%.** Implementação inicial isolada na branch `maintenance/lote-1-integridade-clinica-contratacao-20261010`. O percentual reflete código/documentação versionados, não validação funcional.
+
+- [x] Criar migration com campos de quantidade de vagas e contador derivado de contratações.
+- [x] Incluir guardas transacionais no banco para limite de candidaturas/contratações e aptidão do exame admissional.
+- [x] Remover acesso clínico implícito de administrador global nas políticas de encaminhamentos e anexos.
+- [x] Criar RPC autorizada para metadados dos anexos e ajustar frontend para usá-la.
+- [x] Registrar matriz de testes e limites conhecidos em [documento do Lote 1](maintenance/2026-10-10-lote1-integridade-clinica-contratacao.md).
+- [ ] Executar revisão estática final da migration e compatibilidade com os caminhos legados de status/fase.
+- [ ] Executar lint, type-check, build e suíte de testes do repositório.
+- [ ] Aplicar migration em homologação (não no projeto de produção) e testar concorrência com sessões separadas.
+- [ ] Validar permissões efetivas para RH, clínica, médico, administrador global e tenant cruzado.
+- [ ] Confirmar UX de cadastro/edição de `quantidade_vagas` e todos os escritores de `candidaturas.status`.
+- [ ] Registrar evidências dos testes, corrigir falhas e só então solicitar revisão para merge.
+- [ ] Manter migration remota, publicação de Edge Functions e deploy Vercel bloqueados até autorização explícita.
+
+**Importante:** nenhum código foi mesclado em `main`; nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; nenhum deploy foi realizado. Os testes ainda não foram executados.
