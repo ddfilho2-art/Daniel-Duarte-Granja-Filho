@@ -874,7 +874,7 @@ Documento: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-1
 | Corrigir lista de exames admissionais para usuário com papel de scheduler e médico | Implementado — não validado | A visão ampla operacional prevalece quando o usuário também é scheduler; médico sem papel administrativo só vê os próprios exames |
 | Incluir médico responsável na listagem geral de encaminhamentos | Implementado — não validado | RPC list_my_medical_referrals inclui apenas encaminhamentos atribuídos ao médico ativo; equipes administrativas mantêm a visão da clínica |
 | Inventariar todos os escritores em clientes, Edge Functions e integrações | Em progresso — 40% | Páginas principais revisadas; inventário completo de funções Edge/jobs/consumidores externos ainda pendente |
-| Revisar grants/RLS e owner das RPCs SECURITY DEFINER | Em progresso — 50% | Migration e contratos revisados estaticamente; ainda não confirmado em banco de homologação |
+| Revisar grants/RLS e owner das RPCs SECURITY DEFINER | Em progresso — 65% | Policies e ACLs das tabelas-alvo revisadas estaticamente; owner/grants efetivos ainda não confirmados no banco de homologação |
 | Identificar dados clínicos legados incompatíveis com a sequência | Não iniciado — 0% | Somente relatório; nenhuma alteração automática de dados |
 | Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar antes de concluir a implementação integrada |
 | Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita; deploy continua manual |
