@@ -951,3 +951,26 @@ Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-
 - [ ] Conferir console e rede por respostas 400/401/403/500; revisar logs de Supabase e corrigir apenas defeitos reproduzidos.
 
 **Limitação conhecida:** na consulta anterior às migrations, vagas, candidaturas, encaminhamentos e contratos clínicos estavam sem registros. Os smoke tests podem exigir a criação de fixtures de desenvolvimento e não devem ser interpretados como testes de dados de produção existentes.
+
+## Manutenção — recuperar login de administradores (2026-10-11)
+
+| Etapa | Status | Progresso | Evidência / pendência |
+|---|---|---:|---|
+| Investigar o fluxo de autenticação e os logs do Supabase | **Concluído** | 100% | Logins e consultas do perfil retornavam HTTP 200; os papéis de administrador da plataforma e da Control Med foram conferidos. |
+| Corrigir repetição da verificação de autorização | **Concluído** | 100% | Efeito de autorização reexecuta após cada login bem-sucedido, inclusive quando o ID de usuário não muda. |
+| Evitar submissões de login duplicadas | **Concluído** | 100% | Botão fica desabilitado durante autenticação, carga do perfil, associação ao tenant e autorização. |
+| Corrigir arquivo auxiliar para empacotamento local da função clínica | **Concluído** | 100% | Adicionado `supabase/functions/clinic-user-management/shared/http.ts` para corresponder ao import relativo da função. |
+| Typecheck e build de produção | **Concluído** | 100% | Passaram no CI do commit final; [run 38185976835](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185976835). |
+| Replay integral das migrations em Supabase local | **Em tratamento** | 70% | A tentativa inicial falhou por não existir o helper no caminho relativo; arquivo foi adicionado e o replay foi iniciado novamente. A última consulta ainda mostrava a inicialização do stack, sem resultado final. |
+| Deploy manual da Vercel | **Não iniciado** | 0% | Mantido sob controle do responsável; não foi disparado pela manutenção. |
+| Teste real de login como administrador da plataforma e administrador da clínica | **Não iniciado** | 0% | Fazer após o deploy e confirmar rota final, fim do carregamento e ausência de novo loop na tela de login. |
+
+**PR integrado:** [#11 — Recuperar autorização após login repetido](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/pull/11). Commit de merge: `72c64de5796457db8bd0385a276c1a5e04da6554`.
+
+### Roteiro de verificação após deploy
+- Entrar como `teste.platform@recrutaai.local`; confirmar redirecionamento para `/master`.
+- Entrar como `controlmed@recrutaai.local` no portal da clínica; confirmar redirecionamento para `/saude-ocupacional`.
+- No console, confirmar `LOGIN_AUTHORIZATION_REFRESH_REQUESTED` e o término das RPCs `is_platform_master_admin` e `get_current_clinic_access`.
+- Se houver falha, registrar o primeiro erro e sua resposta de rede; não redefinir senhas nem alterar permissões antes de confirmar a causa.
+
+**Critério de encerramento:** o build passou, mas esta manutenção não deve ser considerada funcionalmente validada até concluir o deploy manual e os dois testes de login.
