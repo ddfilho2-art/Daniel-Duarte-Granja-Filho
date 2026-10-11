@@ -628,3 +628,22 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 - [ ] Manter migration remota, publicação de Edge Functions e deploy Vercel bloqueados até autorização explícita.
 
 **Importante:** nenhum código foi mesclado em `main`; nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; nenhum deploy foi realizado. Os testes ainda não foram executados.
+
+
+## Manutenção — 2026-10-10 — Lote 2: fila clínica, médicos e FIFO
+
+| Etapa | Status | Evidência / critério |
+|---|---|---|
+| Adicionar papel explícito de médico ao enum de tenant | Implementado no código; não validado | `20261010200000_add_clinic_doctor_role.sql`; migration separada para evitar uso do enum recém-adicionado na mesma transação |
+| Criar FIFO original e backfill | Implementado no código; não validado | `fifo_original_at` preenchido com `referred_at/created_at` e protegido contra alteração |
+| Criar atribuição exclusiva de encaminhamento | Implementado no código; não validado | RPC `claim_medical_referral` com lock de linha e registro de histórico |
+| Devolver encaminhamento à fila sem perder posição | Implementado no código; não validado | RPC exige justificativa, limpa atribuição e preserva timestamp FIFO |
+| Prioridade excepcional com justificativa | Implementado no código; não validado | RPC `set_medical_referral_priority`; perfil autorizado provisório `clinic_admin` |
+| Restringir fila disponível e exames do médico | Implementado no código; não validado | RPCs de fila mínima e lista de exames atribuídos ao usuário atual |
+| Restringir acesso a encaminhamentos e anexos por médico | Implementado no código; não validado | `can_access_medical_referral` considera atribuição e papel médico ativo |
+| Permitir agendamento pela secretaria e médico atribuído | Implementado no código; não validado | `update_medical_referral` alterada; integração direta com agenda Google ainda pendente |
+| Criar documento do Lote 2 | Concluído | `docs/maintenance/2026-10-10-lote2-fila-clinica-medicos-fifo.md` |
+| Executar testes, build e type-check | Adiado para a etapa final | A pedido do usuário, nenhuma validação técnica/funcional será considerada concluída neste momento |
+| Criar plano integrado de testes | Planejado para a etapa final | Cobrir concorrência, FIFO, perfis, isolamento, anexos, agenda e regressões |
+| Aplicar migrations no Supabase remoto | Não iniciado | Exige autorização explícita do usuário |
+| Merge para main / deploy Vercel | Não iniciado | Deploy Vercel manual; não executar sem autorização explícita |
