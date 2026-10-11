@@ -842,3 +842,20 @@ Documento: [status do Lote 14](maintenance/2026-10-11-lote14-desistencia-candida
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
 
 Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-contratacao-headcount.md).
+
+
+## Manutenção — 2026-10-11 — Lote 16: transições de candidatura pela RPC protegida
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Endurecer RPC de transição | Concluído — não validado | Migration `20261011150000_harden_candidatura_process_transition.sql` versionada |
+| Modal de perfil de RH | Concluído — não validado | Usa `rpc_atualizar_candidatura_processo` |
+| Ações em massa e individuais | Concluído — não validado | Usam RPC; status de contratação canônico e reprovação encerrada |
+| Salvamento de entrevista | Concluído — não validado | Usa RPC existente com status canônico corrigido |
+| Encaminhamento para exame | Concluído — não validado | Transição de fase usa RPC e trata erro |
+| Inventariar todos os clientes/rotas com UPDATE direto de fase/status | Em progresso — 40% | `src/pages/HR.tsx` foi revisado; revisar demais páginas/componentes e políticas de escrita antes de afirmar centralização completa |
+| Reconciliação de estados legados | Não iniciado | Apenas identificar e reportar; não modificar dados sem plano aprovado |
+| Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar nesta fase, conforme orientação |
+| Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [Lote 16 — transições de candidatura pela RPC](maintenance/2026-10-11-lote16-transicoes-candidatura-rpc.md).
