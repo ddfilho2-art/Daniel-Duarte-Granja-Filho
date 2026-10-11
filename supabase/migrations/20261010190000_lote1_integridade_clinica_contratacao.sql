@@ -210,6 +210,18 @@ begin
   end if;
 
   if tg_op = 'INSERT' then
+    if v_is_hired and not exists (
+      select 1
+      from public.medical_referrals r
+      where r.legacy_application_id = new.id
+        and r.employer_tenant_id = new.tenant_id
+        and r.exam_type = 'admission'::public.medical_exam_type
+        and r.fitness_result = 'fit'::public.medical_fitness_result
+        and r.status <> 'cancelled'::public.medical_referral_status
+    ) then
+      raise exception using errcode = '23514', message = 'admission_exam_fit_required';
+    end if;
+
     select count(*)::integer into v_hired_count
     from public.candidaturas c
     where c.vaga_id = v_vacancy_id
