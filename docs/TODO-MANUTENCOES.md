@@ -682,3 +682,34 @@ A matriz registra mais três pontos a tratar antes de publicar o lote empresa–
 | Integração bancária/geração de boleto | Aguardando decisão de escopo | Base atual registra emissão externa; não gera boleto nem chama provedor |
 | Testes/build/type-check | Adiado para a etapa final | Nenhuma validação foi executada neste lote |
 | Aplicar migration remota / deploy | Não iniciado | Exige autorização explícita; Vercel permanece manual |
+
+
+## Manutenção — 2026-10-11 — Lote 5: interface de operação clínica
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| Página de operação clínica e rota protegida | Implementado no código — não validado | `src/pages/ClinicOperations.tsx`, rota `/saude-ocupacional/operacoes` e atalho no portal |
+| Fila FIFO, atribuição e devolução justificada | Implementado no código — não validado | UI usa RPCs clínicas; conferir autorização efetiva na validação integrada |
+| Solicitação, agendamento e registro de exame complementar | Implementado no código — não validado | UI conecta catálogo, encaminhamento e fluxo operacional |
+| Permissões e experiência por perfil | Em progresso | Refinar mensagens/visibilidade para médico, equipe clínica e administrador |
+| Testes/build/type-check | Adiado para a etapa final | Não executar antes do plano integrado |
+| Migrations remotas / merge / deploy | Não iniciado | Exige autorização explícita |
+
+Documento: [status do Lote 5](maintenance/2026-10-10-lote5-interface-clinica-status.md).
+
+## Manutenção — 2026-10-11 — Lote 6: interface de contratos e faturamento
+
+| Etapa | Status | Evidência / próximo passo |
+|---|---|---|
+| RPC segura de listagem de contratos da clínica | Implementado no código — não validado | Migration `20261010230000_occupational_health_billing_read_rpcs.sql` |
+| RPC segura de consulta de preços por contrato | Implementado no código — não validado | Sem liberar acesso direto às tabelas financeiras |
+| Cadastro de preços e vigência | Implementado no código — não validado | Revisar política de histórico/versionamento; sobreposição de vigências é bloqueada pela base |
+| Criação de ciclos e geração de itens | Implementado no código — não validado | Ciclo por contrato e período; preço ausente bloqueia geração conforme RPC existente |
+| Conferência, fechamento, fatura externa e pagamento | Implementado no código — não validado | Integração bancária/geração de boleto não incluída |
+| Ajustes e reversão de item em rascunho | Implementado no código — não validado | Justificativa exigida pelas RPCs existentes |
+| Relatório macro por empresa e exportação CSV | Implementado no código — não validado | Exportação CSV do relatório e dos itens; XLSX/PDF pendentes |
+| Plano integrado de testes | Planejado para a etapa final | Incluir segurança por clínica/tenant, concorrência, preços, vigências, duplicidade, fechamento, ajustes, relatório e regressão |
+| Build/type-check/testes | Adiado para a etapa final | Não executar nesta fase por orientação do usuário |
+| Aplicar migrations, publicar funções, merge ou deploy | Não iniciado | Produção intocada; requer autorização explícita |
+
+Documento: [status do Lote 6](maintenance/2026-10-11-lote6-interface-faturamento-clinica.md). O status é de implementação versionada, não de validação. Nenhum teste/build/type-check foi executado.
