@@ -194,7 +194,20 @@ security definer
 set search_path = public, pg_temp
 as $function$
   select r.id, r.employer_tenant_id, r.clinic_tenant_id,
-    r.candidate_snapshot ->> 'name', r.candidate_snapshot ->> 'email',
+    r.candidate_snapshot ->> 'name',
+    case
+      when public.is_active_clinic_scheduler(r.clinic_tenant_id)
+        or (
+          r.employer_tenant_id = public.current_tenant_id()
+          and public.has_tenant_role(r.employer_tenant_id, array[
+            'tenant_admin'::public.tenant_role,
+            'tenant_admin_substitute'::public.tenant_role,
+            'hr'::public.tenant_role
+          ])
+        )
+      then r.candidate_snapshot ->> 'email'
+      else null
+    end,
     r.job_snapshot ->> 'title', r.exam_type, r.status, r.fitness_result,
     r.scheduled_for, r.scheduled_location, r.updated_at
   from public.medical_referrals r
