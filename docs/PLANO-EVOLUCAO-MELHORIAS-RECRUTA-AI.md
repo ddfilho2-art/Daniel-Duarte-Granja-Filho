@@ -245,3 +245,6 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - [Especificação anterior: múltiplas posições por vaga](maintenance/2026-10-10-multiple-openings-per-requisition.md)
 - [Fluxo empresa–clínica](maintenance/2026-10-10-employer-clinic-workflow.md)
 - [TODO de manutenções](TODO-MANUTENCOES.md)
+
+
+| 2026-10-10 | Iniciada implementação isolada do Lote 1 em branch de manutenção: migration de headcount/contratação e autorização clínica, RPC segura para metadados de anexos, atualização do frontend e matriz de testes. Status 35%, ainda sem build/testes/homologação; Supabase remoto e Vercel não foram alterados. |
