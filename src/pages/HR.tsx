@@ -689,13 +689,18 @@ function CandidateProfileModal({
 
       console.log("Payload enviado (CandidateProfileModal):", payload);
 
-      const { data, error: updateError } = await supabase
-        .from("candidaturas")
-        .update(payload)
-        .eq("id", candidaturaId)
-        .select();
+      const { data, error: updateError } = await supabase.rpc(
+        "rpc_atualizar_candidatura_processo",
+        {
+          p_id: candidaturaId,
+          p_fase: payload.fase,
+          p_status: payload.status,
+          p_visualizado: payload.visualizado,
+          p_updated_at: payload.updated_at,
+        },
+      );
 
-      console.log("Resposta (CandidateProfileModal):", data, updateError);
+      console.log("Resposta (CandidateProfileModal RPC):", data, updateError);
 
       if (updateError) throw updateError;
 
@@ -1028,11 +1033,17 @@ function CandidateProfileModal({
                               });
                               if (rpcError) throw rpcError;
                               // Advance phase to Exame Médico
-                              await supabase.from("candidaturas").update({
-                                fase: "Exame Médico",
-                                status: "APROVADA",
-                                updated_at: new Date().toISOString(),
-                              }).eq("id", candidaturaId);
+                              const { error: transitionError } = await supabase.rpc(
+                                "rpc_atualizar_candidatura_processo",
+                                {
+                                  p_id: candidaturaId,
+                                  p_fase: "Exame Médico",
+                                  p_status: "APROVADA",
+                                  p_visualizado: true,
+                                  p_updated_at: new Date().toISOString(),
+                                },
+                              );
+                              if (transitionError) throw transitionError;
                               setReferralSuccess(true);
                               setTimeout(() => { setReferralSuccess(false); onActionComplete?.(); }, 2000);
                             } catch (err: any) {
@@ -5179,7 +5190,8 @@ export function HRCandidatos() {
             newStatus = "RESERVA";
           }
 
-          if (newFase === "Contratado") newStatus = "APROVADA";
+          if (newFase === "Contratado") newStatus = "Contratado";
+          if (newStatus === "REPROVADA") newFase = "Encerrado";
 
           const payload = {
             status: newStatus,
@@ -5190,13 +5202,18 @@ export function HRCandidatos() {
 
           console.log("Payload enviado (handleAction):", payload);
 
-          const { data, error: updateError } = await supabase
-            .from("candidaturas")
-            .update(payload)
-            .eq("id", id)
-            .select();
+          const { data, error: updateError } = await supabase.rpc(
+            "rpc_atualizar_candidatura_processo",
+            {
+              p_id: id,
+              p_fase: payload.fase,
+              p_status: payload.status,
+              p_visualizado: payload.visualizado,
+              p_updated_at: payload.updated_at,
+            },
+          );
 
-          console.log("Resposta (handleAction):", data, updateError);
+          console.log("Resposta (handleAction RPC):", data, updateError);
 
           if (updateError) throw updateError;
 
@@ -5267,9 +5284,10 @@ export function HRCandidatos() {
 
       if (action === "Aprovar") {
         newFase = getProximaFase(currentFase, vaga);
-        newStatus = newFase === "Contratado" ? "APROVADA" : "ATIVO";
+        newStatus = newFase === "Contratado" ? "Contratado" : "ATIVO";
       } else if (action === "Reprovar") {
         newStatus = "REPROVADA";
+        newFase = "Encerrado";
       } else if (action === "Reserva") {
         newStatus = "RESERVA";
       }
@@ -5290,8 +5308,8 @@ export function HRCandidatos() {
         newStatus === currentData.status &&
         action === "Aprovar"
       ) {
-        // Se já está na última fase e clicou aprovar, talvez queira apenas marcar como aprovado
-        newStatus = "APROVADA";
+        // Preservar o status canônico se a fase atual já for a de contratação.
+        newStatus = newFase === "Contratado" ? "Contratado" : "APROVADA";
       }
 
       if (newFase === currentFase && newStatus === currentData.status) {
@@ -5308,13 +5326,18 @@ export function HRCandidatos() {
 
       console.log("Payload enviado (handleSingleAction):", payload);
 
-      const { data, error: updateError } = await supabase
-        .from("candidaturas")
-        .update(payload)
-        .eq("id", id)
-        .select();
+      const { data, error: updateError } = await supabase.rpc(
+        "rpc_atualizar_candidatura_processo",
+        {
+          p_id: id,
+          p_fase: payload.fase,
+          p_status: payload.status,
+          p_visualizado: payload.visualizado,
+          p_updated_at: payload.updated_at,
+        },
+      );
 
-      console.log("Resposta (handleSingleAction):", data, updateError);
+      console.log("Resposta (handleSingleAction RPC):", data, updateError);
 
       if (updateError) throw updateError;
 
@@ -6355,7 +6378,8 @@ export function HREntrevistas() {
         }
       }
 
-      if (nextFase === "Contratado") nextStatus = "APROVADA";
+      if (nextFase === "Contratado") nextStatus = "Contratado";
+      if (nextStatus === "REPROVADA") nextFase = "Encerrado";
 
       const payload = {
         fase: nextFase,
