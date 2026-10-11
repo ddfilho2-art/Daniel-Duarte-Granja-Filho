@@ -16,6 +16,7 @@ Status: **Em progresso — base de dados e RPCs versionadas; validações adiada
 - Índice único impede que a mesma origem faturável esteja ativa em mais de um ciclo; item reverso pode ser faturado novamente em ciclo posterior.
 - Fechamento de ciclo, registro de referência de cobrança/boleto emitido externamente, registro de pagamento e ajustes positivos/negativos auditáveis.
 - Reversão de item permitida somente enquanto o ciclo está em rascunho; correções pós-fechamento usam ajuste/credito auditado.
+- RPC macro por clínica/período com totais por contrato/empresa: admissionais, complementares por status, itens faturáveis, valores, ajustes e ciclos por status.
 - RPCs e tabelas com acesso direto revogado para `anon`/`authenticated`; ações administrativas limitadas a `clinic_admin`.
 
 ## Migration
