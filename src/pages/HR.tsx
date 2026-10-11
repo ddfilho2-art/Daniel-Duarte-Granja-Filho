@@ -865,12 +865,15 @@ function CandidateProfileModal({
       if (error) throw error;
 
       try {
-        await logCandidaturaEvento(
+        const historyLogged = await logCandidaturaEvento(
           candidaturaId,
           "DESISTÊNCIA",
           `Candidatura encerrada por RH. Motivo: ${withdrawReason.trim()}`,
           profile?.id,
         );
+        if (!historyLogged) {
+          console.warn("A auditoria do banco foi gravada, mas o histórico visual não foi atualizado.");
+        }
       } catch (historyError) {
         console.warn("A auditoria do banco foi gravada, mas o histórico visual não foi atualizado:", historyError);
       }
@@ -5240,12 +5243,13 @@ export function HRCandidatos() {
             }
 
             try {
-              await logCandidaturaEvento(
+              const historyLogged = await logCandidaturaEvento(
                 id,
                 action.toUpperCase() as any,
                 `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
                 profile?.id,
               );
+              if (!historyLogged) throw new Error("candidatura_event_history_not_persisted");
             } catch (historyError) {
               historyFailures.push(id);
               console.error("Transição concluída, mas falhou o histórico:", id, historyError);
@@ -5365,12 +5369,13 @@ export function HRCandidatos() {
       if (updateError) throw updateError;
 
       try {
-        await logCandidaturaEvento(
+        const historyLogged = await logCandidaturaEvento(
           id,
           action.toUpperCase() as any,
           `Candidato ${action === "Aprovar" ? "avançou para " + newFase : action === "Reprovar" ? "reprovado" : "movido para reserva"}`,
           profile?.id,
         );
+        if (!historyLogged) throw new Error("candidatura_event_history_not_persisted");
       } catch (historyError) {
         historyFailed = true;
         console.error("Transição concluída, mas falhou o histórico:", id, historyError);
