@@ -55,10 +55,19 @@ As atualizações não relacionadas à transição de fase/status, como marcaç�
 - A migration está apenas versionada na branch; não foi aplicada ao Supabase remoto.
 - A proteção de exame e headcount depende da migration do Lote 1 estar aplicada no ambiente em que o fluxo for validado.
 - Registros legados incoerentes não foram modificados.
-- O trigger protege alterações de fase/status mesmo nos caminhos diretos restantes; ainda é necessário terminar o inventário de clientes/rotas e revisar políticas SQL/RLS para confirmar todos os campos e caminhos de escrita.
+- O inventário do código cliente e das Edge Functions de candidatura foi concluído nesta revisão estática: em `HR.tsx`, a escrita direta restante na tabela `candidaturas` é somente para `visualizado`/marcação de leitura; em `Candidate.tsx`, a única atualização direta localizada está comentada e não é executável; `Public.tsx`, `HRDetalheVaga.tsx` e `HRRelatorios.tsx` não alteram fase/status de candidaturas; as Edge Functions de candidatura inspecionadas não mostraram escrita direta de fase/status. O trigger continua sendo a proteção de banco contra bypass. **Pendente:** revisar integralmente políticas SQL/RLS e outros consumidores externos; essa revisão estática não equivale a teste nem comprova o comportamento em runtime.
 - A ação de desistência permanece na RPC dedicada `rpc_cancelar_candidatura_rh`.
 - Nenhum teste, build, type-check ou E2E foi executado, conforme orientação de deixar a validação para o final.
 - Não houve aplicação de migration remota, merge, pull request ou deploy.
+
+## Inventário complementar de escritas
+
+- `src/pages/HR.tsx`: chamadas de transição identificadas usam `rpc_atualizar_candidatura_processo`; atualização direta remanescente encontrada marca apenas campos de visualização/leitura.
+- `src/pages/Candidate.tsx`: atualização direta antiga de `candidaturas` está em comentário, sem execução; as demais ocorrências relevantes são leituras.
+- `src/pages/Public.tsx`: leituras e verificação de candidatura existente; sem atualização de fase/status.
+- `src/pages/HRDetalheVaga.tsx` e `src/pages/HRRelatorios.tsx`: leituras de candidaturas; atualizações observadas são de vagas, não de fase/status de candidatura.
+- Edge Functions inspecionadas relacionadas a aplicação/análise não mostraram atualização direta de fase/status. A criação de candidatura deve continuar protegida pelo fluxo de aplicação já existente.
+- **Pendente antes de validar:** revisão completa das políticas SQL/RLS, triggers relacionados e consumidores externos. Não inferir segurança de runtime somente pela inspeção estática.
 
 ## Validação integrada posterior
 
