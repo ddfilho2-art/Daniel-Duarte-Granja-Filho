@@ -850,7 +850,7 @@ Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-con
 |---|---|---|
 | Endurecer RPC e trigger de tabela | Concluído — não validado | Migration versiona RPC autorizada, trigger de integridade fase/status e guarda de auditoria atômica para desistência |
 | Modal de perfil de RH | Concluído — não validado | Usa `rpc_atualizar_candidatura_processo` |
-| Ações em massa e individuais | Concluído — não validado | Usam RPC; status canônico, reprovação encerrada e aprovação da última etapa `Contrato` convertida em contratação |
+| Ações em massa e individuais | Concluído — não validado | Usam RPC; status canônico, reprovação comum encerrada, exceção de `Exame` retorna à `Entrevista RH`, última etapa `Contrato` convertida em contratação |
 | Salvamento de entrevista | Concluído — não validado | Usa RPC existente com status canônico corrigido |
 | Encaminhamento para exame | Concluído — não validado | Transição de fase usa RPC e trata erro; decisão final da fase legada `Exame` permanece protegida pelo exame admissional apto no banco |
 | Inventariar todos os clientes/rotas com UPDATE direto de fase/status | Em progresso — 80% | `src/pages/HR.tsx`, `Candidate.tsx`, `Public.tsx`, `HRDetalheVaga.tsx`, `HRRelatorios.tsx` e Edge Functions de candidatura revisados; trigger agora protege fase/status contra bypass; falta busca ampla final para confirmar os campos de escrita não relacionados à transição e políticas SQL/RLS |
