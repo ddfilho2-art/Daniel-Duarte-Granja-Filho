@@ -275,3 +275,13 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - Implementada a fundação de preço contratual com vigência, ciclos e itens de cobrança com snapshots, prevenção de duplicidade, fechamento, referência de emissão externa, pagamento, ajustes e reversão em rascunho.
 - Integração de boleto/banco permanece não implementada até decisão de escopo; UI e exportações também pendentes.
 - Validação adiada para a etapa final; migrations ainda não aplicadas ao Supabase remoto.
+
+
+### Atualização — Lote 5 e Lote 6: interface clínica e faturamento (2026-10-11)
+
+- **Lote 5 — Em progresso, implementação versionada e não validada:** página de operações clínicas com fila FIFO e fluxo de exames complementares, rota protegida e atalho no portal Saúde Ocupacional. Evidência: [status do Lote 5](maintenance/2026-10-10-lote5-interface-clinica-status.md).
+- **Lote 6 — Em progresso, implementação versionada e não validada:** interface de contratos/preços, vigência de preços, ciclos de cobrança, itens, fechamento, referência de fatura externa, pagamento, ajustes, reversão de rascunho, relatório macro e exportação CSV. Evidência: [status do Lote 6](maintenance/2026-10-11-lote6-interface-faturamento-clinica.md).
+- Migration adicional: `20261010230000_occupational_health_billing_read_rpcs.sql`, com RPCs protegidas para listar contratos da clínica e preços por contrato. Não foi aplicada ao banco remoto.
+- Percentual de implementação dos lotes 5/6: **aproximadamente 70% do escopo de interface previsto**, sem equivalência a validação técnica ou funcional. Ainda faltam revisão de versionamento histórico de preços, exportações XLSX/PDF, refinamento de permissões/experiência por perfil e eventual decisão de integração de boleto/banco.
+- **Validações seguem adiadas por orientação do usuário:** não executar build, type-check, testes automatizados ou validação funcional neste momento. O plano integrado de testes será criado ao final do desenvolvimento.
+- Nenhuma migration foi aplicada ao Supabase remoto; nenhuma Edge Function foi publicada; não houve merge para `main`, criação de PR ou deploy Vercel. Deploy permanece manual e depende de autorização explícita.
