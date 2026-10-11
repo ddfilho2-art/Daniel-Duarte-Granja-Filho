@@ -261,3 +261,22 @@ A execução posterior da CI de manutenção concluiu com sucesso type-check e b
 ### Limite de validação e próximo passo
 
 **Status:** merge e aplicação das migrations concluídos; type-check/build e replay local passaram. **Não** foram executados E2E funcionais completos nem testes manuais após o deploy Vercel. O próximo passo é o deploy manual pelo responsável, seguido dos smoke tests documentados em `docs/maintenance/2026-10-11-plano-liberacao-main-supabase.md`. Não declarar a clínica, contratação ou faturamento integralmente validados antes desses testes.
+
+## 2026-10-11 — Correção do login persistente para administrador de plataforma e clínica
+
+### Sintoma e evidências
+- Relato: administrador da ferramenta e administrador da clínica autenticavam com sucesso, mas continuavam na tela de login ou recebiam a impressão de senha incorreta.
+- Nos logs do Supabase do período investigado, chamadas `POST /auth/v1/token` e consultas do perfil em `/rest/v1/users` retornavam HTTP 200. As RPCs `is_platform_master_admin` e `get_current_clinic_access` também retornavam HTTP 200.
+- A inspeção do código encontrou um defeito compatível com o sintoma: o efeito de autorização dependia somente de `authUserId`. Ao autenticar novamente com o mesmo ID, o código podia marcar `authorizationLoading` como pendente sem disparar uma nova consulta de permissões; a tela de login aguarda essa consulta antes de redirecionar.
+- A inspeção de dados confirmou que o administrador de plataforma tinha a função `platform_master_admin` ativa e que o administrador da Control Med tinha associação ativa com os papéis `tenant_admin` e `clinic_admin`. Não havia evidência que justificasse redefinir senhas.
+
+### Correção aplicada
+- PR #11 foi integrado a `main` no commit `72c64de5796457db8bd0385a276c1a5e04da6554`.
+- `src/contexts/AuthContext.tsx`: adicionada uma versão de atualização para forçar a revalidação das permissões a cada login bem-sucedido, mesmo quando o ID autenticado não muda; o estado de autorização também é liberado em caso de falha.
+- `src/pages/Public.tsx`: bloqueia submissões concorrentes e mantém o botão desabilitado enquanto autenticação, perfil, vínculo de tenant ou autorização estiverem em carregamento.
+- `supabase/functions/clinic-user-management/shared/http.ts`: incluída cópia do helper compartilhado no caminho relativo usado pela função, para que o código da função também possa ser empacotado pelo replay local do Supabase.
+
+### Validação e estado
+- Typecheck e build de produção passaram no CI para o commit final da correção: run [38185976835](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185976835).
+- O replay das migrations em Supabase local ainda estava em execução na última consulta, durante a inicialização do stack; não deve ser marcado como aprovado até haver resultado final.
+- Não foi feito deploy da Vercel nem teste manual de login após a correção. Os testes manuais pendentes são entrar com o administrador da plataforma e com o administrador da clínica, confirmar redirecionamento e verificar os eventos `LOGIN_AUTHORIZATION_REFRESH_REQUESTED`, `is_platform_master_admin` e `get_current_clinic_access` no console.
