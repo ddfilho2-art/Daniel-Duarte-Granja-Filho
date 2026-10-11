@@ -81,7 +81,7 @@ Arquivos versionados:
 - `src/lib/medical-attachments.ts`
 - `docs/maintenance/2026-10-10-lote1-integridade-clinica-contratacao.md`
 
-O código inicial acrescenta contagem de vagas/contratações, guardas transacionais para nova candidatura e contratação apta, autorização de acesso clínico baseada em vínculo ativo e RPC autorizada para metadados dos anexos. Isso é **implementação inicial em branch, ainda não validada**. Não representa conclusão do Lote 1.
+O código inicial acrescenta contagem de vagas/contratações, guardas transacionais para nova candidatura e contratação apta, ordem consistente de locks por vaga, filtro/mensagem de vagas preenchidas no portal do candidato, autorização clínica baseada em vínculo ativo e RPC autorizada para metadados dos anexos. Isso é **implementação inicial em branch, ainda não validada**. Não representa conclusão do Lote 1.
 
 Pendências críticas: confirmar valores canônicos de status; revisar todos os escritores de fase/status; auditar compatibilidade da UX de headcount; validar a migration em ambiente isolado; executar testes de concorrência e regressão; verificar efeitos das políticas RLS sobre todos os fluxos legítimos. O vínculo legado ainda é textual e o isolamento por médico/FIFO não foi implementado neste lote.
 
