@@ -332,3 +332,12 @@ Estas decisões não impedem a auditoria técnica, mas precisam ser resolvidas a
 - A interface permite cancelar exame complementar não realizado com justificativa e apresenta o motivo registrado; a RPC mantém as restrições por perfil e a trilha de auditoria.
 - Evidência: [Lote 11 — agendamento e cancelamento](maintenance/2026-10-11-lote11-agendamento-cancelamento-complementares.md).
 - Testes de transição, data/hora e autorização ficam para a etapa integrada final. Nenhum build/teste/type-check foi executado; banco remoto e Vercel seguem intocados.
+
+
+### Atualização — Lote 12: relatório macro com status financeiros separados (2026-10-11)
+
+- **Status:** em progresso; implementação versionada, não validada.
+- Nova RPC get_occupational_health_billing_macro_report_v2 separa contagem de itens faturáveis, itens em rascunho e itens incluídos em ciclos fechados, além de valores em rascunho, faturados e ajustes.
+- A interface por empresa/período foi atualizada para mostrar essas distinções e exportá-las em CSV.
+- Evidência: [Lote 12 — relatório macro](maintenance/2026-10-11-lote12-relatorio-macro-faturamento.md).
+- A validação de reconciliação de totais, períodos e isolamento de tenant fica para o plano integrado final. Nenhum teste/build/type-check foi executado; sem publicação remota.
