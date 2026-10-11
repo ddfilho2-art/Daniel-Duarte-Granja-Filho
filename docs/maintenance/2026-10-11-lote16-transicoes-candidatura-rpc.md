@@ -71,7 +71,7 @@ Na comparação com a migration anterior `20260927130000_rpc_candidatura_tenant_
 - `src/pages/Public.tsx`: leituras e verificação de candidatura existente; sem atualização de fase/status.
 - `src/pages/HRDetalheVaga.tsx` e `src/pages/HRRelatorios.tsx`: leituras de candidaturas; atualizações observadas são de vagas, não de fase/status de candidatura.
 - Edge Functions inspecionadas relacionadas a aplicação/análise não mostraram atualização direta de fase/status. A criação de candidatura deve continuar protegida pelo fluxo de aplicação já existente.
-- **Pendente antes de validar:** revisão completa das políticas SQL/RLS, triggers relacionados e consumidores externos. Não inferir segurança de runtime somente pela inspeção estática.
+- **Pendente antes de validar:** a revisão estática das policies/ACLs das tabelas-alvo candidaturas e medical_referrals foi concluída nos Lotes 17–18. Continua pendente a revisão global das policies/RLS, triggers relacionados e consumidores externos. Não inferir segurança de runtime somente pela inspeção estática.
 
 ## Validação integrada posterior
 
