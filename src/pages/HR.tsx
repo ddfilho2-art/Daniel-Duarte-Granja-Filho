@@ -670,8 +670,13 @@ function CandidateProfileModal({
         newFase = getProximaFase(dbCurrentFase, vaga);
         newStatus = "APROVADA";
       } else if (action === "Reprovar") {
-        newFase = "Encerrado";
-        newStatus = "REPROVADA";
+        if (dbCurrentFase === "Exame") {
+          newFase = "Entrevista RH";
+          newStatus = "APROVADA";
+        } else {
+          newFase = "Encerrado";
+          newStatus = "REPROVADA";
+        }
       } else if (action === "Reserva") {
         newFase = dbCurrentFase;
         newStatus = "RESERVA";
@@ -5196,8 +5201,13 @@ export function HRCandidatos() {
               newStatus = "APROVADA";
             }
           } else if (action === "Reprovar") {
-            newFase = "Encerrado";
-            newStatus = "REPROVADA";
+            if (currentFase === "Exame") {
+              newFase = "Entrevista RH";
+              newStatus = "APROVADA";
+            } else {
+              newFase = "Encerrado";
+              newStatus = "REPROVADA";
+            }
           } else if (action === "Reserva") {
             newFase = "Banco de Talentos";
             newStatus = "RESERVA";
@@ -5299,8 +5309,13 @@ export function HRCandidatos() {
         newFase = getProximaFase(currentFase, vaga);
         newStatus = newFase === "Contratado" ? "Contratado" : "ATIVO";
       } else if (action === "Reprovar") {
-        newStatus = "REPROVADA";
-        newFase = "Encerrado";
+        if (currentFase === "Exame") {
+          newStatus = "APROVADA";
+          newFase = "Entrevista RH";
+        } else {
+          newStatus = "REPROVADA";
+          newFase = "Encerrado";
+        }
       } else if (action === "Reserva") {
         newStatus = "RESERVA";
       }
