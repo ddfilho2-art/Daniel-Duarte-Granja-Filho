@@ -848,12 +848,12 @@ Documento: [status do Lote 15](maintenance/2026-10-11-lote15-status-canonico-con
 
 | Etapa | Status | Evidência / próximo passo |
 |---|---|---|
-| Endurecer RPC de transição | Concluído — não validado | Migration `20261011150000_harden_candidatura_process_transition.sql` versionada |
+| Endurecer RPC e trigger de tabela | Concluído — não validado | Migration versiona RPC autorizada, trigger de integridade fase/status e guarda de auditoria atômica para desistência |
 | Modal de perfil de RH | Concluído — não validado | Usa `rpc_atualizar_candidatura_processo` |
 | Ações em massa e individuais | Concluído — não validado | Usam RPC; status canônico, reprovação encerrada e aprovação da última etapa `Contrato` convertida em contratação |
 | Salvamento de entrevista | Concluído — não validado | Usa RPC existente com status canônico corrigido |
 | Encaminhamento para exame | Concluído — não validado | Transição de fase usa RPC e trata erro; decisão final da fase legada `Exame` permanece protegida pelo exame admissional apto no banco |
-| Inventariar todos os clientes/rotas com UPDATE direto de fase/status | Em progresso — 70% | `src/pages/HR.tsx`, `Candidate.tsx`, `Public.tsx`, `HRDetalheVaga.tsx`, `HRRelatorios.tsx` e Edge Functions de candidatura revisados; faltam busca ampla final e revisão das permissões SQL/RLS para confirmar todos os caminhos |
+| Inventariar todos os clientes/rotas com UPDATE direto de fase/status | Em progresso — 80% | `src/pages/HR.tsx`, `Candidate.tsx`, `Public.tsx`, `HRDetalheVaga.tsx`, `HRRelatorios.tsx` e Edge Functions de candidatura revisados; trigger agora protege fase/status contra bypass; falta busca ampla final para confirmar os campos de escrita não relacionados à transição e políticas SQL/RLS |
 | Reconciliação de estados legados | Não iniciado | Apenas identificar e reportar; não modificar dados sem plano aprovado |
 | Build/type-check/testes integrados/E2E | Adiado para etapa final | Não executar nesta fase, conforme orientação |
 | Aplicar migration / merge / deploy | Não iniciado | Exige autorização explícita |
