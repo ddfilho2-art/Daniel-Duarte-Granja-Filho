@@ -117,4 +117,74 @@ $function$;
 revoke all on function public.rpc_atualizar_candidatura_processo(text, text, text, boolean, timestamptz) from public, anon;
 grant execute on function public.rpc_atualizar_candidatura_processo(text, text, text, boolean, timestamptz) to authenticated;
 
+
+-- Guard the underlying table as well: RLS permits candidates to update limited
+-- non-transition fields, so phase/status changes must still require an authorized
+-- HR/admin actor even if a client bypasses the RPC.
+create or replace function public.guard_candidatura_transition_write()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $function$
+declare
+  v_old_status text := lower(trim(coalesce(old.status, '')));
+  v_new_status text := lower(trim(coalesce(new.status, '')));
+  v_old_fase text := lower(trim(coalesce(old.fase, '')));
+  v_new_fase text := lower(trim(coalesce(new.fase, '')));
+begin
+  if old.fase is not distinct from new.fase
+     and old.status is not distinct from new.status then
+    return new;
+  end if;
+
+  if auth.uid() is null
+     or new.tenant_id is distinct from public.current_tenant_id()
+     or not public.has_tenant_role(new.tenant_id, array[
+       'tenant_admin'::public.tenant_role,
+       'tenant_admin_substitute'::public.tenant_role,
+       'hr'::public.tenant_role
+     ]) then
+    raise exception using errcode = '42501', message = 'authorized_hr_required_for_candidatura_transition';
+  end if;
+
+  if v_old_status in ('contratado', 'reprovada', 'desistência', 'desistencia', 'cancelada')
+     or v_old_fase in ('encerrado', 'finalizado', 'contratado') then
+    raise exception using errcode = '55000', message = 'application_is_terminal';
+  end if;
+
+  if v_new_fase = 'contratado' and v_new_status <> 'contratado' then
+    raise exception using errcode = '22023', message = 'hiring_phase_requires_hired_status';
+  end if;
+
+  if v_new_status = 'contratado' and v_new_fase <> 'contratado' then
+    raise exception using errcode = '22023', message = 'hired_status_requires_hiring_phase';
+  end if;
+
+  if v_new_status = 'reprovada' and v_new_fase <> 'encerrado' then
+    raise exception using errcode = '22023', message = 'rejected_application_must_be_closed';
+  end if;
+
+  if v_new_status in ('desistência', 'desistencia') then
+    if v_new_fase <> 'encerrado'
+       or nullif(trim(coalesce(new.motivo_declinio, '')), '') is null then
+      raise exception using errcode = '22023', message = 'withdrawal_requires_closed_phase_and_reason';
+    end if;
+  elsif v_new_fase in ('encerrado', 'finalizado') and v_new_status <> 'reprovada' then
+    raise exception using errcode = '22023', message = 'closed_phase_requires_rejection_or_dedicated_operation';
+  end if;
+
+  if v_new_status = 'cancelada' then
+    raise exception using errcode = '22023', message = 'use_dedicated_candidatura_closure_operation';
+  end if;
+
+  return new;
+end;
+$function$;
+
+drop trigger if exists trg_guard_candidatura_transition_write on public.candidaturas;
+create trigger trg_guard_candidatura_transition_write
+before update of fase, status on public.candidaturas
+for each row execute function public.guard_candidatura_transition_write();
+
 commit;
