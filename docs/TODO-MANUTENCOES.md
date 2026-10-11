@@ -894,3 +894,17 @@ Documento de evidência: [Lote 17 — integridade do ciclo de vida clínico](mai
 | Aplicar migration remota / merge / PR / deploy | Não iniciado — 0% | Exige autorização explícita |
 
 Documento: [Lote 18 — superfície de escrita de candidaturas](maintenance/2026-10-11-lote18-superficie-escrita-candidaturas.md).
+
+
+## Manutenção integrada — Lote 19: confiabilidade das ações de RH (2026-10-11)
+
+| Etapa | Status | Critério / evidência |
+|---|---|---|
+| Ação em massa com resultado independente por candidatura | Implementado — não validado | Cada candidatura retorna sucesso/falha; não interromper nem ocultar atualizações confirmadas de outros itens |
+| Preservar seleção das candidaturas que falharam | Implementado — não validado | Só as falhas permanecem selecionadas para nova tentativa |
+| Separar falha de histórico da falha de transição | Implementado — não validado | Transição confirmada conta como sucesso; falha de histórico aparece em aviso/log |
+| Ação individual consistente com o resultado real | Implementado — não validado | Consulta apresenta erro; Reserva usa fase Banco de Talentos; auditoria/histórico não mascara transição confirmada |
+| Validar TypeScript/build e cenários de sucesso/parcial/falha | Aguardando etapa integrada final | Não executado durante a implementação |
+| Confirmar indicadores após processamento em lote | Aguardando etapa integrada final | Comparar contagens da interface e do banco em ambiente autorizado |
+
+Documento: [Lote 19 — confiabilidade das ações de RH](maintenance/2026-10-11-lote19-confiabilidade-acoes-rh.md).
