@@ -7,6 +7,7 @@ export type TenantRole =
   | "candidate"
   | "clinic_admin"
   | "clinic_staff"
+  | "doctor"
   | "auditor";
 
 export interface TenantAccess {
@@ -24,6 +25,7 @@ const TENANT_ROLES = new Set<TenantRole>([
   "candidate",
   "clinic_admin",
   "clinic_staff",
+  "doctor",
   "auditor",
 ]);
 
@@ -91,21 +93,21 @@ export function resolveAuthorizedHomePath(
   }
 
   if (isTenantRoute) {
+    // A clinic administrator can also have tenant_admin for tenant-level
+    // management. Clinic roles must win so login opens the clinical portal,
+    // not the employer recruiting dashboard.
+    const hasClinicRole =
+      access.roles.includes("clinic_admin") ||
+      access.roles.includes("clinic_staff") ||
+      access.roles.includes("doctor") ||
+      Boolean(
+        access.clinicRoles?.includes("clinic_admin") ||
+        access.clinicRoles?.includes("clinic_staff"),
+      );
+    if (hasClinicRole) return "/saude-ocupacional";
     if (access.canAdministerTenant) return "/admin";
     if (access.roles.includes("hr")) return "/rh";
     if (access.roles.includes("candidate")) return "/candidato";
-    if (
-      access.roles.includes("clinic_admin") ||
-      access.roles.includes("clinic_staff")
-    ) {
-      return "/saude-ocupacional";
-    }
-    if (
-      access.clinicRoles?.includes("clinic_admin") ||
-      access.clinicRoles?.includes("clinic_staff")
-    ) {
-      return "/saude-ocupacional";
-    }
     return null;
   }
 
