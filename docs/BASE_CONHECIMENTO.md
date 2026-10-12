@@ -280,3 +280,22 @@ A execução posterior da CI de manutenção concluiu com sucesso type-check e b
 - Typecheck e build de produção passaram no CI para o commit final da correção: run [38185976835](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185976835).
 - O replay integral das migrations em Supabase local e a confirmação do estado passaram no CI do PR [#11](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/38185974030). O job ainda estava finalizando a limpeza dos containers na última consulta.
 - Não foi feito deploy da Vercel nem teste manual de login após a correção. Os testes manuais pendentes são entrar com o administrador da plataforma e com o administrador da clínica, confirmar redirecionamento e verificar os eventos `LOGIN_AUTHORIZATION_REFRESH_REQUESTED`, `is_platform_master_admin` e `get_current_clinic_access` no console.
+
+## 2026-10-11 — Follow-up do login administrativo após smoke test
+
+### Evidências adicionais
+- O usuário continuou relatando retorno à tela de login após o primeiro pacote de correções de autenticação.
+- Os logs do Supabase mostraram respostas HTTP 200 de `/auth/v1/token` para contas administrativas e contas de teste. Isso descarta “senha incorreta” como explicação para aquelas tentativas específicas, mas não prova que a interface completou a autorização e o redirecionamento.
+- A função `is_platform_master_admin()` retorna true ao avaliar o claim da conta de administrador de plataforma, cuja role está ativa no banco.
+- Foram encontrados dois problemas na autorização clínica: a RPC `get_current_clinic_access()` usava o modo SECURITY INVOKER ao ler tabelas filtradas por RLS; e a resolução de rota de tenant priorizava `canAdministerTenant` sobre os papéis de clínica quando um usuário possuía também `tenant_admin`.
+
+### Solução aplicada no follow-up
+- O efeito de autorização agora encerra o caminho do administrador global depois de confirmar `is_platform_master_admin = true`, sem esperar uma consulta de associação clínica que não se aplica a ele.
+- O helper de rota considera `clinic_admin`, `clinic_staff` e `doctor` antes da autorização administrativa genérica de tenant.
+- A migration `20261011212000_fix_clinic_access_rpc_for_login.sql` converte `get_current_clinic_access()` para SECURITY DEFINER com `search_path` fixo, filtro estrito por `auth.uid()` e grants limitados a `authenticated`.
+
+### Limites / próxima validação
+- O HTTP 200 em Auth prova que a senha foi aceita naquelas solicitações; não prova que o perfil, as permissões e a rota foram carregados corretamente.
+- O follow-up ainda deve passar por typecheck, build e replay integral de migrations na CI.
+- Não declarar o login como validado até deploy manual da Vercel e testes reais com administrador da plataforma e administrador da Control Med.
+- Registro técnico: [Follow-up — login de administradores da plataforma e da clínica](maintenance/2026-10-11-login-admin-routing-followup.md).
