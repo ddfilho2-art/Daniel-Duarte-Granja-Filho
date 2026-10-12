@@ -259,6 +259,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsPlatformMasterAdmin(platformData === true);
         }
 
+        // Platform Master does not need clinic membership. Do not block the
+        // global administrator's login on a secondary clinic-access RPC.
+        if (!platformError && platformData === true) {
+          setClinicRoles([]);
+          setClinicTenantIds([]);
+          setHasClinicAccess(false);
+          return;
+        }
+
         const clinicRpcStartedAt = Date.now();
         console.info("[RPC DEBUG]", {
           phase: "start",
