@@ -15,7 +15,7 @@ export function MasterTenantPublicContent() {
     listTenants()
       .then((items) => {
         if (!active) return;
-        const eligible = items.filter((item) => item.kind === "employer" && item.status === "active");
+        const eligible = items.filter((item) => item.kind === "employer" && (item.status === "active" || item.status === "configuring"));
         setTenants(eligible);
         if (eligible[0]) {
           setSupabaseTenantId(eligible[0].id);
@@ -63,7 +63,7 @@ export function MasterTenantPublicContent() {
         {error && <div role="alert" className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertTriangle className="h-4 w-4 shrink-0" />{error}</div>}
         {!loading && tenants.length === 0 && !error && <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">Não há empresas empregadoras ativas para configurar. Cadastre ou reative uma empresa na seção Empresas.</p>}
       </section>
-      {selected && <TenantPublicContent key={selected.id} masterTenant={{ id: selected.id, kind: selected.kind, displayName: selected.display_name }} />}
+      {selected && <TenantPublicContent key={selected.id} masterTenant={{ id: selected.id, kind: selected.kind, displayName: selected.display_name, status: selected.status }} />}
     </div>
   );
 }
