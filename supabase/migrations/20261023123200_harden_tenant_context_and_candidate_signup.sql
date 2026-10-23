@@ -140,6 +140,7 @@ BEGIN
          AND tm.status::text = 'invited'
          AND tm.roles @> ARRAY['candidate'::public.tenant_role]
          AND t.status = 'active'
+         AND t.kind = 'employer'
      ) THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_mismatch';
   END IF;
@@ -340,6 +341,8 @@ BEGIN
           updated_at = now()
       WHERE id = v_membership.id
       RETURNING * INTO v_membership;
+    ELSIF v_membership.status::text <> 'active' THEN
+      RAISE EXCEPTION USING errcode = '42501', message = 'candidate_membership_unavailable';
     END IF;
   ELSE
     SELECT COALESCE(s.candidate_signup_enabled, true)
