@@ -24,7 +24,6 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims',json_build_object('sub',v_candidate_a::text,'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
   PERFORM set_config('role','authenticated',true);
   IF public.current_tenant_id() IS NOT NULL THEN RAISE EXCEPTION 'Forged x-tenant-id resolved without membership'; END IF;
   SELECT count(*) INTO v_count FROM public.mensagens WHERE id='phase2b-message-b'; IF v_count<>0 THEN RAISE EXCEPTION 'Tenant A read Tenant B messages'; END IF;
@@ -54,7 +53,6 @@ BEGIN
   IF v_project_ref IS NULL OR v_project_ref='dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN RAISE EXCEPTION 'Refused: non-production environment marker missing.'; END IF;
   PERFORM set_config('request.jwt.claims',json_build_object('role','anon')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
   PERFORM set_config('role','anon',true);
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id='tenant-public-content' AND name='bbbbbbbb-0000-0000-0000-000000000002/site-content/44444444-4444-4444-8444-444444444444.png';
   IF v_count<>0 THEN RAISE EXCEPTION 'Anonymous role read private image metadata'; END IF;
