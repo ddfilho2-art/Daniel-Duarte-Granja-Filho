@@ -194,7 +194,7 @@ Deno.serve(async (request) => {
       let registrationTenantId: string | null = null;
       if (isRegistration) {
         const tenantSlug = String(body.tenantSlug || "").trim().toLowerCase();
-        const routedTenantId = String(req.headers.get("x-tenant-id") || "").trim().toLowerCase();
+        const routedTenantId = String(request.headers.get("x-tenant-id") || "").trim().toLowerCase();
         const hasValidRoutedTenantId =
           /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(routedTenantId);
 
