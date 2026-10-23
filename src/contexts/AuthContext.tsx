@@ -460,6 +460,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setTenantMembershipLoading(true);
     try {
+      const { error: intentError } = await supabase.rpc(
+        "create_candidate_signup_intent",
+        { p_tenant_id: tenant.id },
+      );
+      if (intentError) throw intentError;
       await registerCurrentCandidate(tenant.id);
       const access = await loadCurrentTenantAccess(tenant.id);
       if (!access.hasAccess || !access.roles.includes("candidate")) {
@@ -468,6 +473,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setTenantRoles(access.roles);
       setHasTenantAccess(true);
       setCanAdministerTenant(access.canAdministerTenant);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : "";
+      const messages: Record<string, string> = {
+        candidate_signup_disabled: "O cadastro de candidatos está desabilitado nesta empresa.",
+        candidate_membership_suspended: "Sua associação a esta empresa está suspensa. Solicite ajuda ao RH.",
+        candidate_membership_unavailable: "Sua associação a esta empresa não está disponível para autoatendimento.",
+        candidate_signup_intent_expired: "A autorização de cadastro expirou. Tente novamente.",
+        candidate_signup_intent_mismatch: "A autorização de cadastro não corresponde a esta empresa. Tente novamente.",
+        candidate_access_required: "Somente uma conta ativa de candidato pode concluir este cadastro.",
+        employer_tenant_required: "Esta empresa não está disponível para cadastro.",
+        tenant_role_conflict: "Sua conta possui um perfil incompatível com o cadastro de candidato.",
+      };
+      throw new Error(messages[code] || code || "Não foi possível concluir o cadastro nesta empresa.");
     } finally {
       setTenantMembershipLoading(false);
     }

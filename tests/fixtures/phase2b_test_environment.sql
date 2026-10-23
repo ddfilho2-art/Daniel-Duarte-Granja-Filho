@@ -17,6 +17,10 @@ BEGIN
     email text PRIMARY KEY,
     user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE
   )';
+  -- SQL isolation tests deliberately switch the session role to anon/authenticated.
+  -- These grants expose only synthetic fixture metadata in the disposable test DB.
+  GRANT USAGE ON SCHEMA test TO anon, authenticated;
+  GRANT SELECT ON TABLE test.phase2b_environment_marker, test.phase2b_accounts TO anon, authenticated;
   EXECUTE 'INSERT INTO test.phase2b_environment_marker(environment,project_ref)
     VALUES (''isolated-test'',$1)
     ON CONFLICT(environment) DO UPDATE SET project_ref=EXCLUDED.project_ref,created_at=now()'

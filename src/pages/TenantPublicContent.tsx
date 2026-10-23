@@ -65,20 +65,36 @@ export function TenantPublicContent() {
   const [draftVersion, setDraftVersion] = useState<number | null>(null);
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
   const [versionHistory, setVersionHistory] = useState<SavedContentVersion[]>([]);
+  const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
 
   const isEmployerPortal = Boolean(
     isTenantRoute && tenant?.kind === "employer" && tenant?.id,
   );
+  const imagePathSignature = [...new Set(
+    about.sections.map((section) => section.imagePath).filter(Boolean),
+  )].join("|");
 
-  const imageUrl = useCallback((path: string): string | null => {
-    if (!tenant?.id || !path) return null;
-    const prefix = `${tenant.id}/site-content/`;
-    const filename = path.startsWith(prefix) ? path.slice(prefix.length) : "";
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(filename)) {
-      return null;
-    }
-    return supabase.storage.from("tenant-public-content").getPublicUrl(path).data.publicUrl;
-  }, [tenant?.id]);
+  useEffect(() => {
+    let cancelled = false;
+    setSignedImageUrls({});
+    if (!tenant?.id || !isEmployerPortal || !imagePathSignature) return () => { cancelled = true; };
+    const paths = imagePathSignature.split("|");
+    const loadSignedUrls = async () => {
+      const entries = await Promise.all(paths.map(async (path) => {
+        const prefix = `${tenant.id}/site-content/`;
+        const filename = path.startsWith(prefix) ? path.slice(prefix.length) : "";
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(filename)) return [path, null] as const;
+        const { data, error } = await supabase.storage.from("tenant-public-content").createSignedUrl(path, 3600);
+        return [path, !error && data?.signedUrl ? data.signedUrl : null] as const;
+      }));
+      if (cancelled) return;
+      const resolved: Record<string, string> = {};
+      for (const [path, url] of entries) if (url) resolved[path] = url;
+      setSignedImageUrls(resolved);
+    };
+    void loadSignedUrls();
+    return () => { cancelled = true; };
+  }, [tenant?.id, isEmployerPortal, imagePathSignature]);
 
   const loadContent = useCallback(async () => {
     if (!isEmployerPortal || !tenant?.id) {
@@ -400,7 +416,7 @@ export function TenantPublicContent() {
         )}
         <div className="space-y-4">
           {about.sections.map((section, index) => {
-            const image = imageUrl(section.imagePath);
+            const image = section.imagePath ? signedImageUrls[section.imagePath] || null : null;
             return (
               <article key={section.id} className="space-y-3 rounded-lg border border-slate-200 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -462,7 +478,7 @@ export function TenantPublicContent() {
           <h3 className="mt-2 text-xl font-bold text-slate-900">{about.title || "Sobre nós"}</h3>
           {about.subtitle && <p className="mt-2 text-slate-600">{about.subtitle}</p>}
           {about.sections.map((section, index) => {
-            const image = imageUrl(section.imagePath);
+            const image = section.imagePath ? signedImageUrls[section.imagePath] || null : null;
             return (
               <div key={section.id} className="mt-5 border-t border-slate-100 pt-4">
                 {section.title && <h4 className="font-semibold text-slate-900">{index + 1}. {section.title}</h4>}

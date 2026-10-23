@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.clinic-user-management]
 verify_jwt = true
+
+[functions.tenant-public-content-image]
+verify_jwt = false

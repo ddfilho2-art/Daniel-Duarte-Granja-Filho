@@ -102,6 +102,7 @@ BEGIN
        WHERE i.user_id = v_user_id
          AND i.tenant_id = p_tenant_id
          AND i.status = 'pending'
+         AND i.expires_at > now()
          AND t.status = 'active'
          AND t.kind = 'employer'
      )
@@ -114,6 +115,18 @@ BEGIN
          AND tm.roles @> ARRAY['candidate'::public.tenant_role]
          AND t.status = 'active'
          AND t.kind = 'employer'
+     )
+     AND NOT EXISTS (
+       SELECT 1
+       FROM public.users u
+       JOIN public.tenants t ON t.id = p_tenant_id
+       LEFT JOIN public.tenant_site_settings s ON s.tenant_id = t.id
+       WHERE (u.id = v_user_id::text OR u.uid = v_user_id::text)
+         AND u.perfil = 'Candidato'
+         AND u.status = 'Ativo'
+         AND t.status = 'active'
+         AND t.kind = 'employer'
+         AND COALESCE(s.candidate_signup_enabled, true)
      ) THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_mismatch';
   END IF;
@@ -164,6 +177,29 @@ $function$;
 REVOKE ALL ON FUNCTION public.get_current_tenant_access(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_current_tenant_access(uuid) TO authenticated, service_role;
 
+-- RLS on public.tenants intentionally hides other tenants from authenticated
+-- users. Evaluate only the public-routing predicate through a narrowly scoped,
+-- stable SECURITY DEFINER helper so an unaffiliated visitor can still see open
+-- vacancies for an active employer without receiving direct tenant-table access.
+CREATE OR REPLACE FUNCTION public.is_active_employer_tenant(p_tenant_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = p_tenant_id
+      AND t.kind = 'employer'
+      AND t.status = 'active'
+  );
+$function$;
+
+REVOKE ALL ON FUNCTION public.is_active_employer_tenant(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_active_employer_tenant(uuid) TO authenticated, service_role;
+
 -- Keep the public status allow-list unchanged; authenticated candidates see
 -- only published/open vacancies. HR/admin membership may see private records.
 DROP POLICY IF EXISTS vagas_select_policy ON public.vagas;
@@ -184,6 +220,14 @@ CREATE POLICY vagas_select_policy ON public.vagas
         )
         OR status IN ('Aberta', 'aberta', 'active', 'ativo')
       )
+    )
+    OR (
+      status IN ('Aberta', 'aberta', 'active', 'ativo')
+      AND tenant_id::text = lower(COALESCE(
+        (SELECT current_setting('request.headers', true))::jsonb ->> 'x-tenant-id',
+        ''
+      ))
+      AND public.is_active_employer_tenant(public.vagas.tenant_id)
     )
   );
 
@@ -223,6 +267,103 @@ CREATE POLICY provas_select_policy ON public.provas
     )
   );
 
+-- Create a short-lived, tenant-specific intent for an authenticated active candidate.
+CREATE OR REPLACE FUNCTION public.create_candidate_signup_intent(p_tenant_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'auth', 'pg_temp'
+AS $function$
+DECLARE
+  v_uid uuid := (SELECT auth.uid());
+  v_user public.users%rowtype;
+  v_tenant public.tenants%rowtype;
+  v_membership public.tenant_memberships%rowtype;
+  v_signup_enabled boolean := true;
+  v_intent public.candidate_signup_intents%rowtype;
+BEGIN
+  IF v_uid IS NULL THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'authentication_required';
+  END IF;
+  IF p_tenant_id IS NULL THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_required';
+  END IF;
+
+  SELECT u.* INTO v_user
+  FROM public.users u
+  WHERE u.id = v_uid::text OR u.uid = v_uid::text
+  ORDER BY CASE WHEN u.uid = v_uid::text THEN 0 ELSE 1 END
+  LIMIT 1;
+  IF NOT FOUND OR v_user.perfil <> 'Candidato' OR v_user.status <> 'Ativo' THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'candidate_access_required';
+  END IF;
+
+  SELECT t.* INTO v_tenant FROM public.tenants t
+  WHERE t.id = p_tenant_id AND t.kind = 'employer' AND t.status = 'active';
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'employer_tenant_required';
+  END IF;
+
+  SELECT tm.* INTO v_membership
+  FROM public.tenant_memberships tm
+  WHERE tm.tenant_id = p_tenant_id AND tm.user_id = v_uid
+  FOR UPDATE;
+  IF FOUND THEN
+    IF v_membership.roles @> ARRAY['tenant_admin'::public.tenant_role]
+       OR v_membership.roles @> ARRAY['tenant_admin_substitute'::public.tenant_role]
+       OR v_membership.roles @> ARRAY['hr'::public.tenant_role]
+       OR NOT (v_membership.roles @> ARRAY['candidate'::public.tenant_role]) THEN
+      RAISE EXCEPTION USING errcode = '42501', message = 'tenant_role_conflict';
+    END IF;
+    IF v_membership.status::text = 'active' THEN
+      RETURN jsonb_build_object('status', 'already_member');
+    ELSIF v_membership.status::text = 'invited' THEN
+      RETURN jsonb_build_object('status', 'invitation');
+    ELSIF v_membership.status::text = 'suspended' THEN
+      RAISE EXCEPTION USING errcode = '42501', message = 'candidate_membership_suspended';
+    ELSE
+      RAISE EXCEPTION USING errcode = '42501', message = 'candidate_membership_unavailable';
+    END IF;
+  END IF;
+
+  SELECT COALESCE(s.candidate_signup_enabled, true)
+    INTO v_signup_enabled
+  FROM (SELECT 1) seed
+  LEFT JOIN public.tenant_site_settings s ON s.tenant_id = p_tenant_id;
+  IF NOT v_signup_enabled THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'candidate_signup_disabled';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(
+    hashtextextended('candidate-signup-intent:' || v_uid::text || ':' || p_tenant_id::text, 0)
+  );
+  SELECT i.* INTO v_intent
+  FROM public.candidate_signup_intents i
+  WHERE i.user_id = v_uid AND i.tenant_id = p_tenant_id
+  FOR UPDATE;
+
+  IF FOUND THEN
+    IF v_intent.status = 'pending' AND v_intent.expires_at > now() THEN
+      RETURN jsonb_build_object('status', 'pending', 'tenantId', p_tenant_id, 'expiresAt', v_intent.expires_at);
+    END IF;
+    UPDATE public.candidate_signup_intents
+    SET status = 'pending', created_at = now(),
+        expires_at = now() + interval '30 minutes', consumed_at = NULL
+    WHERE user_id = v_uid AND tenant_id = p_tenant_id
+    RETURNING * INTO v_intent;
+  ELSE
+    INSERT INTO public.candidate_signup_intents(user_id,tenant_id,status,created_at,expires_at,consumed_at)
+    VALUES(v_uid,p_tenant_id,'pending',now(),now()+interval '30 minutes',NULL)
+    RETURNING * INTO v_intent;
+  END IF;
+
+  RETURN jsonb_build_object('status', 'pending', 'tenantId', p_tenant_id, 'expiresAt', v_intent.expires_at);
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.create_candidate_signup_intent(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.create_candidate_signup_intent(uuid) TO authenticated, service_role;
+
 -- Preserve the existing candidate onboarding flow, but bind new memberships to
 -- a server-created intent and never reactivate a suspended membership by self-service.
 CREATE OR REPLACE FUNCTION public.rpc_registrar_candidato(p_tenant_id uuid DEFAULT NULL::uuid)
@@ -242,6 +383,7 @@ DECLARE
   v_membership public.tenant_memberships%rowtype;
   v_candidate public.candidatos%rowtype;
   v_intent_tenant_id uuid;
+  v_intent_expires_at timestamptz;
   v_signup_enabled boolean := true;
   v_membership_found boolean := false;
 BEGIN
@@ -250,7 +392,7 @@ BEGIN
   END IF;
 
   BEGIN
-    v_headers := COALESCE(current_setting('request.headers', true), '{}'::jsonb)::jsonb;
+    v_headers := COALESCE(current_setting('request.headers', true), '{}')::jsonb;
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_required';
   END;
@@ -327,14 +469,19 @@ BEGIN
       RAISE EXCEPTION USING errcode = '42501', message = 'candidate_signup_disabled';
     END IF;
 
-    SELECT i.tenant_id INTO v_intent_tenant_id
+    SELECT i.tenant_id, i.expires_at
+      INTO v_intent_tenant_id, v_intent_expires_at
     FROM public.candidate_signup_intents i
     WHERE i.user_id = v_uid
+      AND i.tenant_id = v_tenant_id
       AND i.status = 'pending'
     FOR UPDATE;
 
     IF NOT FOUND OR v_intent_tenant_id IS DISTINCT FROM v_tenant_id THEN
       RAISE EXCEPTION USING errcode = '42501', message = 'candidate_signup_intent_mismatch';
+    END IF;
+    IF v_intent_expires_at <= now() THEN
+      RAISE EXCEPTION USING errcode = '42501', message = 'candidate_signup_intent_expired';
     END IF;
 
     INSERT INTO public.tenant_memberships (
@@ -381,11 +528,15 @@ BEGIN
   END IF;
 
   IF NOT v_membership_found THEN
-    UPDATE public.candidate_signup_intents
+    UPDATE public.candidate_signup_intents AS intent
     SET status = 'consumed', consumed_at = now()
-    WHERE user_id = v_uid
-      AND tenant_id = v_tenant_id
-      AND status = 'pending';
+    WHERE intent.user_id = v_uid
+      AND intent.tenant_id = v_tenant_id
+      AND intent.status = 'pending'
+      AND intent.expires_at > now();
+    IF NOT FOUND THEN
+      RAISE EXCEPTION USING errcode = '42501', message = 'candidate_signup_intent_expired';
+    END IF;
   END IF;
 
   RETURN QUERY SELECT v_candidate.id, v_tenant_id, v_membership.status;

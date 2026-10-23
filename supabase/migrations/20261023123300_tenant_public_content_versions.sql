@@ -33,18 +33,26 @@ INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 VALUES (
   'tenant-public-content',
   'tenant-public-content',
-  true,
+  false,
   2097152,
   ARRAY['image/png', 'image/webp']::text[]
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  public = false,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 DROP POLICY IF EXISTS tenant_public_content_objects_public_read ON storage.objects;
-CREATE POLICY tenant_public_content_objects_public_read ON storage.objects
-  FOR SELECT TO anon, authenticated
+DROP POLICY IF EXISTS tenant_public_content_objects_tenant_select ON storage.objects;
+CREATE POLICY tenant_public_content_objects_tenant_select ON storage.objects
+  FOR SELECT TO authenticated
   USING (
     bucket_id = 'tenant-public-content'
-    AND name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)$'
+    AND public.current_tenant_id() IS NOT NULL
+    AND name ~ ('^' || public.current_tenant_id()::text ||
+      '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)$')
+    AND public.can_administer_tenant(public.current_tenant_id())
   );
 
 DROP POLICY IF EXISTS tenant_public_content_objects_tenant_insert ON storage.objects;
