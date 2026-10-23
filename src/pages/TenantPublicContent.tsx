@@ -82,7 +82,7 @@ export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: str
     const paths = imagePathSignature.split("|");
     const loadSignedUrls = async () => {
       const entries = await Promise.all(paths.map(async (path) => {
-        const prefix = `${tenant.id}/site-content/`;
+        const prefix = `${effectiveTenant!.id}/site-content/`;
         const filename = path.startsWith(prefix) ? path.slice(prefix.length) : "";
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(filename)) return [path, null] as const;
         const { data, error } = await supabase.storage.from("tenant-public-content").createSignedUrl(path, 3600);
@@ -107,7 +107,7 @@ export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: str
     try {
       const { data, error: rpcError } = await supabase.rpc(
         "get_tenant_public_content_admin",
-        { p_tenant_id: tenant.id },
+        { p_tenant_id: effectiveTenant!.id },
       );
       if (rpcError) throw rpcError;
       const response = data as AdminContentResponse;
@@ -198,7 +198,7 @@ export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: str
     setNotice("");
     try {
       const extension = file.type === "image/png" ? "png" : "webp";
-      const path = `${tenant.id}/site-content/${crypto.randomUUID()}.${extension}`;
+      const path = `${effectiveTenant!.id}/site-content/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage
         .from("tenant-public-content")
         .upload(path, file, {
@@ -225,7 +225,7 @@ export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: str
       const { data, error: rpcError } = await supabase.rpc(
         "save_tenant_public_content_draft",
         {
-          p_tenant_id: tenant.id,
+          p_tenant_id: effectiveTenant!.id,
           p_home_message: homeMessage,
           p_about_content: {
             title: about.title,
@@ -268,7 +268,7 @@ export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: str
       const { error: rpcError } = await supabase.rpc(
         "publish_tenant_public_content_version",
         {
-          p_tenant_id: tenant.id,
+          p_tenant_id: effectiveTenant!.id,
           p_version_id: draftId,
           p_reason: "Publicação do conteúdo do site",
         },
