@@ -529,8 +529,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
       </div>
       {onFinish && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-600">Você pode continuar a edição depois em Conteúdo dos Portais. A empresa ainda precisa ser ativada para publicar o conteúdo.</p>
-          <button type="button" onClick={onFinish} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+          <p className="text-sm text-slate-600">Salve um rascunho para concluir esta etapa. Depois, você poderá continuar a edição em Conteúdo dos Portais. A publicação só será liberada após a ativação da empresa.</p>
+          <button type="button" onClick={onFinish} disabled={!draftId || saving || publishing || uploadingIndex !== null} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">
             Concluir cadastro e voltar
           </button>
         </div>
