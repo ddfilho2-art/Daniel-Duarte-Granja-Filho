@@ -29,6 +29,7 @@ Os três primeiros commits incluem alterações funcionais e de autorização; n
 - `src/pages/Public.tsx`: adiciona `PlatformHome` e remove o conteúdo institucional estático específico da DFL, usando uma apresentação neutra por empresa enquanto o editor persistente não existe.
 - `src/contexts/TenantContext.tsx`: muda a marca padrão global de DFL para Recruta AÍ.
 - `src/components/layouts/DashboardLayouts.tsx`: remove o fallback global do logo DFL; mantém a logo do tenant como principal e Recruta AÍ abaixo.
+- `src/pages/Master.tsx` e `src/lib/tenant-provisioning.ts`: adicionam upload e prévia de favicon por empresa no editor existente, usando o campo `favicon_path`, a função de rascunho e o bucket `tenant-branding` já existentes; sem migration nova.
 - `index.html`: atualiza o título global e passa a referenciar `/favicon.png`.
 - `public/logo.png`: reutiliza o blob do logo fornecido já presente em `dist/logo.png` (blob `5a37e6e68108acfed693c2dc3156be44616944d4`).
 - `public/favicon.png`: derivado do favicon original disponibilizado pelo usuário, redimensionado para 64×64 para uso no navegador; blob `910f81dbcf30cbf9b8bedf59375dc219c15277d3`.
@@ -50,7 +51,7 @@ A alteração RLS/autorização e os testes que escrevem em banco permanecem blo
 - **Cadastro habilitado por tenant:** o schema/RPC público atual não expõe uma configuração de habilitação de cadastro, e a Edge Function `email-verification` não recebe nem valida o tenant. A UI agora omite o atalho para clínicas, mas a restrição completa no servidor ainda não foi implementada. Não tratar o controle visual como barreira de segurança.
 - **Mensagem personalizada da Home:** não há campo/configuração retornado por `get_public_tenant_context`. A mensagem segue sem persistência editável por empresa.
 - **Editor Sobre Nós:** foi removida a narrativa DFL aplicada globalmente, mas ainda não existe editor persistente de conteúdo, upload, rascunho, prévia, publicação ou histórico para essa página.
-- **Favicon por tenant:** o contexto existente consegue usar `favicon_path` publicado quando configurado; o editor atual ainda não oferece um fluxo de gestão do favicon.
+- **Favicon por tenant:** o editor agora permite enviar PNG/WebP/ICO, visualizar o favicon e salvar o caminho no rascunho. O fluxo de ponta a ponta (upload, reload, publicação, portal) não foi executado; permanece aguardando teste funcional.
 
 Esses itens exigem decisões de schema/versionamento e validação server-side. Nenhuma migration nova foi criada ou aplicada.
 
