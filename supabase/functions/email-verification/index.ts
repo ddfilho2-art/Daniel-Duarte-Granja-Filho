@@ -294,10 +294,30 @@ Deno.serve(async (request) => {
         p_code_hash: codeHash,
         p_challenge_token_hash: challengeTokenHash,
       });
-      if (error) throw error;
+      if (error) {
+        if (createdUserId) {
+          const { error: cleanupError } = await admin.auth.admin.deleteUser(createdUserId);
+          if (cleanupError) {
+            console.error("candidate_signup_challenge_cleanup_failed", {
+              requestId: currentRequestId,
+              code: cleanupError.code ?? "unknown",
+            });
+          }
+        }
+        throw error;
+      }
 
       const challenge = Array.isArray(data) ? data[0] : data;
       if (!challenge?.challenge_id || !challenge?.expires_at) {
+        if (createdUserId) {
+          const { error: cleanupError } = await admin.auth.admin.deleteUser(createdUserId);
+          if (cleanupError) {
+            console.error("candidate_signup_invalid_challenge_cleanup_failed", {
+              requestId: currentRequestId,
+              code: cleanupError.code ?? "unknown",
+            });
+          }
+        }
         throw new Error("invalid_challenge_response");
       }
 
