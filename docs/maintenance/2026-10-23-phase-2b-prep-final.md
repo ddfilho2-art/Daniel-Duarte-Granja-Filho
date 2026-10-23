@@ -7,7 +7,7 @@ Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 
 ## 1. Resumo executivo
 
-- **[VERIFICADO — GitHub]** A branch de preparação foi construída sobre a `main`, sem merge ou force-push. A comparação final contém 19 caminhos: 18 de implementação/testes/configuração e este relatório. A branch está 20 commits à frente e zero atrás; os 48 commits originais não foram integrados integralmente.
+- **[VERIFICADO — GitHub]** A branch de preparação foi construída sobre a `main`, sem merge ou force-push. A comparação final contém 19 caminhos: 18 de implementação/testes/configuração e este relatório. A branch permanece baseada na `main`, sem commits dela perdidos; os 48 commits originais não foram integrados integralmente.
 - **[VERIFICADO — Node 24 sandbox]** `npm ci --no-audit --no-fund`, `npm run lint` e `npm run build` passaram no checkout `84ea6df21c24e9b616fb30c510628f38fc7d8cd8`, usando Node.js `v24.22.1`.
 - **[VERIFICADO — inspeção estática]** Os três testes SQL foram reconstruídos com delimitadores válidos; os 12 cenários de isolamento, 4 cenários de cadastro e 3 cenários de conteúdo têm transação própria e `ROLLBACK`.
 - **[NÃO EXECUTADO]** Migrations e testes SQL não foram executados. O sandbox não possui `psql` nem Supabase CLI, e não existe um banco isolado disponível para validar funções/RLS contra PostgreSQL real.
@@ -20,7 +20,7 @@ Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 |---|---|---|
 | `main` | `aac8c8719abe931aaf37a5876337e6997f7d3794` | Base preservada |
 | Branch original de manutenção | `5e5f371b91f898a9796598c0dd3764ab45bf5694` | 48 commits à frente da base no reconhecimento |
-| Branch de preparação | `84ea6df21c24e9b616fb30c510628f38fc7d8cd8` | Código, migrations e testes de preparação validados com lint/build |
+| Commit de código validado com lint/build | `84ea6df21c24e9b616fb30c510628f38fc7d8cd8` | Código, migrations e testes de preparação nesse checkout |
 
 O relatório e a ampliação do fixture de ambiente foram registrados após o build; essa última alteração é somente SQL de setup de testes, não altera o código TypeScript validado.
 
