@@ -126,6 +126,35 @@ BEGIN
 END;
 $$;
 
+-- C. Anonymous users cannot execute administrative RPCs.
+DO $
+DECLARE
+  v_denied boolean := false;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
+  PERFORM set_config(
+    'request.headers',
+    jsonb_build_object('x-tenant-id', 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+    true
+  );
+  PERFORM set_config('request.header.x-tenant-id', 'bbbbbbbb-0000-0000-0000-000000000001', true);
+  PERFORM set_config('role', 'anon', true);
+
+  BEGIN
+    PERFORM public.get_tenant_public_content_admin(
+      'bbbbbbbb-0000-0000-0000-000000000001'::uuid
+    );
+  EXCEPTION WHEN insufficient_privilege THEN
+    v_denied := true;
+  END;
+
+  IF NOT v_denied THEN
+    RAISE EXCEPTION 'FAIL: anonymous user executed tenant content admin RPC';
+  END IF;
+  RAISE NOTICE 'PASS: anonymous user cannot execute tenant content admin RPC';
+END;
+$;
+
 -- The test is deliberately non-persistent.
 SELECT set_config('role', 'postgres', true);
 ROLLBACK;
