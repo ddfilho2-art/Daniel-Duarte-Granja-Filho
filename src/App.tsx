@@ -46,6 +46,7 @@ const ClinicUserManagement = lazyNamed(() => import("./pages/ClinicUserManagemen
 
 const MasterDashboard = lazyNamed(() => import("./pages/Master"), "MasterDashboard");
 const MasterTenantList = lazyNamed(() => import("./pages/Master"), "MasterTenantList");
+const MasterTenantPublicContent = lazyNamed(() => import("./pages/MasterTenantPublicContent"), "MasterTenantPublicContent");
 const MasterTenantAdminManagement = lazyNamed(
   () => import("./pages/Master"),
   "MasterTenantAdminManagement",
@@ -345,6 +346,7 @@ const App = () => {
             >
               <Route index element={<MasterDashboard />} />
               <Route path="tenants" element={<MasterTenantList />} />
+              <Route path="site-publico" element={<MasterTenantPublicContent />} />
               <Route path="administradores" element={<MasterTenantAdminManagement />} />
               <Route path="branding" element={<MasterBrandingEditor />} />
               <Route path="sre" element={<MasterSRE />} />
