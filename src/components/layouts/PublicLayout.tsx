@@ -43,7 +43,9 @@ function Brand() {
 export function PublicLayout() {
   const { branding, tenant, isTenantRoute } = useTenant();
   const allowCandidateSignup =
-    isTenantRoute && tenant?.kind === "employer";
+    isTenantRoute &&
+    tenant?.kind === "employer" &&
+    tenant.candidateSignupEnabled !== false;
 
   return (
     <div className="min-h-screen flex flex-col">
