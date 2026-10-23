@@ -21,5 +21,18 @@ BEGIN
     VALUES (''isolated-test'',$1)
     ON CONFLICT(environment) DO UPDATE SET project_ref=EXCLUDED.project_ref,created_at=now()'
     USING v_project_ref;
+  EXECUTE 'INSERT INTO test.phase2b_accounts(email,user_id)
+    SELECT lower(email), id FROM auth.users
+    WHERE lower(email)=ANY($1)
+    ON CONFLICT(email) DO UPDATE SET user_id=EXCLUDED.user_id'
+    USING ARRAY[
+      'master@platform.test',
+      'admin-a@tenant-a.test',
+      'hr-a@tenant-a.test',
+      'candidate-a@tenant-a.test',
+      'admin-b@tenant-b.test',
+      'hr-b@tenant-b.test',
+      'clinic@clinic.test'
+    ]::text[];
 END;
 $setup$;
