@@ -45,7 +45,7 @@ DECLARE
   v_user_id uuid := (SELECT auth.uid());
 BEGIN
   BEGIN
-    v_headers := COALESCE(current_setting('request.headers', true), '{}'::jsonb)::jsonb;
+    v_headers := COALESCE(current_setting('request.headers', true), '{}')::jsonb;
   EXCEPTION WHEN OTHERS THEN
     RETURN NULL;
   END;
