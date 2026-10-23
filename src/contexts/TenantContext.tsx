@@ -35,6 +35,7 @@ interface PublicAboutSection {
   text?: string;
   imagePath?: string | null;
   imageAlt?: string;
+  layout?: "stacked" | "image-top" | "image-left" | "image-right" | "image-only" | "text-only";
 }
 
 interface PublicTenantContent {
