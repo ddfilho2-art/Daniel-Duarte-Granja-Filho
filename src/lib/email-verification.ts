@@ -17,7 +17,13 @@ export async function registerCandidateAccount(
   email: string,
   name: string,
   password: string,
+  tenantSlug: string,
 ): Promise<void> {
+  const normalizedTenantSlug = tenantSlug.trim().toLowerCase();
+  if (!normalizedTenantSlug || normalizedTenantSlug.length > 120) {
+    throw new Error("REGISTRATION_UNAVAILABLE");
+  }
+
   const { data, error } = await supabase.functions.invoke<VerificationResponse>(
     "email-verification",
     {
@@ -26,6 +32,7 @@ export async function registerCandidateAccount(
         email: email.trim().toLowerCase(),
         name: name.trim(),
         password,
+        tenantSlug: normalizedTenantSlug,
       },
     },
   );
