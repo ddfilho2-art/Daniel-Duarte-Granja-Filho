@@ -44,7 +44,7 @@ CREATE POLICY tenant_public_content_objects_public_read ON storage.objects
   FOR SELECT TO anon, authenticated
   USING (
     bucket_id = 'tenant-public-content'
-    AND name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)$'
+    AND name ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)$'
   );
 
 DROP POLICY IF EXISTS tenant_public_content_objects_tenant_insert ON storage.objects;
