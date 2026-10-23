@@ -99,6 +99,97 @@ $function$;
 REVOKE ALL ON FUNCTION public.current_tenant_id() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.current_tenant_id() TO anon, authenticated, service_role;
 
+-- A candidate with a valid server-created signup intent (or an explicit candidate
+-- invitation) must be able to reach the existing registration RPC while still
+-- having no data-plane tenant access before membership becomes active.
+CREATE OR REPLACE FUNCTION public.get_current_tenant_access(p_tenant_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'auth', 'pg_temp'
+AS $function$
+DECLARE
+  v_user_id uuid := (SELECT auth.uid());
+  v_roles public.tenant_role[] := ARRAY[]::public.tenant_role[];
+  v_is_platform_master boolean := false;
+  v_can_administer boolean := false;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'authentication_required';
+  END IF;
+  IF p_tenant_id IS NULL THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_mismatch';
+  END IF;
+
+  IF p_tenant_id IS DISTINCT FROM public.current_tenant_id()
+     AND NOT EXISTS (
+       SELECT 1 FROM public.candidate_signup_intents i
+       JOIN public.tenants t ON t.id = i.tenant_id
+       WHERE i.user_id = v_user_id
+         AND i.tenant_id = p_tenant_id
+         AND i.status = 'pending'
+         AND t.status = 'active'
+         AND t.kind = 'employer'
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM public.tenant_memberships tm
+       JOIN public.tenants t ON t.id = tm.tenant_id
+       WHERE tm.tenant_id = p_tenant_id
+         AND tm.user_id = v_user_id
+         AND tm.status::text = 'invited'
+         AND tm.roles @> ARRAY['candidate'::public.tenant_role]
+         AND t.status = 'active'
+     ) THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_mismatch';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.tenants t
+    WHERE t.id = p_tenant_id AND t.status = 'active'
+  ) THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'tenant_unavailable';
+  END IF;
+
+  SELECT public.is_platform_master_admin() INTO v_is_platform_master;
+
+  -- A global platform account is not a tenant user, even if it has stale membership.
+  IF v_is_platform_master THEN
+    RETURN jsonb_build_object(
+      'tenantId', p_tenant_id,
+      'roles', '[]'::jsonb,
+      'hasAccess', false,
+      'canAdministerTenant', false,
+      'isPlatformMasterAdmin', true
+    );
+  END IF;
+
+  SELECT tm.roles INTO v_roles
+  FROM public.tenant_memberships tm
+  JOIN public.tenants t ON t.id = tm.tenant_id
+  WHERE tm.tenant_id = p_tenant_id
+    AND tm.user_id = v_user_id
+    AND tm.status = 'active'
+    AND t.status = 'active';
+
+  v_roles := COALESCE(v_roles, ARRAY[]::public.tenant_role[]);
+  IF cardinality(v_roles) > 0 THEN
+    v_can_administer := public.can_administer_tenant(p_tenant_id);
+  END IF;
+
+  RETURN jsonb_build_object(
+    'tenantId', p_tenant_id,
+    'roles', to_jsonb(v_roles),
+    'hasAccess', cardinality(v_roles) > 0,
+    'canAdministerTenant', v_can_administer,
+    'isPlatformMasterAdmin', false
+  );
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.get_current_tenant_access(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_current_tenant_access(uuid) TO authenticated, service_role;
+
 -- Keep the public status allow-list unchanged; authenticated candidates see
 -- only published/open vacancies. HR/admin membership may see private records.
 DROP POLICY IF EXISTS vagas_select_policy ON public.vagas;
