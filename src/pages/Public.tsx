@@ -1241,7 +1241,12 @@ export function Login() {
     login,
     registerCandidateForTenant,
   } = useAuth();
-  const { isTenantRoute } = useTenant();
+  const { isTenantRoute, tenant } = useTenant();
+  const canRegisterCandidate = Boolean(
+    isTenantRoute &&
+    tenant?.kind === "employer" &&
+    tenant.candidateSignupEnabled !== false
+  );
   const isLoginBusy = loading || authLoading || profileLoading || tenantMembershipLoading || authorizationLoading;
 
   useEffect(() => {
@@ -1318,7 +1323,11 @@ export function Login() {
 
       if (err.message === "CANDIDATE_TENANT_REGISTRATION_REQUIRED") {
         setCandidateRegistrationRequired(true);
-        setError("Sua conta já existe, mas ainda não está cadastrada nesta empresa.");
+        setError(
+          tenant?.candidateSignupEnabled === false
+            ? "O cadastro de candidatos nesta empresa está desativado."
+            : "Sua conta já existe, mas ainda não está cadastrada nesta empresa.",
+        );
         return;
       }
       setError(err.message || "Não foi possível entrar.");
@@ -1404,7 +1413,7 @@ export function Login() {
             </button>
           </form>
 
-          {candidateRegistrationRequired && isTenantRoute && (
+          {candidateRegistrationRequired && canRegisterCandidate && (
             <button
               type="button"
               disabled={loading}
@@ -1434,15 +1443,17 @@ export function Login() {
             verifica automaticamente o perfil e as permissões no Supabase.
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-600">
-            Não tem uma conta?{" "}
-            <Link
-              to="/cadastro"
-              className="font-medium text-primary hover:underline"
-            >
-              Cadastre-se
-            </Link>
-          </p>
+          {canRegisterCandidate && (
+            <p className="mt-6 text-center text-sm text-slate-600">
+              Não tem uma conta?{" "}
+              <Link
+                to="/cadastro"
+                className="font-medium text-primary hover:underline"
+              >
+                Cadastre-se
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>
