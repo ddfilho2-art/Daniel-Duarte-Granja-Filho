@@ -93,7 +93,8 @@ BEGIN
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
   PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
-  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.users WHERE tenant_id='bbbbbbbb-0000-0000-0000-000000000002'; IF v_count<>0 THEN RAISE EXCEPTION 'Cross-tenant profiles visible'; END IF;
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.users
+    WHERE id=(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-b@tenant-b.test'); IF v_count<>0 THEN RAISE EXCEPTION 'Cross-tenant profiles visible'; END IF;
 END;
 $test$;
 ROLLBACK;
