@@ -6,21 +6,10 @@ import {
   Briefcase,
   ChevronRight,
   CheckCircle2,
-  Globe,
-  Calendar,
-  Users,
-  FlaskConical,
-  Award,
-  Leaf,
   Building2,
-  Rocket,
-  ExternalLink,
   Eye,
   EyeOff,
   DollarSign,
-  Trash2,
-  Plus,
-  XCircle,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
@@ -116,9 +105,9 @@ export function Home() {
               <span className="text-[#00b4d8]">sua carreira</span>
             </h1>
 
-            <p className="text-lg md:text-xl mb-12 max-w-xl font-light leading-relaxed opacity-85">
-              Encontre oportunidades na {branding.displayName} e acompanhe cada
-              etapa do processo seletivo em um ambiente seguro.
+            <p className="text-lg md:text-xl mb-12 max-w-xl font-light leading-relaxed opacity-85 whitespace-pre-line">
+              {tenant?.publicContent?.homeMessage?.trim() ||
+                `Encontre oportunidades na ${branding.displayName} e acompanhe cada etapa do processo seletivo em um ambiente seguro.`}
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-start gap-4">
@@ -128,12 +117,14 @@ export function Home() {
               >
                 Ver vagas abertas <ChevronRight className="w-5 h-5" />
               </Link>
-              <Link
-                to="/cadastro"
-                className="tenant-primary-action w-full sm:w-auto px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg flex items-center justify-center"
-              >
-                Cadastre-se
-              </Link>
+              {tenant?.kind === "employer" && tenant.candidateSignupEnabled !== false && (
+                <Link
+                  to="/cadastro"
+                  className="tenant-primary-action w-full sm:w-auto px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg flex items-center justify-center"
+                >
+                  Cadastre-se
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -1049,7 +1040,7 @@ export function Cadastro() {
       const email = formData.email.trim().toLowerCase();
       const name = formData.nome.trim();
 
-      await registerCandidateAccount(email, name, formData.senha);
+      await registerCandidateAccount(email, name, formData.senha, tenant.slug);
 
       try {
         await logAudit(
@@ -1074,7 +1065,9 @@ export function Cadastro() {
     } catch (err: any) {
       const code = String(err?.message || "");
       console.error("Erro no cadastro:", err);
-      if (code === "EMAIL_ALREADY_REGISTERED") {
+      if (code === "REGISTRATION_UNAVAILABLE" || code === "TENANT_REGISTRATION_DISABLED") {
+        setError("O cadastro de candidatos não está disponível nesta empresa no momento.");
+      } else if (code === "EMAIL_ALREADY_REGISTERED") {
         setError("Este e-mail já possui uma conta. Entre com essa conta ou use a recuperação de senha.");
       } else if (code === "RATE_LIMITED") {
         setError("Muitas solicitações de código. Aguarde alguns minutos antes de tentar novamente.");
@@ -1248,7 +1241,12 @@ export function Login() {
     login,
     registerCandidateForTenant,
   } = useAuth();
-  const { isTenantRoute } = useTenant();
+  const { isTenantRoute, tenant } = useTenant();
+  const canRegisterCandidate = Boolean(
+    isTenantRoute &&
+    tenant?.kind === "employer" &&
+    tenant.candidateSignupEnabled !== false
+  );
   const isLoginBusy = loading || authLoading || profileLoading || tenantMembershipLoading || authorizationLoading;
 
   useEffect(() => {
@@ -1325,7 +1323,11 @@ export function Login() {
 
       if (err.message === "CANDIDATE_TENANT_REGISTRATION_REQUIRED") {
         setCandidateRegistrationRequired(true);
-        setError("Sua conta já existe, mas ainda não está cadastrada nesta empresa.");
+        setError(
+          tenant?.candidateSignupEnabled === false
+            ? "O cadastro de candidatos nesta empresa está desativado."
+            : "Sua conta já existe, mas ainda não está cadastrada nesta empresa.",
+        );
         return;
       }
       setError(err.message || "Não foi possível entrar.");
@@ -1411,7 +1413,7 @@ export function Login() {
             </button>
           </form>
 
-          {candidateRegistrationRequired && isTenantRoute && (
+          {candidateRegistrationRequired && canRegisterCandidate && (
             <button
               type="button"
               disabled={loading}
@@ -1441,370 +1443,128 @@ export function Login() {
             verifica automaticamente o perfil e as permissões no Supabase.
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-600">
-            Não tem uma conta?{" "}
-            <Link
-              to="/cadastro"
-              className="font-medium text-primary hover:underline"
-            >
-              Cadastre-se
-            </Link>
-          </p>
+          {canRegisterCandidate && (
+            <p className="mt-6 text-center text-sm text-slate-600">
+              Não tem uma conta?{" "}
+              <Link
+                to="/cadastro"
+                className="font-medium text-primary hover:underline"
+              >
+                Cadastre-se
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-export function SobreNos() {
+export function PlatformHome() {
   return (
-    <div className="bg-slate-50 min-h-screen pb-20">
-      {/* Hero Section */}
-      <section className="bg-[#27336D] text-white py-24 px-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/20"></div>
-        <div className="max-w-4xl mx-auto text-center relative z-10">
-          <div className="inline-block bg-white/10 backdrop-blur-sm border border-white/20 px-4 py-1.5 rounded-full text-sm font-medium mb-6">
-            Sobre a DFL
-          </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-            Uma empresa de 85 anos conectada com o futuro
-          </h1>
-          <p className="text-lg md:text-xl text-blue-100 max-w-3xl mx-auto font-light leading-relaxed">
-            Líder nacional em anestésicos injetáveis e agulhas gengivais, a
-            única fabricante brasileira de anestésicos odontológicos em tubetes
-            de vidro.
-          </p>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="max-w-6xl mx-auto px-4 -mt-12 relative z-20 mb-20">
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 divide-x divide-slate-100">
-            <div className="text-center px-4">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Globe className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-1">
-                45+ países
-              </h3>
-              <p className="text-sm text-slate-500">
-                Exportação global de produtos
-              </p>
-            </div>
-            <div className="text-center px-4">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Calendar className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-1">
-                85 anos
-              </h3>
-              <p className="text-sm text-slate-500">Fundada em 1939</p>
-            </div>
-            <div className="text-center px-4">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">                <Users className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-1">
-                53% mulheres
-              </h3>
-              <p className="text-sm text-slate-500">
-                Equidade de gênero no quadro
-              </p>
-            </div>
-            <div className="text-center px-4">
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <FlaskConical className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900 mb-1">
-                Lab PDI
-              </h3>
-              <p className="text-sm text-slate-500">
-                Pesquisa e inovação de ponta
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Nossa História */}
-      <section className="max-w-6xl mx-auto px-4 mb-24">
-        <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-200">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-3xl font-bold text-slate-900 mb-6">
-                Nossa História
-              </h2>
-              <div className="space-y-4 text-slate-600 leading-relaxed">
-                <p>
-                  A DFL foi fundada em <strong>1939</strong> como uma empresa
-                  importadora, rapidamente se estabelecendo como a maior
-                  representante da indústria americana e europeia de odontologia
-                  no Brasil.
-                </p>
-                <p>
-                  O início da fabricação de{" "}
-                  <strong>anestésicos injetáveis em 1998</strong> marcou uma
-                  nova era para a DFL. Uma reestruturação interna modernizou a
-                  empresa, possibilitando o aumento na produtividade e a criação
-                  de um laboratório de P&D de última geração.
-                </p>
-                <p>
-                  Hoje, a DFL exporta para mais de <strong>45 países</strong> e
-                  está expandindo sua atuação para o segmento médico, sendo
-                  referência em inovação, qualidade e responsabilidade no setor
-                  farmacêutico-odontológico.
-                </p>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="absolute left-6 top-4 bottom-4 w-px bg-slate-200"></div>
-              <div className="space-y-8 relative">
-                <div className="flex gap-6">
-                  <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shrink-0 font-bold text-sm z-10">
-                    1939
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-lg">
-                      Fundação
-                    </h4>
-                    <p className="text-slate-500 text-sm mt-1">
-                      Empresa importadora referência no setor odontológico
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-6">
-                  <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shrink-0 font-bold text-sm z-10">
-                    1998
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-lg">
-                      Nova era
-                    </h4>
-                    <p className="text-slate-500 text-sm mt-1">
-                      Início da fabricação de anestésicos injetáveis
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-6">
-                  <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shrink-0 font-bold text-sm z-10">
-                    1999
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-lg">
-                      Internacionalização
-                    </h4>
-                    <p className="text-slate-500 text-sm mt-1">
-                      Início do processo de exportação global
-                    </p>
-                  </div>
-                </div>
-                <div className="flex gap-6">
-                  <div className="w-12 h-12 bg-slate-900 text-white rounded-xl flex items-center justify-center shrink-0 font-bold text-sm z-10">
-                    2022
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-lg">
-                      Lab PDI
-                    </h4>
-                    <p className="text-slate-500 text-sm mt-1">
-                      Laboratório de pesquisa e inovação de última geração
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Laboratório de PDI */}
-      <section className="max-w-6xl mx-auto px-4 mb-24 text-center">
-        <h2 className="text-3xl font-bold text-slate-900 mb-3">
-          Laboratório de PDI
-        </h2>
-        <p className="text-slate-500 mb-12">
-          Transformando a Saúde com Modernidade e Inovação
+    <section className="min-h-[calc(100vh-64px)] flex items-center justify-center bg-slate-50 px-4 py-16">
+      <div className="max-w-xl text-center">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-slate-900">
+          Área administrativa da plataforma
+        </h1>
+        <p className="mt-4 text-base sm:text-lg leading-relaxed text-slate-600">
+          Entre com sua conta autorizada para acessar o Recruta AÍ.
         </p>
+      </div>
+    </section>
+  );
+}
 
-        <div className="grid md:grid-cols-3 gap-8 text-left">
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6">
-              <FlaskConical className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-3">
-              Quality by Design
-            </h3>
-            <p className="text-slate-600 text-sm leading-relaxed">
-              Abordagem orientada por dados que antecipa e controla variáveis no
-              desenvolvimento de produtos, garantindo qualidade superior.
-            </p>
-          </div>
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6">
-              <Award className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-3">
-              Medicina Baseada em Evidências
-            </h3>
-            <p className="text-slate-600 text-sm leading-relaxed">
-              Estudos clínicos rigorosos fundamentam cada produto, assegurando
-              eficácia e segurança comprovadas cientificamente.
-            </p>
-          </div>
-          <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
-            <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center mb-6">
-              <Globe className="w-6 h-6" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-3">
-              Inovação Contínua
-            </h3>
-            <p className="text-slate-600 text-sm leading-relaxed">
-              De anestésicos injetáveis a formulações odontológicas avançadas,
-              nosso lab é onde o futuro da saúde é criado.
-            </p>
-          </div>
-        </div>
-      </section>
+export function SobreNos() {
+  const { tenant, branding } = useTenant();
+  const companyName = tenant?.displayName || branding.displayName;
+  const about = tenant?.publicContent?.about;
+  const sections = Array.isArray(about?.sections) ? about.sections : [];
+  const hasPublishedAbout = Boolean(
+    (about?.title && about.title.trim() && about.title.trim().toLocaleLowerCase("pt-BR") !== "sobre nós") ||
+    about?.subtitle?.trim() ||
+    sections.length > 0
+  );
+  const pageTitle = hasPublishedAbout
+    ? about?.title?.trim() || `Conheça ${companyName}`
+    : `Conheça ${companyName}`;
 
-      {/* Certificações */}
-      <section className="max-w-6xl mx-auto px-4 mb-24">
-        <div className="bg-slate-100 rounded-3xl p-8 md:p-12 text-center">
-          <h2 className="text-3xl font-bold text-slate-900 mb-3">
-            Certificações
-          </h2>
-          <p className="text-slate-500 mb-12">
-            Reconhecimentos internacionais que atestam nossos padrões de
-            qualidade
+  const imageUrl = (path?: string | null): string | null => {
+    if (!tenant?.id || !path) return null;
+    const prefix = `${tenant.id}/site-content/`;
+    const fileName = path.startsWith(prefix) ? path.slice(prefix.length) : "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(fileName)) {
+      return null;
+    }
+    return supabase.storage.from("tenant-public-content").getPublicUrl(path).data.publicUrl;
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 px-4 py-16 sm:py-24">
+      <section className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white px-6 py-12 shadow-sm sm:px-12">
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary">
+          Sobre a empresa
+        </p>
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+          {pageTitle}
+        </h1>
+        {about?.subtitle?.trim() && (
+          <p className="mt-4 text-lg leading-relaxed text-slate-600">
+            {about.subtitle}
           </p>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            <div className="bg-white p-6 rounded-2xl shadow-sm">
-              <div className="w-10 h-10 bg-slate-50 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm mb-1">
-                CBPF ANVISA
-              </h4>
-              <p className="text-xs text-slate-500">
-                Certificado de Boas Práticas de Fabricação
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm">
-              <div className="w-10 h-10 bg-slate-50 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm mb-1">
-                ISO 13485:2016
-              </h4>
-              <p className="text-xs text-slate-500">
-                Boas práticas de fabricação e segurança de produtos para saúde
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm">
-              <div className="w-10 h-10 bg-slate-50 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm mb-1">
-                FDA Certified
-              </h4>
-              <p className="text-xs text-slate-500">
-                Certificação da agência federal dos EUA para produtos médicos
-              </p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm">
-              <div className="w-10 h-10 bg-slate-50 text-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Award className="w-5 h-5" />
-              </div>
-              <h4 className="font-bold text-slate-900 text-sm mb-1">
-                ISO 14001:2015
-              </h4>
-              <p className="text-xs text-slate-500">
-                Sistema de gestão ambiental internacional
-              </p>
-            </div>
-          </div>
+        )}
+        {!hasPublishedAbout && (
+          <p className="mt-6 text-lg leading-relaxed text-slate-600">
+            Esta é a página institucional de {companyName}. As informações sobre
+            sua história, cultura e valores poderão ser configuradas pela própria
+            empresa.
+          </p>
+        )}
+        <div className="mt-8 space-y-8">
+          {sections.map((section, index) => {
+            const image = imageUrl(section.imagePath);
+            return (
+              <article key={section.id || `about-section-${index}`} className="border-t border-slate-100 pt-8">
+                {section.title?.trim() && (
+                  <h2 className="text-2xl font-semibold text-slate-900">
+                    {section.title}
+                  </h2>
+                )}
+                {section.subtitle?.trim() && (
+                  <h3 className="mt-2 text-lg font-medium text-slate-700">
+                    {section.subtitle}
+                  </h3>
+                )}
+                {section.text?.trim() && (
+                  <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">
+                    {section.text}
+                  </p>
+                )}
+                {image && (
+                  <img
+                    src={image}
+                    alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
+                    loading="lazy"
+                    className="mt-5 max-h-[480px] w-full rounded-2xl object-contain"
+                  />
+                )}
+              </article>
+            );
+          })}
         </div>
-      </section>
-
-      {/* Responsabilidade e Transparência */}
-      <section className="max-w-6xl mx-auto px-4 mb-24">
-        <div className="grid md:grid-cols-2 gap-8">
-          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-200">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
-                <Leaf className="w-5 h-5" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900">
-                Responsabilidade Socioambiental
-              </h3>
-            </div>
-            <div className="space-y-4 text-slate-600 text-sm leading-relaxed mb-8">
-              <p>
-                A DFL tem consciência de sua responsabilidade social e
-                ambiental. Em 2024, a empresa realizou diversas iniciativas de
-                impacto: apoio a colaboradores afetados pelas enchentes no RS,
-                atendimentos oftalmológicos gratuitos para crianças vulneráveis
-                e suporte à educação de jovens de baixa renda.
-              </p>
-              <p>
-                Certificada com a ISO 14001:2015, a DFL está engajada em um
-                projeto de Sustentabilidade para que suas atividades não
-                comprometam o futuro das próximas gerações.
-              </p>
-            </div>
-            <button className="inline-flex items-center gap-2 px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-              Ver Relatório ESG <ExternalLink className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="bg-white p-8 md:p-10 rounded-3xl shadow-sm border border-slate-200">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5" />
-              </div>
-              <h3 className="text-2xl font-bold text-slate-900">
-                Transparência e Igualdade
-              </h3>
-            </div>
-            <div className="space-y-4 text-slate-600 text-sm leading-relaxed mb-8">
-              <p>
-                Na DFL, acreditamos que o desenvolvimento sustentável passa pela
-                promoção da equidade entre pessoas. As profissionais já
-                representam <strong>53% do quadro de colaboradores</strong>.
-              </p>
-              <p>
-                Publicamos anualmente nosso Relatório de Transparência e
-                Igualdade Salarial, reforçando o compromisso com práticas
-                justas, inclusivas e transparentes.
-              </p>
-            </div>
-            <button className="inline-flex items-center gap-2 px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-              Baixar Relatório <ExternalLink className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-4">
-        <div className="bg-[#27336D] rounded-3xl p-12 text-center text-white relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/50 to-transparent"></div>
-          <div className="relative z-10">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Faça parte da DFL
-            </h2>
-            <p className="text-blue-100 mb-8 max-w-2xl mx-auto text-lg">
-              Junte-se a uma empresa líder, inovadora e comprometida com o
-              futuro da saúde odontológica no Brasil e no mundo.
-            </p>
-            <Link
-              to="/"
-              className="inline-block bg-white text-[#27336D] px-8 py-3 rounded-lg font-bold hover:bg-blue-50 transition-colors"
-            >
-              Ver vagas abertas
-            </Link>
-          </div>
+        <div className="mt-10 rounded-2xl bg-slate-50 p-6">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Faça parte da equipe
+          </h2>
+          <p className="mt-2 text-slate-600">
+            Consulte as oportunidades publicadas por esta empresa.
+          </p>
+          <Link
+            to="/vagas"
+            className="mt-5 inline-flex rounded-lg bg-primary px-5 py-3 font-semibold text-white transition-colors hover:opacity-90"
+          >
+            Ver vagas abertas
+          </Link>
         </div>
       </section>
     </div>
