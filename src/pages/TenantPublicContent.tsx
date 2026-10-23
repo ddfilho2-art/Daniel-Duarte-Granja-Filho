@@ -69,7 +69,7 @@ export function TenantPublicContent() {
     if (!tenant?.id || !path) return null;
     const prefix = \`\${tenant.id}/site-content/\`;
     const filename = path.startsWith(prefix) ? path.slice(prefix.length) : "";
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\.(png|webp)$/.test(filename)) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(filename)) {
       return null;
     }
     return supabase.storage.from("tenant-public-content").getPublicUrl(path).data.publicUrl;
