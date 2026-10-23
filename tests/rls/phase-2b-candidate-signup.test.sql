@@ -19,7 +19,6 @@ INSERT INTO public.tenant_site_settings(tenant_id,candidate_signup_enabled,updat
 ON CONFLICT(tenant_id) DO UPDATE SET candidate_signup_enabled=false,updated_by=NULL,updated_at=now();
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
   PERFORM set_config('role','authenticated',true);
 BEGIN PERFORM * FROM public.rpc_registrar_candidato('bbbbbbbb-0000-0000-0000-000000000001');
 EXCEPTION WHEN insufficient_privilege THEN v_message:=SQLERRM; v_denied:=(v_message='candidate_signup_disabled'); END;
@@ -43,7 +42,6 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000003')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000003',true);
   PERFORM set_config('role','authenticated',true);
 BEGIN PERFORM * FROM public.rpc_registrar_candidato('bbbbbbbb-0000-0000-0000-000000000003');
 EXCEPTION WHEN insufficient_privilege THEN v_message:=SQLERRM; v_denied:=(v_message='employer_tenant_required'); END;
@@ -74,7 +72,6 @@ INSERT INTO public.candidate_signup_intents(user_id,tenant_id,status) VALUES(v_c
 ON CONFLICT(user_id,tenant_id) DO UPDATE SET status='pending',created_at=now(),expires_at=now()+interval '30 minutes',consumed_at=NULL;
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
   PERFORM set_config('role','authenticated',true);
 BEGIN PERFORM * FROM public.rpc_registrar_candidato('bbbbbbbb-0000-0000-0000-000000000002');
 EXCEPTION WHEN insufficient_privilege THEN v_message:=SQLERRM; v_denied:=(v_message='candidate_signup_intent_mismatch'); END;
@@ -104,7 +101,6 @@ INSERT INTO public.tenant_site_settings(tenant_id,candidate_signup_enabled,updat
 ON CONFLICT(tenant_id) DO UPDATE SET candidate_signup_enabled=true,updated_by=NULL,updated_at=now();
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
   PERFORM set_config('role','authenticated',true);
   v_saved_access := public.get_current_tenant_access('bbbbbbbb-0000-0000-0000-000000000002');
   IF v_saved_access->>'hasAccess' <> 'false' THEN RAISE EXCEPTION 'Existing candidate got access before intent'; END IF;
@@ -139,7 +135,6 @@ BEGIN
     ON CONFLICT(user_id,tenant_id) DO UPDATE SET status='pending',created_at=now()-interval '1 hour',expires_at=now()-interval '1 minute',consumed_at=NULL;
   PERFORM set_config('request.jwt.claims',json_build_object('sub',v_candidate::text,'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
   PERFORM set_config('role','authenticated',true);
   BEGIN
     PERFORM * FROM public.rpc_registrar_candidato('bbbbbbbb-0000-0000-0000-000000000001');
@@ -166,7 +161,6 @@ BEGIN
     VALUES('bbbbbbbb-0000-0000-0000-000000000002',v_candidate,ARRAY['candidate'::public.tenant_role],'suspended',now(),now());
   PERFORM set_config('request.jwt.claims',json_build_object('sub',v_candidate::text,'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
   PERFORM set_config('role','authenticated',true);
   BEGIN
     v_intent:=public.create_candidate_signup_intent('bbbbbbbb-0000-0000-0000-000000000002');
