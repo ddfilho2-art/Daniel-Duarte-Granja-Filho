@@ -77,7 +77,7 @@ ROLLBACK;
 -- 5. Candidate A cannot read Tenant B profiles
 BEGIN;
 DO $test$
-DECLARE v_project_ref text; v_count integer;
+DECLARE v_project_ref text; v_count integer; v_admin_b uuid;
 BEGIN
   IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
     RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
@@ -86,10 +86,12 @@ BEGIN
   IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
     RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
   END IF;
+  SELECT user_id INTO v_admin_b FROM test.phase2b_accounts WHERE email='admin-b@tenant-b.test';
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
-  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.users
-    WHERE id=(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-b@tenant-b.test'); IF v_count<>0 THEN RAISE EXCEPTION 'Cross-tenant profiles visible'; END IF;
+  PERFORM set_config('role','authenticated',true);
+  SELECT count(*) INTO v_count FROM public.users WHERE id=v_admin_b::text;
+  IF v_count<>0 THEN RAISE EXCEPTION 'Cross-tenant profiles visible'; END IF;
 END;
 $test$;
 ROLLBACK;
