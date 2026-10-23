@@ -105,9 +105,9 @@ export function Home() {
               <span className="text-[#00b4d8]">sua carreira</span>
             </h1>
 
-            <p className="text-lg md:text-xl mb-12 max-w-xl font-light leading-relaxed opacity-85">
-              Encontre oportunidades na {branding.displayName} e acompanhe cada
-              etapa do processo seletivo em um ambiente seguro.
+            <p className="text-lg md:text-xl mb-12 max-w-xl font-light leading-relaxed opacity-85 whitespace-pre-line">
+              {tenant?.publicContent?.homeMessage?.trim() ||
+                `Encontre oportunidades na ${branding.displayName} e acompanhe cada etapa do processo seletivo em um ambiente seguro.`}
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-start gap-4">
@@ -117,12 +117,14 @@ export function Home() {
               >
                 Ver vagas abertas <ChevronRight className="w-5 h-5" />
               </Link>
-              <Link
-                to="/cadastro"
-                className="tenant-primary-action w-full sm:w-auto px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg flex items-center justify-center"
-              >
-                Cadastre-se
-              </Link>
+              {tenant?.kind === "employer" && tenant.candidateSignupEnabled !== false && (
+                <Link
+                  to="/cadastro"
+                  className="tenant-primary-action w-full sm:w-auto px-8 py-3.5 rounded-lg font-medium transition-colors shadow-lg flex items-center justify-center"
+                >
+                  Cadastre-se
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -1038,7 +1040,7 @@ export function Cadastro() {
       const email = formData.email.trim().toLowerCase();
       const name = formData.nome.trim();
 
-      await registerCandidateAccount(email, name, formData.senha);
+      await registerCandidateAccount(email, name, formData.senha, tenant.slug);
 
       try {
         await logAudit(
@@ -1063,7 +1065,9 @@ export function Cadastro() {
     } catch (err: any) {
       const code = String(err?.message || "");
       console.error("Erro no cadastro:", err);
-      if (code === "EMAIL_ALREADY_REGISTERED") {
+      if (code === "REGISTRATION_UNAVAILABLE" || code === "TENANT_REGISTRATION_DISABLED") {
+        setError("O cadastro de candidatos não está disponível nesta empresa no momento.");
+      } else if (code === "EMAIL_ALREADY_REGISTERED") {
         setError("Este e-mail já possui uma conta. Entre com essa conta ou use a recuperação de senha.");
       } else if (code === "RATE_LIMITED") {
         setError("Muitas solicitações de código. Aguarde alguns minutos antes de tentar novamente.");
@@ -1463,6 +1467,26 @@ export function PlatformHome() {
 export function SobreNos() {
   const { tenant, branding } = useTenant();
   const companyName = tenant?.displayName || branding.displayName;
+  const about = tenant?.publicContent?.about;
+  const sections = Array.isArray(about?.sections) ? about.sections : [];
+  const hasPublishedAbout = Boolean(
+    (about?.title && about.title.trim() && about.title.trim().toLocaleLowerCase("pt-BR") !== "sobre nós") ||
+    about?.subtitle?.trim() ||
+    sections.length > 0
+  );
+  const pageTitle = hasPublishedAbout
+    ? about?.title?.trim() || `Conheça ${companyName}`
+    : `Conheça ${companyName}`;
+
+  const imageUrl = (path?: string | null): string | null => {
+    if (!tenant?.id || !path) return null;
+    const prefix = `${tenant.id}/site-content/`;
+    const fileName = path.startsWith(prefix) ? path.slice(prefix.length) : "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(fileName)) {
+      return null;
+    }
+    return supabase.storage.from("tenant-public-content").getPublicUrl(path).data.publicUrl;
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-16 sm:py-24">
@@ -1471,13 +1495,52 @@ export function SobreNos() {
           Sobre a empresa
         </p>
         <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-          Conheça {companyName}
+          {pageTitle}
         </h1>
-        <p className="mt-6 text-lg leading-relaxed text-slate-600">
-          Esta página é o espaço institucional de {companyName}. As informações
-          sobre sua história, cultura, valores, instalações e imagens deverão
-          ser configuradas pela própria empresa.
-        </p>
+        {about?.subtitle?.trim() && (
+          <p className="mt-4 text-lg leading-relaxed text-slate-600">
+            {about.subtitle}
+          </p>
+        )}
+        {!hasPublishedAbout && (
+          <p className="mt-6 text-lg leading-relaxed text-slate-600">
+            Esta é a página institucional de {companyName}. As informações sobre
+            sua história, cultura e valores poderão ser configuradas pela própria
+            empresa.
+          </p>
+        )}
+        <div className="mt-8 space-y-8">
+          {sections.map((section, index) => {
+            const image = imageUrl(section.imagePath);
+            return (
+              <article key={section.id || `about-section-${index}`} className="border-t border-slate-100 pt-8">
+                {section.title?.trim() && (
+                  <h2 className="text-2xl font-semibold text-slate-900">
+                    {section.title}
+                  </h2>
+                )}
+                {section.subtitle?.trim() && (
+                  <h3 className="mt-2 text-lg font-medium text-slate-700">
+                    {section.subtitle}
+                  </h3>
+                )}
+                {section.text?.trim() && (
+                  <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">
+                    {section.text}
+                  </p>
+                )}
+                {image && (
+                  <img
+                    src={image}
+                    alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
+                    loading="lazy"
+                    className="mt-5 max-h-[480px] w-full rounded-2xl object-contain"
+                  />
+                )}
+              </article>
+            );
+          })}
+        </div>
         <div className="mt-10 rounded-2xl bg-slate-50 p-6">
           <h2 className="text-lg font-semibold text-slate-900">
             Faça parte da equipe
