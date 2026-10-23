@@ -3,7 +3,7 @@
 Data de preparação: 23/10/2026  
 Branch preparada: `maintenance/phase-2b-production-prep-20261023`  
 Base original da preparação: `main` em `aac8c8719abe931aaf37a5876337e6997f7d3794`  
-HEAD integrado de `main`: `cf509053442a28fe50437377cc7deb078c6dfcda`  
+Commit de fast-forward da implementação para `main`: `cf509053442a28fe50437377cc7deb078c6dfcda` (a documentação foi atualizada depois; consulte o HEAD atual do repositório)  
 Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 
 ## 1. Resumo executivo
@@ -151,6 +151,6 @@ Se alguma migration falhar, parar antes da próxima, inspecionar o estado real e
 - **[VERIFICADO]** Testes SQL corrigidos estaticamente e protegidos com guard/rollback.
 - **[NÃO EXECUTADO]** Testes SQL/RLS contra PostgreSQL.
 - **[NÃO VERIFICADO]** Backup/restauração.
-- **[VERIFICADO]** Não houve alteração de produção, aplicação de migrations, deploy, promoção ou merge. `main` permanece na base documentada.
+- **[VERIFICADO]** A preparação de código foi integrada em `main` por fast-forward, sem force-push nem merge integral da branch antiga. Nenhuma alteração foi enviada ao banco Supabase: não houve migration aplicada, escrita em dados, alteração de Auth/RLS/Storage nem publicação da Edge Function. A consulta pós-integração à Vercel continua mostrando como deployment de produção mais recente um commit antigo (`ae2f2f28b155c797958322ba56bce2dd390b0937`); nenhum deployment do HEAD integrado foi observado. Nenhum comando de deploy foi executado. As configurações do projeto Vercel não puderam ser consultadas por bloqueio de autorização de escopo.
 
 **Preparação concluída e integrada à `main`.** Não fazer o deploy da aplicação Web ainda: primeiro é necessário verificar um backup recuperável e executar, mediante aprovação específica, as três migrations na ordem documentada e a publicação coordenada da Edge Function entre as etapas 2 e 3. A publicação Web permanece responsabilidade manual do usuário e deve ocorrer somente depois das validações de banco/Edge. A confirmação de backup e os testes reais de isolamento ainda são bloqueadores.
