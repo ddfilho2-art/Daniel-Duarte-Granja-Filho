@@ -7,7 +7,7 @@ Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 
 ## 1. Resumo executivo
 
-- **[VERIFICADO — GitHub]** A branch de preparação foi construída sobre a `main`, sem merge ou force-push. A comparação final prevista cobre 18 arquivos, não os 48 commits de manutenção integralmente.
+- **[VERIFICADO — GitHub]** A branch de preparação foi construída sobre a `main`, sem merge ou force-push. A comparação final contém 19 caminhos: 18 de implementação/testes/configuração e este relatório. A branch está 20 commits à frente e zero atrás; os 48 commits originais não foram integrados integralmente.
 - **[VERIFICADO — Node 24 sandbox]** `npm ci --no-audit --no-fund`, `npm run lint` e `npm run build` passaram no checkout `84ea6df21c24e9b616fb30c510628f38fc7d8cd8`, usando Node.js `v24.22.1`.
 - **[VERIFICADO — inspeção estática]** Os três testes SQL foram reconstruídos com delimitadores válidos; os 12 cenários de isolamento, 4 cenários de cadastro e 3 cenários de conteúdo têm transação própria e `ROLLBACK`.
 - **[NÃO EXECUTADO]** Migrations e testes SQL não foram executados. O sandbox não possui `psql` nem Supabase CLI, e não existe um banco isolado disponível para validar funções/RLS contra PostgreSQL real.
@@ -53,7 +53,7 @@ Refeitos/revisados:
 - `tests/fixtures/multi_tenant_seed.sql`;
 - `tests/fixtures/phase2b_test_environment.sql`.
 
-Deixados de fora por estarem fora do escopo desta fase: `src/pages/Master.tsx` e `src/lib/tenant-provisioning.ts` (ajustes do editor Master de favicon). Os commits de clínica, faturamento e demais correções anteriores de `main` não foram sobrescritos.
+Deixados de fora por estarem fora do escopo desta fase: `src/pages/Master.tsx` e `src/lib/tenant-provisioning.ts` (ajustes do editor Master de favicon). Os commits de clínica, faturamento e demais correções anteriores de `main` não foram sobrescritos. Os commits de preparação relevantes incluem `ecceaf9f` (index), `28098c8d` (rotas), `19b5e818` (layout administrativo), `24384494` (layout público), `c0573b18` (contexto tenant), `35c3b267` (cliente de e-mail), `e5df3d35` (páginas públicas), `6d8d547c` (Edge Function proposta), `f43bce4c` (workflow), `8b5a4845` (editor/histórico), `7a755584` / `8c50af8c` / `1a5be5aa` (três migrations) e `e7ad627e` / `1c82684d` / `d19325d3` / `84ea6df2` (fixture e suites SQL).
 
 A página Sobre Nós da branch selecionada remove texto estático específico de empresa e o substitui por conteúdo configurável por tenant. O login administrativo global usa a marca Recruta AÍ, e a entrada pública de cadastro é condicionada ao tipo/configuração do tenant. A validação TypeScript/build confirma compilação, não a autorização efetiva no banco.
 
