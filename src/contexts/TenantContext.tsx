@@ -28,6 +28,24 @@ interface TenantBrandingPayload {
   focusRingColor?: string;
 }
 
+interface PublicAboutSection {
+  id?: string;
+  title?: string;
+  subtitle?: string;
+  text?: string;
+  imagePath?: string | null;
+  imageAlt?: string;
+}
+
+interface PublicTenantContent {
+  homeMessage?: string;
+  about?: {
+    title?: string;
+    subtitle?: string;
+    sections?: PublicAboutSection[];
+  };
+}
+
 interface PublicTenantPayload {
   id: string;
   kind: "employer" | "occupational_health_provider";
@@ -35,6 +53,8 @@ interface PublicTenantPayload {
   displayName: string;
   brandingVersion: number;
   branding: TenantBrandingPayload;
+  candidateSignupEnabled?: boolean;
+  publicContent?: PublicTenantContent;
 }
 
 export interface TenantBranding {
@@ -68,7 +88,7 @@ interface TenantContextValue {
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 const DEFAULT_BRANDING: TenantBranding = {
-  displayName: "DFL",
+  displayName: "Recruta AÍ",
   logoPrimaryUrl: null,
   logoLightUrl: null,
   faviconUrl: null,
