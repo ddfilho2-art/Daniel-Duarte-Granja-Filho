@@ -39,14 +39,35 @@ Supabase de produção consultado apenas para leitura: `dmzagrakkduddofkqjhg`
 - `tests/rls/phase-2b-security-isolation.test.sql` (novo)
 - `.github/workflows/phase-2b-validation.yml`
 
-## Homologação pendente
+## Resultado da homologação isolada
 
-- Confirmar type-check/build e o workflow local SQL no commit final; o commit `46b19cbc1b8d2560e1c4536dd1552655c9ba073d` passou type-check/build, mas o commit mais recente ainda precisa terminar. O workflow não executa Deno check e não valida chamadas HTTP/Storage reais.
-- Executar as migrations e suites RLS/cadastro/conteúdo com os resultados do Supabase local isolado; esse replay verifica o schema criado pela cadeia local, não confirma o estado remoto nem substitui E2E HTTP/Storage.
-- Executar RLS em PostgreSQL/Supabase isolado: manipulação de `x-tenant-id`, leitura/enumeração/update/delete/insert cross-tenant e leitura pública de vagas abertas.
-- E2E Storage com bytes sintéticos: confirmar bucket privado, URL pública negada, recusa a imagem de rascunho/tenant incorreto, URL assinada somente após publicação e expiração aos 900 segundos.
-- Testar conta existente em A entrando em B, convite, suspenso/revogado, cadastro desabilitado, replay/expiração e falhas parciais de e-mail/cadastro.
-- Obter aprovação explícita do custo antes de criar branch Supabase; nenhuma cobrança foi aceita.
-- Antes de futura produção, confirmar backup/restauração e plano para URLs públicas já existentes.
+**Commit de código validado:** `49e38fe06d2770698501519969ec8445db7c551c`.
 
-**Estado:** código e testes preparados; homologação real pendente. Não liberar produção até os testes acima produzirem evidências registradas.
+- **Aprovado — TypeScript e build:** `npm run lint`/TypeScript, checagem Deno das Edge Functions `email-verification` e `tenant-public-content-image`, e `npm run build`. Evidência: [workflow de build seguro #40024959975](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/40024959975).
+- **Aprovado — replay do banco:** cadeia histórica completa de migrations aplicada no Supabase local descartável; estado de migrations conferido; stack efêmero encerrado com `supabase stop --no-backup`. Evidência: [workflow completo #40024959920](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/actions/runs/40024959920).
+- **Aprovados — fixtures e suites SQL:** `phase2b_test_environment.sql`, `multi_tenant_seed.sql`, `isolation.test.sql`, `phase-2b-candidate-signup.test.sql`, `phase-2b-public-content.test.sql` e `phase-2b-security-isolation.test.sql`.
+- Foram criadas sete contas sintéticas somente no Supabase local descartável. As suites cobrem isolamento entre tenants, cadastro e intenção com expiração/consumo, bucket privado e publicação de conteúdo.
+- O teste de vagas confirma que um visitante autenticado sem associação consegue ver uma vaga aberta do tenant ativo, mas não consegue ler mensagens, provas, eventos ou vaga privada de outro tenant.
+
+Essa evidência comprova o replay e o comportamento das políticas/RPCs no ambiente local descartável. **Não** comprova execução real via HTTP das Edge Functions, upload/download real de bytes no Storage, expiração real de URL assinada nem restauração de backup de produção.
+
+## Riscos restantes e condições para liberar produção
+
+- **BLOQUEADOR crítico confirmado em produção:** a consulta somente de leitura ao projeto `dmzagrakkduddofkqjhg` mostrou que a função de produção `current_tenant_id()` ainda retorna o UUID sintaticamente válido do cabeçalho `x-tenant-id` sem verificar associação ativa. As migrations `20261023123200`, `20261023123300` e `20261023123400` não constavam como aplicadas, as três tabelas novas não estavam presentes e o bucket `tenant-public-content` não existia. Portanto, o código corrigido desta branch **não protege o sistema em execução** até uma implantação futura explicitamente autorizada e verificada.
+- **Backup/restauração não comprovados:** falta realizar e documentar um ensaio de restauração tanto do banco como dos objetos Storage.
+- **E2E de Edge Function/Storage pendente:** usar bytes PNG/WebP sintéticos para comprovar que a URL pública direta é negada, conteúdo em rascunho e caminho de outro tenant são recusados, URL assinada só é emitida para conteúdo publicado e a assinatura expira em 900 segundos.
+- **Fluxos de integração pendentes:** exercitar por HTTP o cadastro de candidato existente em A solicitando vínculo a B, convite, suspensão/revogação, cadastro desabilitado, expiração/replay e falhas parciais entre verificação por e-mail e cadastro.
+- Confirmar compatibilidade com URLs de mídia públicas preexistentes e ensaiar a sequência de implantação/retorno. O estado atual de deployment Vercel não foi revalidado nesta retomada.
+- A branch paga de Supabase não foi criada. O custo de referência obtido foi US$ 0,01344/hora; nenhuma infraestrutura paga foi aprovada ou criada.
+- Nesta retomada não foi aplicada migration remota, publicada Edge Function, iniciado deploy nem feito merge em `main`. A integração anterior que já existia em `main` antecede esta retomada; os commits de correção e homologação descritos aqui permaneceram na branch de manutenção.
+
+**Critério de liberação:** não promover para produção antes de fechar o bloqueador de autorização, testar backup/restauração, concluir E2E HTTP/Storage, revisar a ordem da implantação e obter aprovação explícita.
+
+## Procedimento de reversão
+
+1. **Antes de produção (estado atual):** nenhuma reversão de banco é necessária porque esta manutenção não alterou o banco de produção. Mantenha os commits isolados nesta branch; para abandonar as alterações, use commits de reversão com `git revert` nesta branch, sem reset/force-push e sem alterar `main` ou produção.
+2. **Antes de uma futura implantação:** capture backup do banco e dos objetos Storage e demonstre que ambos podem ser restaurados; preserve os artefatos atualmente publicados do frontend e das Edge Functions. Revise e ensaie a sequência de rollout em cópia restaurada.
+3. **Se uma implantação futura precisar ser revertida:** interrompa o rollout e retorne frontend/Edge Functions aos artefatos preservados conforme o plano de release. Depois, aplique somente uma migration reversa revisada e ensaiada numa cópia restaurada, restaurando as definições anteriores das funções, policies e ACLs afetadas. Preserve os registros de intenção, configurações, versões de conteúdo e objetos Storage; não apague esses dados como atalho e não torne o bucket público como fallback.
+4. Uma migration reversa ainda **não foi escrita nem testada**. Por isso, o rollout de produção continua bloqueado até que esse procedimento seja implementado e validado.
+
+**Estado final da Fase 2B isolada:** código e suites SQL aprovados no commit `49e38fe06d2770698501519969ec8445db7c551c`; **produção bloqueada**, pelos riscos acima.
