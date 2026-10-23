@@ -177,6 +177,29 @@ $function$;
 REVOKE ALL ON FUNCTION public.get_current_tenant_access(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_current_tenant_access(uuid) TO authenticated, service_role;
 
+-- RLS on public.tenants intentionally hides other tenants from authenticated
+-- users. Evaluate only the public-routing predicate through a narrowly scoped,
+-- stable SECURITY DEFINER helper so an unaffiliated visitor can still see open
+-- vacancies for an active employer without receiving direct tenant-table access.
+CREATE OR REPLACE FUNCTION public.is_active_employer_tenant(p_tenant_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = p_tenant_id
+      AND t.kind = 'employer'
+      AND t.status = 'active'
+  );
+$function$;
+
+REVOKE ALL ON FUNCTION public.is_active_employer_tenant(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_active_employer_tenant(uuid) TO authenticated, service_role;
+
 -- Keep the public status allow-list unchanged; authenticated candidates see
 -- only published/open vacancies. HR/admin membership may see private records.
 DROP POLICY IF EXISTS vagas_select_policy ON public.vagas;
@@ -204,12 +227,7 @@ CREATE POLICY vagas_select_policy ON public.vagas
         (SELECT current_setting('request.headers', true))::jsonb ->> 'x-tenant-id',
         ''
       ))
-      AND EXISTS (
-        SELECT 1 FROM public.tenants t
-        WHERE t.id = public.vagas.tenant_id
-          AND t.kind = 'employer'
-          AND t.status = 'active'
-      )
+      AND public.is_active_employer_tenant(public.vagas.tenant_id)
     )
   );
 
