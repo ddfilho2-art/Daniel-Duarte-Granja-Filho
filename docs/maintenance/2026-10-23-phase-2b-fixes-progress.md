@@ -127,5 +127,12 @@ A pedido explícito do responsável pelo projeto, a Fase 2B foi integrada à bra
 - [TESTADO AGORA] Aplicação da migration remota e consulta posterior das definições das três RPCs.
 - [INSPECIONADO] Código de autorização e validações existentes nas RPCs; a migration não altera a RPC de publicação nem remove grants/revokes.
 - [PENDENTE] Type-check/build do branch via CI, teste de UI real, teste de upload Storage e teste de isolamento com dois tenants. Não declarar a funcionalidade concluída até o CI e a homologação.
-- [PENDENTE] A edição continua baseada no modelo atual de seções (título/subtítulo/texto/imagem com reordenação); diagramação livre por tipos de blocos/posicionamento não foi implementada nesta etapa.
+- [VERIFICADO] O editor oferece blocos reordenáveis com layout empilhado, imagem acima, imagem à esquerda/direita, somente imagem ou somente texto. A migration `20261023213000_about_section_layout_options.sql` valida e persiste o layout; a página pública usa a mesma opção ao renderizar.
+- [PENDENTE] O editor não oferece arrastar-e-soltar livre nem um construtor visual de colunas arbitrárias. A composição é livre dentro das opções de layout oferecidas por bloco.
 
+
+### Extensão de diagramação dos blocos — 23/10/2026
+- [VERIFICADO] Aplicada a migration `about_section_layout_options` no Supabase remoto. Consulta SQL confirmou que a RPC `save_tenant_public_content_draft` contém a variável de layout, valida os valores permitidos e persiste o campo no JSON.
+- O editor agora oferece seis opções por bloco: empilhado, imagem acima, imagem à esquerda, imagem à direita, somente imagem e somente texto.
+- A prévia administrativa e a página pública foram adaptadas para renderizar a escolha do bloco.
+- [PENDENTE] CI/build após a extensão de layout e homologação visual em navegador.
