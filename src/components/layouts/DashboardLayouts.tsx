@@ -518,6 +518,7 @@ export function MasterLayout() {
   const menuItems = [
     { to: "/master", icon: Home, label: "Dashboard" },
     { to: "/master/tenants", icon: Building2, label: "Empresas" },
+    { to: "/master/site-publico", icon: Palette, label: "Conteúdo dos Portais" },
     { to: "/master/administradores", icon: Users, label: "Administradores das Empresas" },
     { to: "/master/branding", icon: Palette, label: "Identidade Visual" },
     { to: "/master/sre", icon: Activity, label: "SRE da Plataforma" },
