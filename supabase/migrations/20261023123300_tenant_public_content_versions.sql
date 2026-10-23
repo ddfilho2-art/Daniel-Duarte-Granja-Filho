@@ -349,10 +349,6 @@ BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended('tenant-public-content:' || p_tenant_id::text, 0));
 
   UPDATE public.tenant_public_content_versions
-  SET status = 'archived'
-  WHERE tenant_id = p_tenant_id AND status = 'published' AND id <> p_version_id;
-
-  UPDATE public.tenant_public_content_versions
   SET status = 'published',
       published_by = (SELECT auth.uid()),
       published_at = now(),
@@ -363,6 +359,12 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION USING errcode = 'P0002', message = 'draft_version_not_found';
   END IF;
+
+  UPDATE public.tenant_public_content_versions
+  SET status = 'archived'
+  WHERE tenant_id = p_tenant_id
+    AND id <> v_id
+    AND status IN ('draft', 'published');
 
   INSERT INTO public.tenant_audit_logs (
     tenant_id, actor_id, action, resource_type, resource_id, details
