@@ -510,12 +510,12 @@ BEGIN
   END IF;
 
   IF NOT v_membership_found THEN
-    UPDATE public.candidate_signup_intents
+    UPDATE public.candidate_signup_intents AS intent
     SET status = 'consumed', consumed_at = now()
-    WHERE user_id = v_uid
-      AND tenant_id = v_tenant_id
-      AND status = 'pending'
-      AND expires_at > now();
+    WHERE intent.user_id = v_uid
+      AND intent.tenant_id = v_tenant_id
+      AND intent.status = 'pending'
+      AND intent.expires_at > now();
     IF NOT FOUND THEN
       RAISE EXCEPTION USING errcode = '42501', message = 'candidate_signup_intent_expired';
     END IF;
