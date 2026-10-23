@@ -10,7 +10,7 @@ Supabase de produção consultado apenas para leitura: `dmzagrakkduddofkqjhg`
 - Nenhuma migration foi aplicada em produção, nenhuma Edge Function foi publicada e nenhum deployment foi feito.
 - Branch isolada do GitHub criada a partir de `main`.
 - A branch Supabase de testes não foi criada: o custo retornado foi **US$ 0,01344/hora** (aprox. US$ 0,32/dia ou US$ 9,68 por 30 dias, antes de outros custos). A homologação PostgreSQL/Supabase real aguarda aprovação explícita.
-- O container não tinha `psql`, `postgres`, Docker ou Deno; a tentativa de clonagem por Git falhou por DNS indisponível. Não declarar lint/build/Deno/PostgreSQL executados sem logs reais.
+- O container desta sessão não tinha `psql`, `postgres`, Docker ou Deno; por isso a homologação PostgreSQL é executada pelo GitHub Actions em um stack Supabase local descartável. Não declarar teste como concluído sem o resultado do workflow.
 
 ## Correções nesta branch
 
@@ -41,8 +41,8 @@ Supabase de produção consultado apenas para leitura: `dmzagrakkduddofkqjhg`
 
 ## Homologação pendente
 
-- Executar lint/build e Deno check com logs reais. O GitHub Actions já concluiu type-check/build com sucesso para o commit `46b19cbc1b8d2560e1c4536dd1552655c9ba073d`; isso não valida as Edge Functions nem SQL.
-- Aplicar as migrations somente no ambiente isolado e validar dependências do schema real.
+- Confirmar type-check/build e o workflow local SQL no commit final; o commit `46b19cbc1b8d2560e1c4536dd1552655c9ba073d` passou type-check/build, mas o commit mais recente ainda precisa terminar. O workflow não executa Deno check e não valida chamadas HTTP/Storage reais.
+- Executar as migrations e suites RLS/cadastro/conteúdo com os resultados do Supabase local isolado; esse replay verifica o schema criado pela cadeia local, não confirma o estado remoto nem substitui E2E HTTP/Storage.
 - Executar RLS em PostgreSQL/Supabase isolado: manipulação de `x-tenant-id`, leitura/enumeração/update/delete/insert cross-tenant e leitura pública de vagas abertas.
 - E2E Storage com bytes sintéticos: confirmar bucket privado, URL pública negada, recusa a imagem de rascunho/tenant incorreto, URL assinada somente após publicação e expiração aos 900 segundos.
 - Testar conta existente em A entrando em B, convite, suspenso/revogado, cadastro desabilitado, replay/expiração e falhas parciais de e-mail/cadastro.
