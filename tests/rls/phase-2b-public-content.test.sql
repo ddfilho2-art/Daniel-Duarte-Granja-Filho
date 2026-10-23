@@ -24,7 +24,6 @@ BEGIN
     ON CONFLICT (bucket_id,name) DO NOTHING;
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
   PERFORM set_config('role','authenticated',true);
 v_saved:=public.save_tenant_public_content_draft('bbbbbbbb-0000-0000-0000-000000000001','Synthetic Alpha home message',
  jsonb_build_object('title','About Alpha','subtitle','Synthetic subtitle','sections',jsonb_build_array(
@@ -66,7 +65,6 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-b@tenant-b.test'),'role','authenticated','email','admin-b@tenant-b.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
   PERFORM set_config('role','authenticated',true);
 BEGIN PERFORM public.get_tenant_public_content_admin('bbbbbbbb-0000-0000-0000-000000000001'); EXCEPTION WHEN insufficient_privilege THEN v_denied:=true; END;
 IF NOT v_denied THEN RAISE EXCEPTION 'Tenant B accessed Tenant A editor'; END IF;
@@ -89,7 +87,6 @@ BEGIN
 
   PERFORM set_config('request.jwt.claims',json_build_object('role','anon')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
   PERFORM set_config('role','anon',true);
 BEGIN PERFORM public.get_tenant_public_content_admin('bbbbbbbb-0000-0000-0000-000000000001'); EXCEPTION WHEN insufficient_privilege THEN v_denied:=true; END;
 IF NOT v_denied THEN RAISE EXCEPTION 'Anonymous caller accessed admin RPC'; END IF;
@@ -110,7 +107,6 @@ BEGIN
     ON CONFLICT (bucket_id,name) DO NOTHING;
   PERFORM set_config('request.jwt.claims',json_build_object('role','anon')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
-  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
   PERFORM set_config('role','anon',true);
   SELECT count(*) INTO v_count FROM storage.objects WHERE bucket_id='tenant-public-content'
     AND name='bbbbbbbb-0000-0000-0000-000000000001/site-content/22222222-2222-4222-8222-222222222222.webp';
