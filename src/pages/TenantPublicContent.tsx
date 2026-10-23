@@ -50,7 +50,7 @@ const newSection = (): AboutSection => ({
   imageAlt: "",
 });
 
-export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string } | null; onFinish?: () => void }) {
+export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string; status?: string } | null; onFinish?: () => void }) {
   const { tenant, isTenantRoute } = useTenant();
   const effectiveTenant = masterTenant || (isTenantRoute ? tenant : null);
   const [loading, setLoading] = useState(true);
@@ -71,6 +71,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
   const isEmployerPortal = Boolean(
     effectiveTenant?.kind === "employer" && effectiveTenant?.id,
   );
+  const canPublish = !masterTenant || masterTenant.status !== "configuring";
   const imagePathSignature = [...new Set(
     about.sections.map((section) => section.imagePath).filter(Boolean),
   )].join("|");
@@ -257,7 +258,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
   };
 
   const publishDraft = async () => {
-    if (!effectiveTenant?.id || !draftId || !isEmployerPortal) {
+    if (!effectiveTenant?.id || !draftId || !isEmployerPortal || !canPublish) {
       setError("Salve o rascunho antes de publicar.");
       return;
     }
@@ -496,8 +497,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
         <button type="button" onClick={() => void saveDraft()} disabled={saving || publishing || uploadingIndex !== null} className="rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">
           {saving ? "Salvando rascunho..." : "Salvar rascunho"}
         </button>
-        <button type="button" onClick={() => void publishDraft()} disabled={!draftId || saving || publishing || uploadingIndex !== null} className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 disabled:opacity-50">
-          {publishing ? "Publicando..." : "Publicar versão salva"}
+        <button type="button" onClick={() => void publishDraft()} disabled={!draftId || !canPublish || saving || publishing || uploadingIndex !== null} className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 disabled:opacity-50">
+          {publishing ? "Publicando..." : canPublish ? "Publicar versão salva" : "Publicação após ativação"}
         </button>
       </div>
       {onFinish && (
