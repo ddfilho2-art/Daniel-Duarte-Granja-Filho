@@ -20,8 +20,12 @@ BEGIN
   END IF;
 
   INSERT INTO storage.objects(bucket_id,name,metadata)
-    VALUES('tenant-public-content','bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png','{"mimetype":"image/png"}'::jsonb)
-    ON CONFLICT (bucket_id,name) DO NOTHING;
+    SELECT 'tenant-public-content','bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png','{"mimetype":"image/png"}'::jsonb
+    WHERE NOT EXISTS (
+      SELECT 1 FROM storage.objects
+      WHERE bucket_id='tenant-public-content'
+        AND name='bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png'
+    );
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
   PERFORM set_config('role','authenticated',true);
@@ -103,8 +107,12 @@ BEGIN
   EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
   IF v_project_ref IS NULL OR v_project_ref='dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN RAISE EXCEPTION 'Refused: non-production environment marker missing.'; END IF;
   INSERT INTO storage.objects(bucket_id,name,metadata)
-    VALUES('tenant-public-content','bbbbbbbb-0000-0000-0000-000000000001/site-content/22222222-2222-4222-8222-222222222222.webp','{"mimetype":"image/webp"}'::jsonb)
-    ON CONFLICT (bucket_id,name) DO NOTHING;
+    SELECT 'tenant-public-content','bbbbbbbb-0000-0000-0000-000000000001/site-content/22222222-2222-4222-8222-222222222222.webp','{"mimetype":"image/webp"}'::jsonb
+    WHERE NOT EXISTS (
+      SELECT 1 FROM storage.objects
+      WHERE bucket_id='tenant-public-content'
+        AND name='bbbbbbbb-0000-0000-0000-000000000001/site-content/22222222-2222-4222-8222-222222222222.webp'
+    );
   PERFORM set_config('request.jwt.claims',json_build_object('role','anon')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
   PERFORM set_config('role','anon',true);
