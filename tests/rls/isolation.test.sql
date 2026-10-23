@@ -11,6 +11,9 @@
 --   3. Auth users created matching the UUIDs below
 -- ============================================================================
 
+-- The test schema is test-only; do not run this script against production.
+create schema if not exists test;
+
 -- ── Helper: simulate authenticated request with tenant header ──────────────
 create or replace function test.set_auth_context(
   p_user_id uuid,
