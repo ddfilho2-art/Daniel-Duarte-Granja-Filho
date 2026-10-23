@@ -27,6 +27,7 @@ import {
   type BrandingDraftPayload,
 } from "../lib/tenant-provisioning";
 import { supabase } from "../lib/supabase";
+import { TenantPublicContent } from "./TenantPublicContent";
 import DFLlogo from "../assets/DFLlogo.svg";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
@@ -558,6 +559,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [slugError, setSlugError] = useState("");
+  const [createdTenant, setCreatedTenant] = useState<{ id: string; kind: string; displayName: string } | null>(null);
 
   useEffect(() => {
     saveTenantProvisionDraft(form);
@@ -583,18 +585,29 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
     }
 
     try {
-      await provisionTenant(form);
+      const result = await provisionTenant(form);
+      const tenantId = typeof result.tenant_id === "string" ? result.tenant_id : "";
+      if (!tenantId) throw new Error("A empresa foi criada, mas o identificador não foi retornado. Atualize a lista de empresas antes de tentar novamente.");
       clearTenantProvisionDraft();
-      setSuccess(
-        "Empresa criada em configuração. Agora cadastre o primeiro administrador na seção Administradores das Empresas.",
-      );
-      setTimeout(onCreated, 1800);
+      setCreatedTenant({ id: tenantId, kind: form.kind || "employer", displayName: form.displayName.trim() });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
   };
+
+  if (createdTenant) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <h2 className="font-semibold text-emerald-900">Empresa criada em configuração</h2>
+          <p className="mt-1 text-sm text-emerald-800">Configure agora a mensagem inicial da Home e a página Sobre Nós. O conteúdo ficará como rascunho; a publicação será liberada quando a empresa estiver ativa.</p>
+        </div>
+        <TenantPublicContent masterTenant={createdTenant} onFinish={onCreated} />
+      </div>
+    );
+  }
 
   return (
     <form onSubmit={handleSubmit} className="rounded-xl border border-slate-200 bg-white p-6 space-y-4">
