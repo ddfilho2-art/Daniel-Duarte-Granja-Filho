@@ -50,7 +50,7 @@ const newSection = (): AboutSection => ({
   imageAlt: "",
 });
 
-export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: string; kind: string; displayName: string } | null }) {
+export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string } | null; onFinish?: () => void }) {
   const { tenant, isTenantRoute } = useTenant();
   const effectiveTenant = masterTenant || (isTenantRoute ? tenant : null);
   const [loading, setLoading] = useState(true);
@@ -500,6 +500,14 @@ export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: str
           {publishing ? "Publicando..." : "Publicar versão salva"}
         </button>
       </div>
+      {onFinish && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-600">Você pode continuar a edição depois em Conteúdo dos Portais. A empresa ainda precisa ser ativada para publicar o conteúdo.</p>
+          <button type="button" onClick={onFinish} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+            Concluir cadastro e voltar
+          </button>
+        </div>
+      )}
     </div>
   );
 }
