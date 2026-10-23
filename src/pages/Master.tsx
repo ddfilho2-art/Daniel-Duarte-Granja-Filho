@@ -27,7 +27,6 @@ import {
   type BrandingDraftPayload,
 } from "../lib/tenant-provisioning";
 import { supabase } from "../lib/supabase";
-import DFLlogo from "../assets/DFLlogo.svg";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import {
   listTenantAdmins,
@@ -700,6 +699,8 @@ export function MasterBrandingEditor() {
   const [reason, setReason] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState("");
+  const [faviconFile, setFaviconFile] = useState<File | null>(null);
+  const [faviconPreview, setFaviconPreview] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -712,15 +713,29 @@ export function MasterBrandingEditor() {
   }, []);
 
   const loadBranding = useCallback(async (tenantId: string) => {
-    if (!tenantId) { setVersions([]); setTheme({}); setLogoFile(null); setLogoPreview(""); return; }
+    if (!tenantId) {
+      setVersions([]);
+      setTheme({});
+      setLogoFile(null);
+      setLogoPreview("");
+      setFaviconFile(null);
+      setFaviconPreview("");
+      return;
+    }
     setError("");
     try {
       const loaded = await getBrandingVersions(tenantId);
       setVersions(loaded);
       const current = loaded.find((v) => v.status === "draft") ?? loaded.find((v) => v.status === "published") ?? loaded[0];
-      if (!current) { setTheme({}); setLogoPreview(""); return; }
+      if (!current) {
+        setTheme({});
+        setLogoPreview("");
+        setFaviconFile(null);
+        setFaviconPreview("");
+        return;
+      }
       const published = loaded.find((v) => v.status === "published");
-      const keys = ["display_name", "sidebar_background", "sidebar_text", "sidebar_active", "sidebar_hover", "home_background", "hero_background", "hero_text", "primary_action", "accent", "primary_color", "secondary_color", "link_color", "focus_ring_color", "logo_primary_path"];
+      const keys = ["display_name", "sidebar_background", "sidebar_text", "sidebar_active", "sidebar_hover", "home_background", "hero_background", "hero_text", "primary_action", "accent", "primary_color", "secondary_color", "link_color", "focus_ring_color", "logo_primary_path", "logo_light_path", "favicon_path"];
       const next: BrandingDraftPayload = {};
       for (const key of keys) {
         const value = current[key];
@@ -733,6 +748,11 @@ export function MasterBrandingEditor() {
       const publishedLogoPath = typeof published?.logo_primary_path === "string" ? published.logo_primary_path : "";
       const path = draftLogoPath || publishedLogoPath;
       setLogoPreview(path ? supabase.storage.from("tenant-branding").getPublicUrl(path).data.publicUrl : "");
+      const draftFaviconPath = typeof current.favicon_path === "string" ? current.favicon_path : "";
+      const publishedFaviconPath = typeof published?.favicon_path === "string" ? published.favicon_path : "";
+      const faviconPath = draftFaviconPath || publishedFaviconPath;
+      setFaviconPreview(faviconPath ? supabase.storage.from("tenant-branding").getPublicUrl(faviconPath).data.publicUrl : "");
+      setFaviconFile(null);
     } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível carregar o histórico."); }
   }, []);
 
@@ -744,6 +764,13 @@ export function MasterBrandingEditor() {
     setLogoPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [logoFile]);
+
+  useEffect(() => {
+    if (!faviconFile) return;
+    const url = URL.createObjectURL(faviconFile);
+    setFaviconPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [faviconFile]);
 
   const colorFields: { key: keyof BrandingDraftPayload; label: string; help: string; sample: "sidebar" | "text" | "active" | "hover" | "page" | "hero" | "heroText" | "button" | "accent" | "primary" | "secondary" | "link" | "focus" }[] = [
     { key: "sidebar_background", label: "Fundo do menu lateral", help: "A faixa vertical que contém os menus.", sample: "sidebar" },
@@ -769,6 +796,14 @@ export function MasterBrandingEditor() {
       setError("Use um logo PNG ou WebP de até 2 MB.");
       return;
     }
+    if (
+      faviconFile &&
+      (!["image/png", "image/webp", "image/x-icon", "image/vnd.microsoft.icon"].includes(faviconFile.type) ||
+        faviconFile.size > 2 * 1024 * 1024)
+    ) {
+      setError("Use um favicon PNG, WebP ou ICO de até 2 MB.");
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -785,9 +820,24 @@ export function MasterBrandingEditor() {
         if (uploadError) throw new Error("Não foi possível enviar o logo: " + uploadError.message);
         draftTheme = { ...draftTheme, logo_primary_path: storagePath } as BrandingDraftPayload;
       }
+      if (faviconFile) {
+        const extension =
+          faviconFile.type === "image/png" ? "png" :
+          faviconFile.type === "image/webp" ? "webp" : "ico";
+        const storagePath = `${selectedTenant}/${crypto.randomUUID()}.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("tenant-branding")
+          .upload(storagePath, faviconFile, {
+            upsert: true,
+            contentType: faviconFile.type,
+          });
+        if (uploadError) throw new Error("Não foi possível enviar o favicon: " + uploadError.message);
+        draftTheme = { ...draftTheme, favicon_path: storagePath } as BrandingDraftPayload;
+      }
       const result = await createBrandingDraft(selectedTenant, draftTheme, reason.trim());
       setSuccess(`Rascunho da identidade visual v${result.version ?? ""} criado. Revise a prévia e publique no histórico quando estiver pronto.`);
       setLogoFile(null);
+      setFaviconFile(null);
       setReason("");
       await loadBranding(selectedTenant);
     } catch (err) {
@@ -841,6 +891,8 @@ export function MasterBrandingEditor() {
           setVersions([]);
           setLogoFile(null);
           setLogoPreview("");
+          setFaviconFile(null);
+          setFaviconPreview("");
           setReason("");
           setError("");
           setSuccess("");
@@ -877,9 +929,39 @@ export function MasterBrandingEditor() {
                   </p>
                 )}
                 <div className="mt-3 border-t border-slate-200 pt-3">
-                  <img src={DFLlogo} alt="Recruta AÍ" className="mx-auto h-7 max-w-36 object-contain" />
+                  <img src="/logo.png" alt="Recruta AÍ" className="mx-auto h-7 max-w-36 object-contain" />
                   <p className="mt-1 text-xs text-slate-500">Recruta AÍ — plataforma de recrutamento</p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 space-y-5">
+            <h2 className="text-lg font-semibold text-slate-800">Favicon da empresa</h2>
+            <p className="text-sm text-slate-600">O favicon é o pequeno ícone exibido na aba do navegador. Ele será salvo como rascunho e só entrará no portal após a publicação da versão.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-start">
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">Escolha o arquivo do favicon</label>
+                <input
+                  type="file"
+                  accept=".png,.webp,.ico,image/png,image/webp,image/x-icon,image/vnd.microsoft.icon"
+                  onChange={(e) => setFaviconFile(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-4 file:py-2"
+                />
+                <p className="text-xs text-slate-500">PNG, WebP ou ICO; até 2 MB. O envio cria um rascunho, não publica automaticamente.</p>
+                {faviconFile && (
+                  <button type="button" onClick={() => setFaviconFile(null)} className="text-sm text-red-700 underline">
+                    Remover arquivo selecionado
+                  </button>
+                )}
+              </div>
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500 mb-3">Prévia do favicon</p>
+                {faviconPreview ? (
+                  <img src={faviconPreview} alt="Prévia do favicon da empresa" className="mx-auto h-16 w-16 rounded object-contain" />
+                ) : (
+                  <div className="py-5 text-sm text-slate-400">O favicon escolhido aparecerá aqui.</div>
+                )}
               </div>
             </div>
           </div>
