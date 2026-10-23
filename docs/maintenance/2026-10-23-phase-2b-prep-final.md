@@ -7,12 +7,13 @@ Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 
 ## 1. Resumo executivo
 
-- **[VERIFICADO — GitHub]** A branch de preparação foi construída sobre a `main`, sem merge ou force-push. A comparação final contém 19 caminhos: 18 de implementação/testes/configuração e este relatório. A branch permanece baseada na `main`, sem commits dela perdidos; os 48 commits originais não foram integrados integralmente.
-- **[VERIFICADO — Node 24 sandbox]** `npm ci --no-audit --no-fund`, `npm run lint` e `npm run build` passaram no checkout `84ea6df21c24e9b616fb30c510628f38fc7d8cd8`, usando Node.js `v24.22.1`.
-- **[VERIFICADO — inspeção estática]** Os três testes SQL foram reconstruídos com delimitadores válidos; os 12 cenários de isolamento, 4 cenários de cadastro e 3 cenários de conteúdo têm transação própria e `ROLLBACK`.
-- **[NÃO EXECUTADO]** Migrations e testes SQL não foram executados. O sandbox não possui `psql` nem Supabase CLI, e não existe um banco isolado disponível para validar funções/RLS contra PostgreSQL real.
+- **[VERIFICADO — GitHub]** A branch de preparação é descendente direta de `main`, sem merge integral dos 48 commits originais nem force-push. A comparação atual cobre 21 caminhos (código, assets, migrations, testes, workflow e relatório). No reconhecimento final, `main` permanecia em `aac8c8719abe931aaf37a5876337e6997f7d3794`.
+- **[VERIFICADO — Node 24 sandbox, HEAD de código `cde9ee010bb232946894117051d3bb71b2196d6e`]** `npm ci --no-audit --no-fund` finalizou com exit 0; `npm run lint` (`tsc --noEmit`) exit 0; `npm run build` exit 0. Node.js `v24.22.1`; Vite `7.3.6`; 2.674 módulos transformados e build concluído em 14,52 s.
+- **[VERIFICADO — PostgreSQL embutido PGlite, schema sintético]** As três migrations foram executadas em sequência num banco efêmero com schemas/tabelas/funções-base simulados; as três completaram e os catálogos mostraram as três tabelas novas, o bucket e as sete RPCs esperadas com `SECURITY DEFINER` e `search_path`. Isso valida sintaxe e dependências imediatas perante o schema simulado, **não** comprova execução no Supabase real nem o comportamento completo das policies/RPCs de produção.
+- **[VERIFICADO — análise estática]** Os scripts SQL têm delimitadores balanceados; os 12 cenários de isolamento, 4 de cadastro e 3 de conteúdo ficam em transações individuais com `ROLLBACK` e guard de ambiente de teste.
+- **[NÃO EXECUTADO]** Os testes RLS/cadastro/conteúdo não foram executados contra PostgreSQL/Supabase real. Não existe base isolada Supabase disponível nesta tarefa; o PGlite de validação foi criado somente dentro do sandbox efêmero.
 - **[NÃO VERIFICADO]** Backup recente e recuperação restaurável.
-- **[VERIFICADO]** Nenhuma alteração foi enviada ao Supabase, nenhuma Edge Function foi publicada, nenhuma implantação Vercel ocorreu e `main` permaneceu intacta.
+- **[VERIFICADO]** Nenhuma migration foi aplicada ao Supabase, nenhuma Edge Function foi publicada, nenhuma implantação Vercel ocorreu e a `main` não foi modificada durante esta etapa.
 
 ## 2. HEADs e commits
 
@@ -20,9 +21,9 @@ Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 |---|---|---|
 | `main` | `aac8c8719abe931aaf37a5876337e6997f7d3794` | Base preservada |
 | Branch original de manutenção | `5e5f371b91f898a9796598c0dd3764ab45bf5694` | 48 commits à frente da base no reconhecimento |
-| Commit de código validado com lint/build | `84ea6df21c24e9b616fb30c510628f38fc7d8cd8` | Código, migrations e testes de preparação nesse checkout |
+| HEAD de código validado com lint/build | `cde9ee010bb232946894117051d3bb71b2196d6e` | Branch preparada integralmente testada com Node 24; SQL também executado no PGlite sintético |
 
-O relatório e a ampliação do fixture de ambiente foram registrados após o build; essa última alteração é somente SQL de setup de testes, não altera o código TypeScript validado.
+O build foi repetido sobre o HEAD `cde9ee010bb232946894117051d3bb71b2196d6e`, incluindo os assets finais de logo/favicon e o editor de histórico. As últimas alterações seguintes foram apenas relatório e fixtures SQL; não alteraram os arquivos TypeScript validados.
 
 Links:
 - [Branch de preparação](https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/tree/maintenance/phase-2b-production-prep-20261023)
@@ -99,7 +100,9 @@ Avisos observados: dependências npm depreciadas e scripts de instalação que n
 - **[EXECUTADO]** `tests/rls/phase-2b-public-content.test.sql`: 3 blocos, 3 rollbacks.
 - **[EXECUTADO]** As tags de função das migrations têm quantidade par e as verificações de conteúdo/histórico estão presentes.
 
-**Isso é verificação estática; não é teste PostgreSQL.** Nenhum caso RLS, RPC, Storage ou migration foi executado. Os testes de produção foram evitados deliberadamente.
+**Validação de migrations no PGlite:** as três migrations executaram em sequência num banco efêmero com um schema sintético construído para representar as tabelas, tipos e funções pré-existentes usados pelo patch. O teste verificou criação das tabelas e bucket, catalogou as RPCs e suas configurações de segurança. Como a base foi simulada, isso não substitui o schema completo do Supabase nem um smoke test de permissões reais.
+
+**Testes RLS:** a suite de isolamento, cadastro e conteúdo não foi executada; só foram verificados estaticamente delimitadores, guards e rollbacks. O teste de produção foi evitado deliberadamente.
 
 ### Proteção dos testes SQL
 
