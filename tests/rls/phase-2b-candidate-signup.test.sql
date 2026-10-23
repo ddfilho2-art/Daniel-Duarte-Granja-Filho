@@ -17,12 +17,18 @@ DELETE FROM public.tenant_memberships WHERE tenant_id='bbbbbbbb-0000-0000-0000-0
 DELETE FROM public.candidate_signup_intents WHERE user_id=v_candidate;
 INSERT INTO public.tenant_site_settings(tenant_id,candidate_signup_enabled,updated_by) VALUES('bbbbbbbb-0000-0000-0000-000000000001',false,NULL)
 ON CONFLICT(tenant_id) DO UPDATE SET candidate_signup_enabled=false,updated_by=NULL,updated_at=now();
+IF (SELECT candidate_signup_enabled FROM public.tenant_site_settings WHERE tenant_id='bbbbbbbb-0000-0000-0000-000000000001') IS DISTINCT FROM false THEN
+  RAISE EXCEPTION 'Fixture did not persist candidate_signup_enabled=false';
+END IF;
+IF EXISTS (SELECT 1 FROM public.tenant_memberships WHERE tenant_id='bbbbbbbb-0000-0000-0000-000000000001' AND user_id=v_candidate) THEN
+  RAISE EXCEPTION 'Fixture candidate still has tenant-A membership before disabled-signup test';
+END IF;
   PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
   PERFORM set_config('role','authenticated',true);
 BEGIN PERFORM * FROM public.rpc_registrar_candidato('bbbbbbbb-0000-0000-0000-000000000001');
 EXCEPTION WHEN insufficient_privilege THEN v_message:=SQLERRM; v_denied:=(v_message='candidate_signup_disabled'); END;
-IF NOT v_denied THEN RAISE EXCEPTION 'Disabled signup was not denied'; END IF;
+IF NOT v_denied THEN RAISE EXCEPTION 'Disabled signup was not denied; caught message=%', COALESCE(v_message,'<no insufficient_privilege exception>'); END IF;
 END;
 $test$;
 ROLLBACK;
