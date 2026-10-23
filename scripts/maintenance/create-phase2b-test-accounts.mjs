@@ -36,7 +36,7 @@ for (const account of accounts) {
       email: account.email,
       password,
       email_confirm: true,
-      user_metadata: { nome: account.nome, perfil: account.perfil },
+      user_metadata: { nome: account.nome, login: account.email, perfil: account.perfil },
     }),
   });
   const payload = await response.json().catch(() => ({}));
