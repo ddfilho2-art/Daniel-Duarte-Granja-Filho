@@ -39,7 +39,7 @@ BEGIN
     (v_a,v_candidate_a,ARRAY['candidate'::public.tenant_role],'active',now()),
     (v_b,v_admin_b,ARRAY['tenant_admin'::public.tenant_role],'active',now()),
     (v_b,v_hr_b,ARRAY['hr'::public.tenant_role],'active',now()),
-    (v_c,v_clinic,ARRAY['clinic_admin'::public.tenant_role],'active',now())
+    (v_c,v_clinic,ARRAY['tenant_admin'::public.tenant_role,'clinic_admin'::public.tenant_role],'active',now())
   ON CONFLICT(tenant_id,user_id) DO UPDATE SET roles=EXCLUDED.roles,status='active',
     activated_at=COALESCE(public.tenant_memberships.activated_at,now()),suspended_at=NULL,revoked_at=NULL,updated_at=now();
   -- Tenant membership is represented by public.tenant_memberships; public.users
