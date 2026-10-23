@@ -42,16 +42,18 @@ BEGIN
     (v_c,v_clinic,ARRAY['clinic_admin'::public.tenant_role],'active',now())
   ON CONFLICT(tenant_id,user_id) DO UPDATE SET roles=EXCLUDED.roles,status='active',
     activated_at=COALESCE(public.tenant_memberships.activated_at,now()),suspended_at=NULL,revoked_at=NULL,updated_at=now();
-  UPDATE public.users u SET nome=f.nome,email=f.email,login=f.email,login_lower=lower(f.email),perfil=f.perfil,status='Ativo',tenant_id=f.tenant_id,updated_at=now()
+  -- Tenant membership is represented by public.tenant_memberships; public.users
+  -- intentionally keeps the global profile and has no tenant_id column.
+  UPDATE public.users u SET nome=f.nome,email=f.email,login=f.email,login_lower=lower(f.email),perfil=f.perfil,status='Ativo',updated_at=now()
   FROM (VALUES
-    (v_master::text,'Platform Test','master@platform.test','Admin',NULL::uuid),
-    (v_admin_a::text,'Admin A','admin-a@tenant-a.test','Admin',v_a),
-    (v_hr_a::text,'HR A','hr-a@tenant-a.test','RH',v_a),
-    (v_candidate_a::text,'Candidate A','candidate-a@tenant-a.test','Candidato',v_a),
-    (v_admin_b::text,'Admin B','admin-b@tenant-b.test','Admin',v_b),
-    (v_hr_b::text,'HR B','hr-b@tenant-b.test','RH',v_b),
-    (v_clinic::text,'Clinic Test','clinic@clinic.test','Admin',v_c)
-  ) AS f(uid,nome,email,perfil,tenant_id) WHERE u.id=f.uid;
+    (v_master::text,'Platform Test','master@platform.test','Admin'),
+    (v_admin_a::text,'Admin A','admin-a@tenant-a.test','Admin'),
+    (v_hr_a::text,'HR A','hr-a@tenant-a.test','RH'),
+    (v_candidate_a::text,'Candidate A','candidate-a@tenant-a.test','Candidato'),
+    (v_admin_b::text,'Admin B','admin-b@tenant-b.test','Admin'),
+    (v_hr_b::text,'HR B','hr-b@tenant-b.test','RH'),
+    (v_clinic::text,'Clinic Test','clinic@clinic.test','Admin')
+  ) AS f(uid,nome,email,perfil) WHERE u.id=f.uid;
   GET DIAGNOSTICS v_updated=ROW_COUNT;
   IF v_updated<>7 THEN RAISE EXCEPTION 'Expected 7 Auth-bootstrap profiles, updated %.',v_updated; END IF;
   INSERT INTO public.tenant_branding_versions(tenant_id,version,status,display_name,change_reason,created_by,published_by,published_at)
