@@ -20,6 +20,7 @@ const lazyNamed = (loader: () => Promise<any>, exportName: string) =>
 const {
   Login,
   Home,
+  PlatformHome,
   ListaVagas,
   DetalheVaga,
   Cadastro,
@@ -27,6 +28,7 @@ const {
 } = {
   Login: lazyNamed(() => import("./pages/Public"), "Login"),
   Home: lazyNamed(() => import("./pages/Public"), "Home"),
+  PlatformHome: lazyNamed(() => import("./pages/Public"), "PlatformHome"),
   ListaVagas: lazyNamed(() => import("./pages/Public"), "ListaVagas"),
   DetalheVaga: lazyNamed(() => import("./pages/Public"), "DetalheVaga"),
   Cadastro: lazyNamed(() => import("./pages/Public"), "Cadastro"),
@@ -68,6 +70,10 @@ const AdminAuditoria = lazyNamed(() => import("./pages/Admin"), "AdminAuditoria"
 const AdminConfiguracoes = lazyNamed(
   () => import("./pages/AdminConfiguracoes"),
   "AdminConfiguracoes",
+);
+const TenantPublicContent = lazyNamed(
+  () => import("./pages/TenantPublicContent"),
+  "TenantPublicContent",
 );
 const AdminPerformance = lazyNamed(
   () => import("./pages/AdminPerformance"),
@@ -126,6 +132,32 @@ const MasterLayout = lazyNamed(
   () => import("./components/layouts/DashboardLayouts"),
   "MasterLayout",
 );
+
+const TenantPublicRoute = ({
+  children,
+  employerOnly = false,
+  signupEnabledOnly = false,
+}: {
+  children: React.ReactNode;
+  employerOnly?: boolean;
+  signupEnabledOnly?: boolean;
+}) => {
+  const { isTenantRoute, tenant } = useTenant();
+  if (
+    !isTenantRoute ||
+    !tenant ||
+    (employerOnly && tenant.kind !== "employer") ||
+    (signupEnabledOnly && tenant.candidateSignupEnabled === false)
+  ) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+};
+
+const TenantHome = () => {
+  const { isTenantRoute } = useTenant();
+  return isTenantRoute ? <Home /> : <PlatformHome />;
+};
 
 const ProtectedRoute = ({
   children,
@@ -293,12 +325,12 @@ const App = () => {
           <Routes>
             {/* Public Routes */}
             <Route element={<PublicLayout />}>
-              <Route path="/" element={<Home />} />
-              <Route path="/vagas" element={<ListaVagas />} />
-              <Route path="/vagas/:id" element={<DetalheVaga />} />
-              <Route path="/cadastro" element={<Cadastro />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/sobre" element={<SobreNos />} />
+              <Route path="/" element={<TenantHome />} />
+              <Route path="/vagas" element={<TenantPublicRoute><ListaVagas /></TenantPublicRoute>} />
+              <Route path="/vagas/:id" element={<TenantPublicRoute><DetalheVaga /></TenantPublicRoute>} />
+              <Route path="/cadastro" element={<TenantPublicRoute employerOnly signupEnabledOnly><Cadastro /></TenantPublicRoute>} />
+              <Route path="/verify-email" element={<TenantPublicRoute employerOnly><VerifyEmail /></TenantPublicRoute>} />
+              <Route path="/sobre" element={<TenantPublicRoute><SobreNos /></TenantPublicRoute>} />
               <Route path="/login" element={<Login />} />
             </Route>
 
@@ -363,6 +395,7 @@ const App = () => {
               <Route path="auditoria" element={<AdminAuditoria />} />
               <Route path="performance" element={<AdminPerformance />} />
               <Route path="configuracoes" element={<AdminConfiguracoes />} />
+              <Route path="site-publico" element={<TenantPublicContent />} />
               <Route path="perfil" element={<PerfilAdmin />} />
             </Route>
 
