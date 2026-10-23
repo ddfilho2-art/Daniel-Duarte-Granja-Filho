@@ -559,7 +559,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [slugError, setSlugError] = useState("");
-  const [createdTenant, setCreatedTenant] = useState<{ id: string; kind: string; displayName: string } | null>(null);
+  const [createdTenant, setCreatedTenant] = useState<{ id: string; kind: string; displayName: string; status: string } | null>(null);
 
   useEffect(() => {
     saveTenantProvisionDraft(form);
@@ -589,7 +589,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
       const tenantId = typeof result.tenant_id === "string" ? result.tenant_id : "";
       if (!tenantId) throw new Error("A empresa foi criada, mas o identificador não foi retornado. Atualize a lista de empresas antes de tentar novamente.");
       clearTenantProvisionDraft();
-      setCreatedTenant({ id: tenantId, kind: form.kind || "employer", displayName: form.displayName.trim() });
+      setCreatedTenant({ id: tenantId, kind: form.kind || "employer", displayName: form.displayName.trim(), status: "configuring" });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -604,7 +604,14 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
           <h2 className="font-semibold text-emerald-900">Empresa criada em configuração</h2>
           <p className="mt-1 text-sm text-emerald-800">Configure agora a mensagem inicial da Home e a página Sobre Nós. O conteúdo ficará como rascunho; a publicação será liberada quando a empresa estiver ativa.</p>
         </div>
-        <TenantPublicContent masterTenant={createdTenant} onFinish={onCreated} />
+        {createdTenant.kind === "employer" ? (
+          <TenantPublicContent masterTenant={createdTenant} onFinish={onCreated} />
+        ) : (
+          <div className="rounded-xl border border-slate-200 bg-white p-5">
+            <p className="text-sm text-slate-700">A empresa de saúde ocupacional foi criada em configuração. A configuração do portal público não se aplica a esse tipo de empresa.</p>
+            <button type="button" onClick={onCreated} className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Concluir cadastro e voltar</button>
+          </div>
+        )}
       </div>
     );
   }
