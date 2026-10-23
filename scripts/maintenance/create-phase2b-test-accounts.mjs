@@ -1,5 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
-
 const supabaseUrl = process.env.SUPABASE_URL?.trim();
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 if (!supabaseUrl || !serviceRoleKey) {
@@ -25,22 +23,27 @@ const accounts = [
   { email: "clinic@clinic.test", nome: "Clinic Test", perfil: "Admin" },
 ];
 
-const admin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
 for (const account of accounts) {
   const password = `Tst!-${crypto.randomUUID()}-aA9`;
-  const { data, error } = await admin.auth.admin.createUser({
-    email: account.email,
-    password,
-    email_confirm: true,
-    user_metadata: { nome: account.nome, perfil: account.perfil },
+  const response = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+    method: "POST",
+    headers: {
+      apikey: serviceRoleKey,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email: account.email,
+      password,
+      email_confirm: true,
+      user_metadata: { nome: account.nome, perfil: account.perfil },
+    }),
   });
-  if (error) {
-    throw new Error(`Failed to create synthetic account ${account.email}: ${error.message}`);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`Failed to create synthetic account ${account.email}: ${payload.msg || payload.message || response.status}`);
   }
-  if (!data.user?.id) {
+  if (!payload.id) {
     throw new Error(`Auth did not return an id for synthetic account ${account.email}`);
   }
   console.log(`Created synthetic Auth fixture: ${account.email}`);
