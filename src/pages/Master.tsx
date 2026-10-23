@@ -26,7 +26,7 @@ import {
   type ProvisionPayload,
   type BrandingDraftPayload,
 } from "../lib/tenant-provisioning";
-import { supabase } from "../lib/supabase";
+import { setSupabaseTenantId, supabase } from "../lib/supabase";
 import { TenantPublicContent } from "./TenantPublicContent";
 import DFLlogo from "../assets/DFLlogo.svg";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
@@ -589,6 +589,7 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
       const tenantId = typeof result.tenant_id === "string" ? result.tenant_id : "";
       if (!tenantId) throw new Error("A empresa foi criada, mas o identificador não foi retornado. Atualize a lista de empresas antes de tentar novamente.");
       clearTenantProvisionDraft();
+      setSupabaseTenantId(tenantId);
       setCreatedTenant({ id: tenantId, kind: form.kind || "employer", displayName: form.displayName.trim(), status: "configuring" });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -605,11 +606,11 @@ function TenantProvisionForm({ onCreated }: { onCreated: () => void }) {
           <p className="mt-1 text-sm text-emerald-800">Configure agora a mensagem inicial da Home e a página Sobre Nós. O conteúdo ficará como rascunho; a publicação será liberada quando a empresa estiver ativa.</p>
         </div>
         {createdTenant.kind === "employer" ? (
-          <TenantPublicContent masterTenant={createdTenant} onFinish={onCreated} />
+          <TenantPublicContent masterTenant={createdTenant} onFinish={() => { setSupabaseTenantId(null); onCreated(); }} />
         ) : (
           <div className="rounded-xl border border-slate-200 bg-white p-5">
             <p className="text-sm text-slate-700">A empresa de saúde ocupacional foi criada em configuração. A configuração do portal público não se aplica a esse tipo de empresa.</p>
-            <button type="button" onClick={onCreated} className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Concluir cadastro e voltar</button>
+            <button type="button" onClick={() => { setSupabaseTenantId(null); onCreated(); }} className="mt-4 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold">Concluir cadastro e voltar</button>
           </div>
         )}
       </div>
