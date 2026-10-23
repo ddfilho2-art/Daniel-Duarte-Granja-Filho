@@ -67,7 +67,7 @@ export function TenantPublicContent() {
 
   const imageUrl = useCallback((path: string): string | null => {
     if (!tenant?.id || !path) return null;
-    const prefix = \`\${tenant.id}/site-content/\`;
+    const prefix = `${tenant.id}/site-content/`;
     const filename = path.startsWith(prefix) ? path.slice(prefix.length) : "";
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(filename)) {
       return null;
@@ -175,7 +175,7 @@ export function TenantPublicContent() {
     setNotice("");
     try {
       const extension = file.type === "image/png" ? "png" : "webp";
-      const path = \`\${tenant.id}/site-content/\${crypto.randomUUID()}.\${extension}\`;
+      const path = `${tenant.id}/site-content/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage
         .from("tenant-public-content")
         .upload(path, file, {
@@ -224,7 +224,7 @@ export function TenantPublicContent() {
       const version = data as { id?: string; version?: number };
       setDraftId(version.id || null);
       setDraftVersion(typeof version.version === "number" ? version.version : null);
-      setNotice(\`Rascunho salvo\${version.version ? \` (versão \${version.version})\` : ""}. O conteúdo só aparece publicamente após publicação; a opção de cadastro é aplicada imediatamente.\`);
+      setNotice(`Rascunho salvo${version.version ? ` (versão ${version.version})` : ""}. O conteúdo só aparece publicamente após publicação; a opção de cadastro é aplicada imediatamente.`);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Não foi possível salvar o rascunho.");
     } finally {
@@ -304,7 +304,7 @@ export function TenantPublicContent() {
             rows={4}
             onChange={(event) => setHomeMessage(event.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder={\`Encontre oportunidades na \${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.\`}
+            placeholder={`Encontre oportunidades na ${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}
           />
           <span className="mt-1 block text-right text-xs text-slate-400">{homeMessage.length}/500</span>
         </label>
@@ -401,7 +401,7 @@ export function TenantPublicContent() {
         <h2 className="text-lg font-semibold text-slate-900">Prévia do conteúdo atual</h2>
         <div className="rounded-lg bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Home</p>
-          <p className="mt-2 whitespace-pre-line text-slate-700">{homeMessage.trim() || \`Encontre oportunidades na \${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.\`}</p>
+          <p className="mt-2 whitespace-pre-line text-slate-700">{homeMessage.trim() || `Encontre oportunidades na ${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}</p>
         </div>
         <div className="rounded-lg bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sobre Nós</p>
