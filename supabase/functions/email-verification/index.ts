@@ -10,7 +10,7 @@ import {
 
 type VerificationRequest =
   | { action: "request"; email?: string }
-  | { action: "register"; email?: string; name?: string; password?: string }
+  | { action: "register"; email?: string; name?: string; password?: string; tenantSlug?: string }
   | {
       action: "verify";
       email?: string;
@@ -191,6 +191,53 @@ Deno.serve(async (request) => {
         );
       }
 
+      let registrationTenantId: string | null = null;
+      if (isRegistration) {
+        const tenantSlug = String(body.tenantSlug || "").trim().toLowerCase();
+        if (!tenantSlug || tenantSlug.length > 120) {
+          return jsonResponse(
+            { success: false, code: "REGISTRATION_UNAVAILABLE", requestId: currentRequestId },
+            403,
+            cors,
+          );
+        }
+
+        const { data: registrationTenant, error: tenantLookupError } = await admin
+          .from("tenants")
+          .select("id, kind, status, slug")
+          .eq("slug", tenantSlug)
+          .maybeSingle();
+        if (tenantLookupError) throw tenantLookupError;
+
+        if (
+          !registrationTenant ||
+          registrationTenant.kind !== "employer" ||
+          registrationTenant.status !== "active" ||
+          registrationTenant.slug !== tenantSlug
+        ) {
+          return jsonResponse(
+            { success: false, code: "REGISTRATION_UNAVAILABLE", requestId: currentRequestId },
+            403,
+            cors,
+          );
+        }
+
+        const { data: siteSettings, error: settingsError } = await admin
+          .from("tenant_site_settings")
+          .select("candidate_signup_enabled")
+          .eq("tenant_id", registrationTenant.id)
+          .maybeSingle();
+        if (settingsError) throw settingsError;
+        if (siteSettings?.candidate_signup_enabled === false) {
+          return jsonResponse(
+            { success: false, code: "REGISTRATION_UNAVAILABLE", requestId: currentRequestId },
+            403,
+            cors,
+          );
+        }
+        registrationTenantId = registrationTenant.id;
+      }
+
       // Use Auth Admin API: unlike auth.signUp(), createUser does not send
       // Supabase's native confirmation-link email. The account stays unconfirmed
       // until the custom six-digit code is verified.
@@ -214,7 +261,28 @@ Deno.serve(async (request) => {
           throw createUserError;
         }
         createdUserId = createdUser?.user?.id ?? null;
-        if (!createdUserId) throw new Error("candidate_signup_user_id_missing");
+        if (!createdUserId || !registrationTenantId) {
+          if (createdUserId) await admin.auth.admin.deleteUser(createdUserId);
+          throw new Error("candidate_signup_context_missing");
+        }
+
+        const { error: intentError } = await admin
+          .from("candidate_signup_intents")
+          .insert({
+            user_id: createdUserId,
+            tenant_id: registrationTenantId,
+            status: "pending",
+          });
+        if (intentError) {
+          const { error: cleanupError } = await admin.auth.admin.deleteUser(createdUserId);
+          if (cleanupError) {
+            console.error("candidate_signup_auth_cleanup_failed", {
+              requestId: currentRequestId,
+              code: cleanupError.code ?? "unknown",
+            });
+          }
+          throw intentError;
+        }
       }
 
       const code = secureCode();
