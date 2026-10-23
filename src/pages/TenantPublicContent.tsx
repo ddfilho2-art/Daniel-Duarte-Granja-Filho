@@ -50,8 +50,9 @@ const newSection = (): AboutSection => ({
   imageAlt: "",
 });
 
-export function TenantPublicContent() {
+export function TenantPublicContent({ masterTenant }: { masterTenant?: { id: string; kind: string; displayName: string } | null }) {
   const { tenant, isTenantRoute } = useTenant();
+  const effectiveTenant = masterTenant || (isTenantRoute ? tenant : null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -68,7 +69,7 @@ export function TenantPublicContent() {
   const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
 
   const isEmployerPortal = Boolean(
-    isTenantRoute && tenant?.kind === "employer" && tenant?.id,
+    effectiveTenant?.kind === "employer" && effectiveTenant?.id,
   );
   const imagePathSignature = [...new Set(
     about.sections.map((section) => section.imagePath).filter(Boolean),
@@ -77,7 +78,7 @@ export function TenantPublicContent() {
   useEffect(() => {
     let cancelled = false;
     setSignedImageUrls({});
-    if (!tenant?.id || !isEmployerPortal || !imagePathSignature) return () => { cancelled = true; };
+    if (!effectiveTenant?.id || !isEmployerPortal || !imagePathSignature) return () => { cancelled = true; };
     const paths = imagePathSignature.split("|");
     const loadSignedUrls = async () => {
       const entries = await Promise.all(paths.map(async (path) => {
@@ -94,10 +95,10 @@ export function TenantPublicContent() {
     };
     void loadSignedUrls();
     return () => { cancelled = true; };
-  }, [tenant?.id, isEmployerPortal, imagePathSignature]);
+  }, [effectiveTenant?.id, isEmployerPortal, imagePathSignature]);
 
   const loadContent = useCallback(async () => {
-    if (!isEmployerPortal || !tenant?.id) {
+    if (!isEmployerPortal || !effectiveTenant?.id) {
       setLoading(false);
       return;
     }
@@ -138,7 +139,7 @@ export function TenantPublicContent() {
     } finally {
       setLoading(false);
     }
-  }, [isEmployerPortal, tenant?.id]);
+  }, [isEmployerPortal, effectiveTenant?.id]);
 
   useEffect(() => {
     void loadContent();
@@ -179,7 +180,7 @@ export function TenantPublicContent() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!tenant?.id || !isEmployerPortal) {
+    if (!effectiveTenant?.id || !isEmployerPortal) {
       setError("Selecione uma empresa autorizada antes de enviar imagens.");
       return;
     }
@@ -216,7 +217,7 @@ export function TenantPublicContent() {
   };
 
   const saveDraft = async () => {
-    if (!tenant?.id || !isEmployerPortal) return;
+    if (!effectiveTenant?.id || !isEmployerPortal) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -256,7 +257,7 @@ export function TenantPublicContent() {
   };
 
   const publishDraft = async () => {
-    if (!tenant?.id || !draftId || !isEmployerPortal) {
+    if (!effectiveTenant?.id || !draftId || !isEmployerPortal) {
       setError("Salve o rascunho antes de publicar.");
       return;
     }
@@ -300,7 +301,7 @@ export function TenantPublicContent() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Site público da empresa</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Configure a mensagem da Home, o cadastro de candidatos e a página Sobre Nós de {tenant?.displayName}.
+          Configure a mensagem da Home, o cadastro de candidatos e a página Sobre Nós de {effectiveTenant?.displayName}.
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Versão publicada: {publishedVersion ?? "nenhuma"} · Rascunho: {draftVersion ?? "nenhum"}
@@ -374,7 +375,7 @@ export function TenantPublicContent() {
             rows={4}
             onChange={(event) => setHomeMessage(event.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder={`Encontre oportunidades na ${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}
+            placeholder={`Encontre oportunidades na ${effectiveTenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}
           />
           <span className="mt-1 block text-right text-xs text-slate-400">{homeMessage.length}/500</span>
         </label>
@@ -471,7 +472,7 @@ export function TenantPublicContent() {
         <h2 className="text-lg font-semibold text-slate-900">Prévia do conteúdo atual</h2>
         <div className="rounded-lg bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Home</p>
-          <p className="mt-2 whitespace-pre-line text-slate-700">{homeMessage.trim() || `Encontre oportunidades na ${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}</p>
+          <p className="mt-2 whitespace-pre-line text-slate-700">{homeMessage.trim() || `Encontre oportunidades na ${effectiveTenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}</p>
         </div>
         <div className="rounded-lg bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sobre Nós</p>
