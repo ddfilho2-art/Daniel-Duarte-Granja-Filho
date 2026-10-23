@@ -71,6 +71,10 @@ const AdminConfiguracoes = lazyNamed(
   () => import("./pages/AdminConfiguracoes"),
   "AdminConfiguracoes",
 );
+const TenantPublicContent = lazyNamed(
+  () => import("./pages/TenantPublicContent"),
+  "TenantPublicContent",
+);
 const AdminPerformance = lazyNamed(
   () => import("./pages/AdminPerformance"),
   "AdminPerformance",
@@ -132,12 +136,19 @@ const MasterLayout = lazyNamed(
 const TenantPublicRoute = ({
   children,
   employerOnly = false,
+  signupEnabledOnly = false,
 }: {
   children: React.ReactNode;
   employerOnly?: boolean;
+  signupEnabledOnly?: boolean;
 }) => {
   const { isTenantRoute, tenant } = useTenant();
-  if (!isTenantRoute || !tenant || (employerOnly && tenant.kind !== "employer")) {
+  if (
+    !isTenantRoute ||
+    !tenant ||
+    (employerOnly && tenant.kind !== "employer") ||
+    (signupEnabledOnly && tenant.candidateSignupEnabled === false)
+  ) {
     return <Navigate to="/" replace />;
   }
   return <>{children}</>;
@@ -317,7 +328,7 @@ const App = () => {
               <Route path="/" element={<TenantHome />} />
               <Route path="/vagas" element={<TenantPublicRoute><ListaVagas /></TenantPublicRoute>} />
               <Route path="/vagas/:id" element={<TenantPublicRoute><DetalheVaga /></TenantPublicRoute>} />
-              <Route path="/cadastro" element={<TenantPublicRoute employerOnly><Cadastro /></TenantPublicRoute>} />
+              <Route path="/cadastro" element={<TenantPublicRoute employerOnly signupEnabledOnly><Cadastro /></TenantPublicRoute>} />
               <Route path="/verify-email" element={<TenantPublicRoute employerOnly><VerifyEmail /></TenantPublicRoute>} />
               <Route path="/sobre" element={<TenantPublicRoute><SobreNos /></TenantPublicRoute>} />
               <Route path="/login" element={<Login />} />
@@ -384,6 +395,7 @@ const App = () => {
               <Route path="auditoria" element={<AdminAuditoria />} />
               <Route path="performance" element={<AdminPerformance />} />
               <Route path="configuracoes" element={<AdminConfiguracoes />} />
+              <Route path="site-publico" element={<TenantPublicContent />} />
               <Route path="perfil" element={<PerfilAdmin />} />
             </Route>
 
