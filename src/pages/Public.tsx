@@ -1480,6 +1480,7 @@ export function SobreNos() {
   const companyName = tenant?.displayName || branding.displayName;
   const about = tenant?.publicContent?.about;
   const sections = Array.isArray(about?.sections) ? about.sections : [];
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const hasPublishedAbout = Boolean(
     (about?.title && about.title.trim() && about.title.trim().toLocaleLowerCase("pt-BR") !== "sobre nós") ||
     about?.subtitle?.trim() ||
@@ -1488,83 +1489,71 @@ export function SobreNos() {
   const pageTitle = hasPublishedAbout
     ? about?.title?.trim() || `Conheça ${companyName}`
     : `Conheça ${companyName}`;
+  const pathSignature = [...new Set(
+    sections.map((section) => typeof section.imagePath === "string" ? section.imagePath : "").filter(Boolean),
+  )].join("|");
 
-  const imageUrl = (path?: string | null): string | null => {
-    if (!tenant?.id || !path) return null;
-    const prefix = `${tenant.id}/site-content/`;
-    const fileName = path.startsWith(prefix) ? path.slice(prefix.length) : "";
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(fileName)) {
-      return null;
-    }
-    return supabase.storage.from("tenant-public-content").getPublicUrl(path).data.publicUrl;
-  };
+  useEffect(() => {
+    let cancelled = false;
+    setImageUrls({});
+    if (!tenant?.id || !tenant.slug || !pathSignature) return () => { cancelled = true; };
+    const paths = pathSignature.split("|");
+    const loadImages = async () => {
+      const entries = await Promise.all(paths.map(async (path) => {
+        const prefix = `${tenant.id}/site-content/`;
+        const fileName = path.startsWith(prefix) ? path.slice(prefix.length) : "";
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(fileName)) return [path, null] as const;
+        try {
+          const { data, error } = await supabase.functions.invoke<{ success?: boolean; url?: string }>(
+            "tenant-public-content-image",
+            { body: { tenantSlug: tenant.slug, path } },
+          );
+          return [path, !error && data?.success && data.url ? data.url : null] as const;
+        } catch {
+          return [path, null] as const;
+        }
+      }));
+      if (cancelled) return;
+      const resolved: Record<string, string> = {};
+      for (const [path, url] of entries) if (url) resolved[path] = url;
+      setImageUrls(resolved);
+    };
+    void loadImages();
+    return () => { cancelled = true; };
+  }, [tenant?.id, tenant?.slug, pathSignature]);
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-16 sm:py-24">
       <section className="mx-auto max-w-4xl rounded-3xl border border-slate-200 bg-white px-6 py-12 shadow-sm sm:px-12">
-        <p className="text-sm font-semibold uppercase tracking-wide text-primary">
-          Sobre a empresa
-        </p>
-        <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-          {pageTitle}
-        </h1>
-        {about?.subtitle?.trim() && (
-          <p className="mt-4 text-lg leading-relaxed text-slate-600">
-            {about.subtitle}
-          </p>
-        )}
+        <p className="text-sm font-semibold uppercase tracking-wide text-primary">Sobre a empresa</p>
+        <h1 className="mt-4 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">{pageTitle}</h1>
+        {about?.subtitle?.trim() && <p className="mt-4 text-lg leading-relaxed text-slate-600">{about.subtitle}</p>}
         {!hasPublishedAbout && (
           <p className="mt-6 text-lg leading-relaxed text-slate-600">
             Esta é a página institucional de {companyName}. As informações sobre
-            sua história, cultura e valores poderão ser configuradas pela própria
-            empresa.
+            sua história, cultura e valores poderão ser configuradas pela própria empresa.
           </p>
         )}
         <div className="mt-8 space-y-8">
           {sections.map((section, index) => {
-            const image = imageUrl(section.imagePath);
+            const image = section.imagePath ? imageUrls[section.imagePath] || null : null;
             return (
               <article key={section.id || `about-section-${index}`} className="border-t border-slate-100 pt-8">
-                {section.title?.trim() && (
-                  <h2 className="text-2xl font-semibold text-slate-900">
-                    {section.title}
-                  </h2>
-                )}
-                {section.subtitle?.trim() && (
-                  <h3 className="mt-2 text-lg font-medium text-slate-700">
-                    {section.subtitle}
-                  </h3>
-                )}
-                {section.text?.trim() && (
-                  <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">
-                    {section.text}
-                  </p>
-                )}
+                {section.title?.trim() && <h2 className="text-2xl font-semibold text-slate-900">{section.title}</h2>}
+                {section.subtitle?.trim() && <h3 className="mt-2 text-lg font-medium text-slate-700">{section.subtitle}</h3>}
+                {section.text?.trim() && <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">{section.text}</p>}
                 {image && (
-                  <img
-                    src={image}
-                    alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
-                    loading="lazy"
-                    className="mt-5 max-h-[480px] w-full rounded-2xl object-contain"
-                  />
+                  <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
+                    loading="lazy" className="mt-5 max-h-[480px] w-full rounded-2xl object-contain" />
                 )}
               </article>
             );
           })}
         </div>
         <div className="mt-10 rounded-2xl bg-slate-50 p-6">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Faça parte da equipe
-          </h2>
-          <p className="mt-2 text-slate-600">
-            Consulte as oportunidades publicadas por esta empresa.
-          </p>
-          <Link
-            to="/vagas"
-            className="mt-5 inline-flex rounded-lg bg-primary px-5 py-3 font-semibold text-white transition-colors hover:opacity-90"
-          >
-            Ver vagas abertas
-          </Link>
+          <h2 className="text-lg font-semibold text-slate-900">Faça parte da equipe</h2>
+          <p className="mt-2 text-slate-600">Consulte as oportunidades publicadas por esta empresa.</p>
+          <Link to="/vagas" className="mt-5 inline-flex rounded-lg bg-primary px-5 py-3 font-semibold text-white transition-colors hover:opacity-90">Ver vagas abertas</Link>
         </div>
       </section>
     </div>

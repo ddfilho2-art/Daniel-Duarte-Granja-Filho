@@ -3,7 +3,7 @@ name: Phase 2B - Safe build validation
 on:
   push:
     branches:
-      - maintenance/phase-2b-production-prep-20261023
+      - maintenance/phase-2b-fixes-20261023
     paths:
       - "src/**"
       - "supabase/functions/**"
