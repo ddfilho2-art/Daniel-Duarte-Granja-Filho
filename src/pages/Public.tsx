@@ -6,21 +6,10 @@ import {
   Briefcase,
   ChevronRight,
   CheckCircle2,
-  Globe,
-  Calendar,
-  Users,
-  FlaskConical,
-  Award,
-  Leaf,
   Building2,
-  Rocket,
-  ExternalLink,
   Eye,
   EyeOff,
   DollarSign,
-  Trash2,
-  Plus,
-  XCircle,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { logAudit } from "../lib/audit";
