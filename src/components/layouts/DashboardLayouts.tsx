@@ -31,29 +31,44 @@ import { useUI } from "../../contexts/UIContext";
 import { supabase } from "../../lib/supabase";
 import { logAudit } from "../../lib/audit";
 import { useTenant } from "../../contexts/TenantContext";
-import DFLlogo from "../../assets/DFLlogo.svg";
-
 const Logo = ({ variant = "primary" }: { variant?: "primary" | "light" }) => {
-  const { branding } = useTenant();
+  const { branding, isTenantRoute } = useTenant();
   const tenantLogo =
     variant === "light"
       ? branding.logoLightUrl || branding.logoPrimaryUrl
       : branding.logoPrimaryUrl;
 
-  return (
-    <div className="flex min-w-0 items-center gap-2">
+  if (!isTenantRoute) {
+    return (
       <img
-        src={tenantLogo || DFLlogo}
-        alt={`Logo ${branding.displayName}`}
-        className="h-10 max-w-44 object-contain"
+        src="/logo.png"
+        alt="Recruta AÍ"
+        className={`h-10 max-w-44 rounded object-contain ${variant === "light" ? "bg-white p-1" : ""}`}
       />
-      {!tenantLogo && branding.displayName !== "DFL" && (
-        <span className="truncate text-sm font-bold">{branding.displayName}</span>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col items-start justify-center gap-0.5">
+      {tenantLogo ? (
+        <img
+          src={tenantLogo}
+          alt={`Logo ${branding.displayName}`}
+          className="h-7 max-w-44 object-contain"
+        />
+      ) : (
+        <span className="max-w-44 truncate text-sm font-bold">
+          {branding.displayName}
+        </span>
       )}
+      <img
+        src="/logo.png"
+        alt="Recruta AÍ"
+        className={`h-3.5 w-auto max-w-20 rounded object-contain object-left ${variant === "light" ? "bg-white px-1" : ""}`}
+      />
     </div>
   );
 };
-
 
 
 function SidebarItem({
@@ -493,6 +508,7 @@ export function AdminLayout() {
     { to: "/admin/auditoria", icon: Shield, label: "Auditoria" },
     { to: "/admin/performance", icon: Activity, label: "Operação de E-mails" },
     { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
+    { to: "/admin/site-publico", icon: Palette, label: "Site público" },
   ];
 
   return <DashboardLayout menuItems={menuItems} />;
