@@ -2,26 +2,28 @@
 
 Data de preparação: 23/10/2026  
 Branch preparada: `maintenance/phase-2b-production-prep-20261023`  
-Base mantida intacta: `main` em `aac8c8719abe931aaf37a5876337e6997f7d3794`  
+Base original da preparação: `main` em `aac8c8719abe931aaf37a5876337e6997f7d3794`  
+HEAD integrado de `main`: `cf509053442a28fe50437377cc7deb078c6dfcda`  
 Projeto Supabase de produção: `dmzagrakkduddofkqjhg`
 
 ## 1. Resumo executivo
 
-- **[VERIFICADO — GitHub]** A branch de preparação é descendente direta de `main`, sem merge integral dos 48 commits originais nem force-push. A comparação atual cobre 21 caminhos (código, assets, migrations, testes, workflow e relatório). No reconhecimento final, `main` permanecia em `aac8c8719abe931aaf37a5876337e6997f7d3794`.
+- **[VERIFICADO — GitHub]** A branch de preparação é descendente direta de `main`, sem merge integral dos 48 commits originais nem force-push. A comparação atual cobre 21 caminhos (código, assets, migrations, testes, workflow e relatório). A branch-base estava em `aac8c8719abe931aaf37a5876337e6997f7d3794` antes da integração; o patch preparado foi integrado depois por fast-forward no commit `cf509053442a28fe50437377cc7deb078c6dfcda`.
 - **[VERIFICADO — Node 24 sandbox, HEAD de código `cde9ee010bb232946894117051d3bb71b2196d6e`]** `npm ci --no-audit --no-fund` finalizou com exit 0; `npm run lint` (`tsc --noEmit`) exit 0; `npm run build` exit 0. Node.js `v24.22.1`; Vite `7.3.6`; 2.674 módulos transformados e build concluído em 14,52 s.
 - **[VERIFICADO — PostgreSQL embutido PGlite, schema sintético]** As três migrations foram executadas em sequência num banco efêmero com schemas/tabelas/funções-base simulados; as três completaram e os catálogos mostraram as três tabelas novas, o bucket e as sete RPCs esperadas com `SECURITY DEFINER` e `search_path`. Isso valida sintaxe e dependências imediatas perante o schema simulado, **não** comprova execução no Supabase real nem o comportamento completo das policies/RPCs de produção.
 - **[VERIFICADO — análise estática]** Os scripts SQL têm delimitadores balanceados; os 12 cenários de isolamento, 4 de cadastro e 3 de conteúdo ficam em transações individuais com `ROLLBACK` e guard de ambiente de teste.
 - **[NÃO EXECUTADO]** Os testes RLS/cadastro/conteúdo não foram executados contra PostgreSQL/Supabase real. Não existe base isolada Supabase disponível nesta tarefa; o PGlite de validação foi criado somente dentro do sandbox efêmero.
 - **[NÃO VERIFICADO]** Backup recente e recuperação restaurável.
-- **[VERIFICADO]** Nenhuma migration foi aplicada ao Supabase, nenhuma Edge Function foi publicada, nenhuma implantação Vercel ocorreu e a `main` não foi modificada durante esta etapa.
+- **[VERIFICADO]** A preparação foi integrada ao GitHub `main` por fast-forward. Nenhuma migration foi aplicada ao Supabase, nenhuma Edge Function foi publicada e nenhum deploy foi solicitado. A consulta posterior de deployments continuou mostrando como mais recente um deployment antigo para o commit `ae2f2f28b155c797958322ba56bce2dd390b0937`; não foi observado deployment para o HEAD integrado. A leitura das configurações do projeto Vercel permaneceu bloqueada por autorização de escopo.
 
 ## 2. HEADs e commits
 
 | Ref | Commit | Resultado |
 |---|---|---|
-| `main` | `aac8c8719abe931aaf37a5876337e6997f7d3794` | Base preservada |
+| Base original de `main` | `aac8c8719abe931aaf37a5876337e6997f7d3794` | HEAD antes da integração |
+| `main` após integração | `cf509053442a28fe50437377cc7deb078c6dfcda` | Patch preparado integrado por fast-forward, sem force-push |
 | Branch original de manutenção | `5e5f371b91f898a9796598c0dd3764ab45bf5694` | 48 commits à frente da base no reconhecimento |
-| HEAD de código validado com lint/build | `cde9ee010bb232946894117051d3bb71b2196d6e` | Branch preparada integralmente testada com Node 24; SQL também executado no PGlite sintético |
+| HEAD de código validado com lint/build | `cde9ee010bb232946894117051d3bb71b2196d6e` | Código validado com Node 24; migrations executadas em PGlite sintético |
 
 O build foi repetido sobre o HEAD `cde9ee010bb232946894117051d3bb71b2196d6e`, incluindo os assets finais de logo/favicon e o editor de histórico. As últimas alterações seguintes foram apenas relatório e fixtures SQL; não alteraram os arquivos TypeScript validados.
 
@@ -151,4 +153,4 @@ Se alguma migration falhar, parar antes da próxima, inspecionar o estado real e
 - **[NÃO VERIFICADO]** Backup/restauração.
 - **[VERIFICADO]** Não houve alteração de produção, aplicação de migrations, deploy, promoção ou merge. `main` permanece na base documentada.
 
-**Próximo passo permitido após sua aprovação:** revisar o diff final, integrar a preparação à `main` sem copiar mudanças fora do escopo e preparar as instruções definitivas para o corte coordenado. A aplicação das migrations, alterações efetivas de Auth/RLS e publicação da Edge Function continuam bloqueadas até uma autorização específica posterior.
+**Preparação concluída e integrada à `main`.** Não fazer o deploy da aplicação Web ainda: primeiro é necessário verificar um backup recuperável e executar, mediante aprovação específica, as três migrations na ordem documentada e a publicação coordenada da Edge Function entre as etapas 2 e 3. A publicação Web permanece responsabilidade manual do usuário e deve ocorrer somente depois das validações de banco/Edge. A confirmação de backup e os testes reais de isolamento ainda são bloqueadores.
