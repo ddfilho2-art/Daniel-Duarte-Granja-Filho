@@ -214,8 +214,9 @@ BEGIN
   IF char_length(v_reason) < 3 OR char_length(v_reason) > 500 THEN
     RAISE EXCEPTION USING errcode = '22023', message = 'change_reason_required';
   END IF;
-  IF jsonb_typeof(p_about_content) <> 'object'
-     OR jsonb_typeof(p_about_content -> 'sections') <> 'array' THEN
+  IF p_about_content IS NULL
+     OR jsonb_typeof(p_about_content) IS DISTINCT FROM 'object'
+     OR jsonb_typeof(p_about_content -> 'sections') IS DISTINCT FROM 'array' THEN
     RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_content';
   END IF;
   IF p_about_content ? 'title'
