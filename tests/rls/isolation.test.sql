@@ -28,6 +28,11 @@ begin
     )::text,
     true
   );
+  perform set_config(
+    'request.headers',
+    jsonb_build_object('x-tenant-id', p_tenant_id::text)::text,
+    true
+  );
   perform set_config('request.header.x-tenant-id', p_tenant_id::text, true);
   perform set_config('role', 'authenticated', true);
 end;
@@ -228,6 +233,135 @@ begin
   end if;
 end;
 $$;
+
+-- ============================================================================
+-- TEST 9: Admin A forges Tenant B's x-tenant-id → no Tenant B rows
+-- ============================================================================
+do $
+declare
+  v_count integer;
+  v_resolved_tenant uuid;
+begin
+  -- The authenticated user belongs only to A, despite a client-supplied B header.
+  perform test.set_auth_context(
+    'aaaaaaaa-0000-0000-0000-000000000010'::uuid,
+    'bbbbbbbb-0000-0000-0000-000000000002'::uuid
+  );
+
+  v_resolved_tenant := public.current_tenant_id();
+  select count(*) into v_count from public.vagas
+  where tenant_id = 'bbbbbbbb-0000-0000-0000-000000000002'::uuid;
+
+  if v_resolved_tenant is null and v_count = 0 then
+    raise notice 'PASS: forged x-tenant-id does not authorize Tenant B';
+  else
+    raise exception 'FAIL: forged header resolved tenant % and exposed % Tenant B vacancies',
+      v_resolved_tenant, v_count;
+  end if;
+end;
+$;
+
+-- ============================================================================
+-- TEST 10: Candidate A cannot read a non-public vacancy in Tenant A
+-- Fixture status "Ativo" is intentionally not in the verified public allow-list.
+-- ============================================================================
+do $
+declare
+  v_count integer;
+begin
+  perform test.set_auth_context(
+    'aaaaaaaa-0000-0000-0000-000000000012'::uuid,
+    'bbbbbbbb-0000-0000-0000-000000000001'::uuid
+  );
+
+  select count(*) into v_count
+  from public.vagas
+  where id = 'vaga-tenant-a-001';
+
+  if v_count = 0 then
+    raise notice 'PASS: candidate sees no non-public vacancy';
+  else
+    raise exception 'FAIL: candidate can see non-public vacancy (count=%)', v_count;
+  end if;
+end;
+$;
+
+-- ============================================================================
+-- TEST 11: Tenant A cannot update or delete Tenant B's vacancy
+-- ============================================================================
+do $
+declare
+  v_rows integer := 0;
+  v_update_blocked boolean := false;
+  v_delete_blocked boolean := false;
+begin
+  perform test.set_auth_context(
+    'aaaaaaaa-0000-0000-0000-000000000010'::uuid,
+    'bbbbbbbb-0000-0000-0000-000000000001'::uuid
+  );
+
+  begin
+    update public.vagas
+      set titulo = 'RLS should block this update'
+      where id = 'vaga-tenant-b-001';
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_update_blocked := (v_rows = 0);
+  exception WHEN OTHERS THEN
+    v_update_blocked := true;
+  end;
+
+  v_rows := 0;
+  begin
+    delete from public.vagas where id = 'vaga-tenant-b-001';
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_delete_blocked := (v_rows = 0);
+  exception WHEN OTHERS THEN
+    v_delete_blocked := true;
+  end;
+
+  if v_update_blocked and v_delete_blocked then
+    raise notice 'PASS: Tenant A cannot update or delete Tenant B vacancy';
+  else
+    raise exception 'FAIL: cross-tenant mutation escaped RLS (update blocked %, delete blocked %)',
+      v_update_blocked, v_delete_blocked;
+  end if;
+end;
+$;
+
+-- ============================================================================
+-- TEST 12: Anonymous reads still obey the exact public vacancy status allow-list
+-- ============================================================================
+do $
+declare
+  v_count integer;
+begin
+  perform set_config(
+    'request.jwt.claims',
+    json_build_object('role', 'anon')::text,
+    true
+  );
+  perform set_config(
+    'request.headers',
+    jsonb_build_object('x-tenant-id', 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+    true
+  );
+  perform set_config('request.header.x-tenant-id', 'bbbbbbbb-0000-0000-0000-000000000001', true);
+  perform set_config('role', 'anon', true);
+
+  select count(*) into v_count
+  from public.vagas
+  where id = 'vaga-tenant-a-001';
+
+  if v_count = 0 then
+    raise notice 'PASS: anon cannot read a vacancy outside the verified public status allow-list';
+  else
+    raise exception 'FAIL: anon read a vacancy outside the public status allow-list';
+  end if;
+end;
+$;
+
+-- Return to the SQL editor's privileged role before removing the helper.
+select set_config('role', 'postgres', true);
 
 -- Cleanup helper
 drop function if exists test.set_auth_context(uuid, uuid);
