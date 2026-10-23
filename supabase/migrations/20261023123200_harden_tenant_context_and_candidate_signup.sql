@@ -51,7 +51,7 @@ BEGIN
   END;
 
   v_tenant_text := lower(trim(COALESCE(v_headers ->> 'x-tenant-id', '')));
-  IF v_tenant_text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN
+  IF v_tenant_text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
     RETURN NULL;
   END IF;
 
@@ -282,7 +282,7 @@ BEGIN
   END;
 
   v_header_text := lower(trim(COALESCE(v_headers ->> 'x-tenant-id', '')));
-  IF v_header_text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN
+  IF v_header_text !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_required';
   END IF;
   v_header_tenant := v_header_text::uuid;
