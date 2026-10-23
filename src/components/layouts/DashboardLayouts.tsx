@@ -508,6 +508,7 @@ export function AdminLayout() {
     { to: "/admin/auditoria", icon: Shield, label: "Auditoria" },
     { to: "/admin/performance", icon: Activity, label: "Operação de E-mails" },
     { to: "/admin/configuracoes", icon: Settings, label: "Configurações" },
+    { to: "/admin/site-publico", icon: Palette, label: "Site público" },
   ];
 
   return <DashboardLayout menuItems={menuItems} />;
