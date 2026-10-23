@@ -496,12 +496,23 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
           {about.subtitle && <p className="mt-2 text-slate-600">{about.subtitle}</p>}
           {about.sections.map((section, index) => {
             const image = section.imagePath ? signedImageUrls[section.imagePath] || null : null;
-            return (
-              <div key={section.id} className="mt-5 border-t border-slate-100 pt-4">
+            const imageFirst = section.layout === "image-top" || section.layout === "image-left";
+            const horizontal = section.layout === "image-left" || section.layout === "image-right";
+            const imageElement = image && section.layout !== "text-only" ? (
+              <img src={image} alt={section.imageAlt || section.title || "Imagem de prévia"} className={horizontal ? "max-h-64 w-full rounded-lg object-contain md:w-2/5" : "max-h-64 w-full rounded-lg object-contain"} />
+            ) : null;
+            const textElement = section.layout === "image-only" ? null : (
+              <div className={horizontal ? "min-w-0 flex-1" : ""}>
                 {section.title && <h4 className="font-semibold text-slate-900">{index + 1}. {section.title}</h4>}
                 {section.subtitle && <p className="mt-1 font-medium text-slate-700">{section.subtitle}</p>}
                 {section.text && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{section.text}</p>}
-                {image && <img src={image} alt={section.imageAlt || section.title || "Imagem de prévia"} className="mt-3 max-h-64 rounded-lg object-contain" />}
+              </div>
+            );
+            return (
+              <div key={section.id} className={`mt-5 border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-4 md:flex-row" : "space-y-3"}`}>
+                {imageFirst && imageElement}
+                {textElement}
+                {!imageFirst && imageElement}
               </div>
             );
           })}
