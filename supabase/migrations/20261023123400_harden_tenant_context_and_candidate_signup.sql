@@ -374,7 +374,7 @@ BEGIN
   END IF;
 
   BEGIN
-    v_headers := COALESCE(current_setting('request.headers', true), '{}'::jsonb)::jsonb;
+    v_headers := COALESCE(current_setting('request.headers', true), '{}')::jsonb;
   EXCEPTION WHEN OTHERS THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'tenant_context_required';
   END;
