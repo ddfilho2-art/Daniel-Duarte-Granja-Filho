@@ -360,6 +360,63 @@ begin
 end;
 $;
 
+-- ============================================================================
+-- TEST 13: A published/open vacancy remains visible to anonymous users of its tenant
+-- ============================================================================
+do $
+declare
+  v_original_status text;
+  v_count integer;
+begin
+  perform set_config('role', 'postgres', true);
+  select status into v_original_status
+  from public.vagas
+  where id = 'vaga-tenant-a-001';
+
+  if not found then
+    raise exception 'Fixture missing: vaga-tenant-a-001';
+  end if;
+
+  -- Isolated-fixture status mutation is restored immediately; the sub-block rolls
+  -- it back automatically on assertion errors.
+  begin
+    update public.vagas set status = 'Aberta'
+    where id = 'vaga-tenant-a-001';
+
+    perform set_config(
+      'request.jwt.claims',
+      json_build_object('role', 'anon')::text,
+      true
+    );
+    perform set_config(
+      'request.headers',
+      jsonb_build_object('x-tenant-id', 'bbbbbbbb-0000-0000-0000-000000000001')::text,
+      true
+    );
+    perform set_config('request.header.x-tenant-id', 'bbbbbbbb-0000-0000-0000-000000000001', true);
+    perform set_config('role', 'anon', true);
+
+    select count(*) into v_count
+    from public.vagas
+    where id = 'vaga-tenant-a-001';
+
+    if v_count <> 1 then
+      raise exception 'FAIL: anonymous Tenant A should see an Aberta vacancy; got % rows', v_count;
+    end if;
+  exception when others then
+    perform set_config('role', 'postgres', true);
+    update public.vagas set status = v_original_status
+    where id = 'vaga-tenant-a-001';
+    raise;
+  end;
+
+  perform set_config('role', 'postgres', true);
+  update public.vagas set status = v_original_status
+  where id = 'vaga-tenant-a-001';
+  raise notice 'PASS: anonymous tenant sees an open vacancy in the verified public status allow-list';
+end;
+$;
+
 -- Return to the SQL editor's privileged role before removing the helper.
 select set_config('role', 'postgres', true);
 
