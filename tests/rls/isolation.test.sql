@@ -1,233 +1,239 @@
--- ============================================================================
--- RLS Isolation Tests — Tenant A vs Tenant B
--- ============================================================================
--- Run in Supabase SQL Editor.  Each test block uses set local role + request
--- headers to simulate a specific user.  Expected results are documented as
--- comments; compare row counts manually or wrap in a pgTAP harness.
---
--- Prerequisites:
---   1. All migrations applied
---   2. tests/fixtures/multi_tenant_seed.sql applied
---   3. Auth users created matching the UUIDs below
--- ============================================================================
+-- 1. Admin A sees only its two vacancies
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.vagas; IF v_count<>2 THEN RAISE EXCEPTION 'Expected 2 Tenant A vacancies; got %',v_count; END IF;
+END;
+$test$;
+ROLLBACK;
 
--- ── Helper: simulate authenticated request with tenant header ──────────────
-create or replace function test.set_auth_context(
-  p_user_id uuid,
-  p_tenant_id uuid
-)
-returns void
-language plpgsql
-as $$
-begin
-  perform set_config('request.jwt.claims',
-    json_build_object(
-      'sub', p_user_id,
-      'role', 'authenticated',
-      'email', p_user_id::text || '@test.local'
-    )::text,
-    true
-  );
-  perform set_config('request.header.x-tenant-id', p_tenant_id::text, true);
-  perform set_config('role', 'authenticated', true);
-end;
-$$;
+-- 2. Admin B sees only its vacancy
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-b@tenant-b.test'),'role','authenticated','email','admin-b@tenant-b.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.vagas; IF v_count<>1 THEN RAISE EXCEPTION 'Expected 1 Tenant B vacancy; got %',v_count; END IF;
+END;
+$test$;
+ROLLBACK;
 
--- ── Test UUIDs (must match multi_tenant_seed.sql) ─────────────────────────
--- Tenant A
-do $$ begin raise notice 'TEST SUITE: RLS Tenant Isolation'; end $$;
+-- 3. Tenant A cannot read Tenant B application
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.candidaturas WHERE id='cand-tenant-b-001'; IF v_count<>0 THEN RAISE EXCEPTION 'Tenant B application visible to A'; END IF;
+END;
+$test$;
+ROLLBACK;
 
--- ============================================================================
--- TEST 1: Admin A queries vagas → should see only Tenant A rows
--- ============================================================================
-do $$
-declare
-  v_count integer;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000010'::uuid,  -- admin-a
-    'bbbbbbbb-0000-0000-0000-000000000001'::uuid   -- tenant A
-  );
+-- 4. Tenant A HR sees only its application
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='hr-a@tenant-a.test'),'role','authenticated','email','hr-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.candidaturas; IF v_count<>1 THEN RAISE EXCEPTION 'Expected 1 local application; got %',v_count; END IF;
+END;
+$test$;
+ROLLBACK;
 
-  select count(*) into v_count from public.vagas;
+-- 5. Candidate A cannot read Tenant B profiles
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.users WHERE tenant_id='bbbbbbbb-0000-0000-0000-000000000002'; IF v_count<>0 THEN RAISE EXCEPTION 'Cross-tenant profiles visible'; END IF;
+END;
+$test$;
+ROLLBACK;
 
-  if v_count = 1 then
-    raise notice 'PASS: Admin A sees 1 vaga (Tenant A only)';
-  else
-    raise exception 'FAIL: Admin A sees % vagas (expected 1)', v_count;
-  end if;
-end;
-$$;
+-- 6. Platform master can list three tenants
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='master@platform.test'),'role','authenticated','email','master@platform.test')::text,true);
+  PERFORM set_config('request.headers','{}'::text,true);
+  PERFORM set_config('request.header.x-tenant-id','',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.tenants; IF v_count<3 THEN RAISE EXCEPTION 'Expected at least 3 tenants; got %',v_count; END IF;
+END;
+$test$;
+ROLLBACK;
 
--- ============================================================================
--- TEST 2: Admin B queries vagas → should see only Tenant B rows
--- ============================================================================
-do $$
-declare
-  v_count integer;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000020'::uuid,  -- admin-b
-    'bbbbbbbb-0000-0000-0000-000000000002'::uuid   -- tenant B
-  );
+-- 7. Tenant A cannot insert Tenant B vacancy
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_inserted boolean:=false;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); BEGIN INSERT INTO public.vagas(id,titulo,tenant_id,status) VALUES('phase2b-cross-tenant','Synthetic denied insert','bbbbbbbb-0000-0000-0000-000000000002','Aberta'); v_inserted:=true; EXCEPTION WHEN OTHERS THEN v_inserted:=false; END; IF v_inserted THEN RAISE EXCEPTION 'Cross-tenant insert succeeded'; END IF;
+END;
+$test$;
+ROLLBACK;
 
-  select count(*) into v_count from public.vagas;
+-- 8. Forged x-tenant-id does not authorize B
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_resolved uuid; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
+  PERFORM set_config('role','authenticated',true); v_resolved:=public.current_tenant_id(); SELECT count(*) INTO v_count FROM public.vagas WHERE tenant_id='bbbbbbbb-0000-0000-0000-000000000002'; IF v_resolved IS NOT NULL OR v_count<>0 THEN RAISE EXCEPTION 'Forged tenant header authorized access'; END IF;
+END;
+$test$;
+ROLLBACK;
 
-  if v_count = 1 then
-    raise notice 'PASS: Admin B sees 1 vaga (Tenant B only)';
-  else
-    raise exception 'FAIL: Admin B sees % vagas (expected 1)', v_count;
-  end if;
-end;
-$$;
+-- 9. Candidate A cannot read restricted vacancy
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test'),'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); SELECT count(*) INTO v_count FROM public.vagas WHERE id='vaga-tenant-a-private-001'; IF v_count<>0 THEN RAISE EXCEPTION 'Restricted vacancy visible'; END IF;
+END;
+$test$;
+ROLLBACK;
 
--- ============================================================================
--- TEST 3: Admin A tries to read Tenant B's candidatura → 0 rows
--- ============================================================================
-do $$
-declare
-  v_count integer;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000010'::uuid,  -- admin-a
-    'bbbbbbbb-0000-0000-0000-000000000001'::uuid   -- tenant A
-  );
+-- 10. Tenant A cannot update/delete Tenant B vacancy
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_rows integer; v_update_blocked boolean; v_delete_blocked boolean;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('sub',(SELECT user_id::text FROM test.phase2b_accounts WHERE email='admin-a@tenant-a.test'),'role','authenticated','email','admin-a@tenant-a.test')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','authenticated',true); BEGIN UPDATE public.vagas SET titulo='must not persist' WHERE id='vaga-tenant-b-001'; GET DIAGNOSTICS v_rows=ROW_COUNT; v_update_blocked:=(v_rows=0); EXCEPTION WHEN OTHERS THEN v_update_blocked:=true; END; BEGIN DELETE FROM public.vagas WHERE id='vaga-tenant-b-001'; GET DIAGNOSTICS v_rows=ROW_COUNT; v_delete_blocked:=(v_rows=0); EXCEPTION WHEN OTHERS THEN v_delete_blocked:=true; END; IF NOT v_update_blocked OR NOT v_delete_blocked THEN RAISE EXCEPTION 'Cross-tenant mutation escaped RLS'; END IF;
+END;
+$test$;
+ROLLBACK;
 
-  select count(*) into v_count
-  from public.candidaturas
-  where id = 'cand-tenant-b-001';
+-- 11. Anonymous cannot read restricted Tenant B vacancy
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('role','anon')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002',true);
+  PERFORM set_config('role','anon',true); SELECT count(*) INTO v_count FROM public.vagas WHERE id='vaga-tenant-b-001'; IF v_count<>0 THEN RAISE EXCEPTION 'Anonymous restricted read succeeded'; END IF;
+END;
+$test$;
+ROLLBACK;
 
-  if v_count = 0 then
-    raise notice 'PASS: Admin A cannot see Tenant B candidatura';
-  else
-    raise exception 'FAIL: Admin A sees Tenant B candidatura (count=%)', v_count;
-  end if;
-end;
-$$;
-
--- ============================================================================
--- TEST 4: HR A queries candidaturas → sees only Tenant A rows
--- ============================================================================
-do $$
-declare
-  v_count integer;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000011'::uuid,  -- hr-a
-    'bbbbbbbb-0000-0000-0000-000000000001'::uuid   -- tenant A
-  );
-
-  select count(*) into v_count from public.candidaturas;
-
-  if v_count = 1 then
-    raise notice 'PASS: HR A sees 1 candidatura (Tenant A only)';
-  else
-    raise exception 'FAIL: HR A sees % candidaturas (expected 1)', v_count;
-  end if;
-end;
-$$;
-
--- ============================================================================
--- TEST 5: Candidate A queries users → sees only same-tenant users + self
--- ============================================================================
-do $$
-declare
-  v_count integer;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000012'::uuid,  -- candidate-a
-    'bbbbbbbb-0000-0000-0000-000000000001'::uuid   -- tenant A
-  );
-
-  select count(*) into v_count
-  from public.users
-  where tenant_id = 'bbbbbbbb-0000-0000-0000-000000000002';
-
-  if v_count = 0 then
-    raise notice 'PASS: Candidate A cannot see Tenant B users';
-  else
-    raise exception 'FAIL: Candidate A sees % Tenant B users', v_count;
-  end if;
-end;
-$$;
-
--- ============================================================================
--- TEST 6: Platform Master Admin sees ALL tenants
--- ============================================================================
-do $$
-declare
-  v_count integer;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000001'::uuid,  -- master
-    null                                             -- no tenant header
-  );
-
-  select count(*) into v_count from public.tenants;
-
-  if v_count >= 3 then
-    raise notice 'PASS: Master Admin sees % tenants', v_count;
-  else
-    raise exception 'FAIL: Master Admin sees only % tenants (expected >= 3)', v_count;
-  end if;
-end;
-$$;
-
--- ============================================================================
--- TEST 7: Admin A cannot INSERT vaga with Tenant B's tenant_id
--- ============================================================================
-do $$
-declare
-  v_inserted boolean := false;
-begin
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000010'::uuid,  -- admin-a
-    'bbbbbbbb-0000-0000-0000-000000000001'::uuid   -- tenant A
-  );
-
-  begin
-    insert into public.vagas (id, titulo, tenant_id, status)
-    values ('vaga-cross-tenant', 'Cross-Tenant Attempt', 'bbbbbbbb-0000-0000-0000-000000000002', 'Ativo');
-    v_inserted := true;
-  exception when others then
-    raise notice 'PASS: Admin A cannot insert vaga with Tenant B tenant_id (blocked by RLS)';
-  end;
-
-  if v_inserted then
-    raise exception 'FAIL: Admin A inserted vaga with Tenant B tenant_id!';
-  end if;
-end;
-$$;
-
--- ============================================================================
--- TEST 8: Tenant count isolation — total vagas visible per tenant
--- ============================================================================
-do $$
-declare
-  v_count_a integer;
-  v_count_b integer;
-begin
-  -- Tenant A view
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000010'::uuid,
-    'bbbbbbbb-0000-0000-0000-000000000001'::uuid
-  );
-  select count(*) into v_count_a from public.vagas;
-
-  -- Tenant B view
-  perform test.set_auth_context(
-    'aaaaaaaa-0000-0000-0000-000000000020'::uuid,
-    'bbbbbbbb-0000-0000-0000-000000000002'::uuid
-  );
-  select count(*) into v_count_b from public.vagas;
-
-  if v_count_a = 1 and v_count_b = 1 then
-    raise notice 'PASS: Each tenant sees exactly 1 vaga';
-  else
-    raise exception 'FAIL: Tenant A sees %, Tenant B sees % (expected 1 each)', v_count_a, v_count_b;
-  end if;
-end;
-$$;
-
--- Cleanup helper
-drop function if exists test.set_auth_context(uuid, uuid);
+-- 12. Anonymous can read open Tenant A vacancy
+BEGIN;
+DO $test$
+DECLARE v_project_ref text; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL THEN
+    RAISE EXCEPTION 'Refused: isolated Phase 2B marker/accounts missing.';
+  END IF;
+  EXECUTE 'SELECT project_ref FROM test.phase2b_environment_marker WHERE environment = $1' INTO v_project_ref USING 'isolated-test';
+  IF v_project_ref IS NULL OR v_project_ref = 'dmzagrakkduddofkqjhg' OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM v_project_ref THEN
+    RAISE EXCEPTION 'Refused: non-production app.recruta_test_project_ref is missing/mismatched.';
+  END IF;
+  PERFORM set_config('request.jwt.claims',json_build_object('role','anon')::text,true);
+  PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001')::text,true);
+  PERFORM set_config('request.header.x-tenant-id','bbbbbbbb-0000-0000-0000-000000000001',true);
+  PERFORM set_config('role','anon',true); SELECT count(*) INTO v_count FROM public.vagas WHERE id='vaga-tenant-a-001'; IF v_count<>1 THEN RAISE EXCEPTION 'Expected one public vacancy; got %',v_count; END IF;
+END;
+$test$;
+ROLLBACK;
