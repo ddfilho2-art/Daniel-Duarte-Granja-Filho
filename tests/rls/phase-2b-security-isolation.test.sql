@@ -19,8 +19,13 @@ BEGIN
     ON CONFLICT(id) DO UPDATE SET vaga_id=EXCLUDED.vaga_id,nome=EXCLUDED.nome,tipo=EXCLUDED.tipo,tenant_id=EXCLUDED.tenant_id;
   INSERT INTO public.candidatura_eventos(id,candidatura_id,tipo,descricao,usuario_id,tenant_id) VALUES('33333333-3333-4333-8333-333333333334','cand-tenant-b-001','FASE','Synthetic event B',v_admin_b::text,'bbbbbbbb-0000-0000-0000-000000000002')
     ON CONFLICT(id) DO UPDATE SET candidatura_id=EXCLUDED.candidatura_id,tipo=EXCLUDED.tipo,descricao=EXCLUDED.descricao,usuario_id=EXCLUDED.usuario_id,tenant_id=EXCLUDED.tenant_id;
-  INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('tenant-public-content','bbbbbbbb-0000-0000-0000-000000000002/site-content/44444444-4444-4444-8444-444444444444.png','{"mimetype":"image/png"}'::jsonb)
-    ON CONFLICT(bucket_id,name) DO NOTHING;
+  INSERT INTO storage.objects(bucket_id,name,metadata)
+    SELECT 'tenant-public-content','bbbbbbbb-0000-0000-0000-000000000002/site-content/44444444-4444-4444-8444-444444444444.png','{"mimetype":"image/png"}'::jsonb
+    WHERE NOT EXISTS (
+      SELECT 1 FROM storage.objects
+      WHERE bucket_id='tenant-public-content'
+        AND name='bbbbbbbb-0000-0000-0000-000000000002/site-content/44444444-4444-4444-8444-444444444444.png'
+    );
 
   PERFORM set_config('request.jwt.claims',json_build_object('sub',v_candidate_a::text,'role','authenticated','email','candidate-a@tenant-a.test')::text,true);
   PERFORM set_config('request.headers',jsonb_build_object('x-tenant-id','bbbbbbbb-0000-0000-0000-000000000002')::text,true);
