@@ -63,6 +63,8 @@ export interface BrandingDraftPayload {
   link_color?: string;
   focus_ring_color?: string;
   logo_primary_path?: string;
+  logo_light_path?: string;
+  favicon_path?: string;
 }
 
 interface EdgeResponse {
