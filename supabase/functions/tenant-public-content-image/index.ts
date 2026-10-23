@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.101.1";
 import { corsHeaders, jsonResponse, readJsonBody, requestId } from "shared/http.ts";
 
 interface ImageRequest { tenantSlug?: string; path?: string; }
-const SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
+const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
 const PATH_PATTERN =
   /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/site-content\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.(png|webp)$/;
 

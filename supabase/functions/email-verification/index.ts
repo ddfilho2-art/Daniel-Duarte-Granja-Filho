@@ -194,7 +194,15 @@ Deno.serve(async (request) => {
       let registrationTenantId: string | null = null;
       if (isRegistration) {
         const tenantSlug = String(body.tenantSlug || "").trim().toLowerCase();
-        if (!tenantSlug || tenantSlug.length > 120) {
+        const routedTenantId = String(req.headers.get("x-tenant-id") || "").trim().toLowerCase();
+        const hasValidRoutedTenantId =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(routedTenantId);
+
+        // Compatibility bridge for the currently deployed Web client, which sends
+        // x-tenant-id as routing context but predates the tenantSlug request field.
+        // The value is not authorization: the database lookup below independently
+        // confirms an active employer and the signup-enabled setting.
+        if ((!tenantSlug && !hasValidRoutedTenantId) || tenantSlug.length > 120) {
           return jsonResponse(
             { success: false, code: "REGISTRATION_UNAVAILABLE", requestId: currentRequestId },
             403,
@@ -202,18 +210,22 @@ Deno.serve(async (request) => {
           );
         }
 
-        const { data: registrationTenant, error: tenantLookupError } = await admin
+        let tenantQuery = admin
           .from("tenants")
-          .select("id, kind, status, slug")
-          .eq("slug", tenantSlug)
-          .maybeSingle();
+          .select("id, kind, status, slug");
+        tenantQuery = tenantSlug
+          ? tenantQuery.eq("slug", tenantSlug)
+          : tenantQuery.eq("id", routedTenantId);
+
+        const { data: registrationTenant, error: tenantLookupError } = await tenantQuery.maybeSingle();
         if (tenantLookupError) throw tenantLookupError;
 
         if (
           !registrationTenant ||
           registrationTenant.kind !== "employer" ||
           registrationTenant.status !== "active" ||
-          registrationTenant.slug !== tenantSlug
+          (tenantSlug && registrationTenant.slug !== tenantSlug) ||
+          (hasValidRoutedTenantId && routedTenantId !== registrationTenant.id)
         ) {
           return jsonResponse(
             { success: false, code: "REGISTRATION_UNAVAILABLE", requestId: currentRequestId },

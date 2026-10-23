@@ -17,7 +17,7 @@ Supabase de produção consultado apenas para leitura: `dmzagrakkduddofkqjhg`
 1. `candidate_signup_intents` usa chave composta usuário/tenant e inclui `expires_at` default de 30 minutos, validações de status/consumo e índice de pendências. A RPC valida expiração, tenant exato e consumo único.
 2. Bucket `tenant-public-content` passa a privado. A policy pública de leitura foi removida; leitura direta fica restrita ao administrador autenticado daquele tenant.
 3. A nova RPC `create_candidate_signup_intent(uuid)` autoriza somente candidato ativo e empregadora ativa, respeita cadastro desabilitado e não reativa associação suspensa/revogada. Uma conta existente pode pedir vínculo a outra empresa sem ganhar permissões antes do cadastro.
-4. A política de vagas mantém vagas abertas publicamente visíveis em portal de empregador ativo; o cabeçalho não concede leitura de mensagens, provas, eventos ou vagas privadas.
+4. A política de vagas mantém vagas abertas publicamente visíveis em portal de empregador ativo; o cabeçalho não concede leitura de mensagens, provas, eventos ou vagas privadas. A Edge Function de cadastro tem uma ponte temporária de compatibilidade: aceita o slug explicitamente enviado pelo frontend novo ou, para o frontend implantado antigo, usa `x-tenant-id` apenas para localizar o destino público solicitado e revalida no servidor o tenant empregador ativo e cadastro habilitado. Nenhum dado do tenant é autorizado por esse cabeçalho.
 5. A nova Edge Function `tenant-public-content-image` emite URL assinada por 900 segundos apenas se o path exato estiver referenciado no conteúdo publicado do tenant ativo. Rascunhos e paths de outro tenant são negados.
 6. A página Sobre Nós usa a Edge Function; o editor autenticado usa URLs assinadas via Storage/RLS. O bucket privado não usa `getPublicUrl`.
 7. Os testes SQL foram estendidos para conta existente, expiração, associação suspensa, bucket privado e isolamento de mensagens/provas/eventos/vagas.
@@ -41,7 +41,7 @@ Supabase de produção consultado apenas para leitura: `dmzagrakkduddofkqjhg`
 
 ## Homologação pendente
 
-- Executar lint/build e Deno check com logs reais.
+- Executar lint/build e Deno check com logs reais. O GitHub Actions já concluiu type-check/build com sucesso para o commit `46b19cbc1b8d2560e1c4536dd1552655c9ba073d`; isso não valida as Edge Functions nem SQL.
 - Aplicar as migrations somente no ambiente isolado e validar dependências do schema real.
 - Executar RLS em PostgreSQL/Supabase isolado: manipulação de `x-tenant-id`, leitura/enumeração/update/delete/insert cross-tenant e leitura pública de vagas abertas.
 - E2E Storage com bytes sintéticos: confirmar bucket privado, URL pública negada, recusa a imagem de rascunho/tenant incorreto, URL assinada somente após publicação e expiração aos 900 segundos.
