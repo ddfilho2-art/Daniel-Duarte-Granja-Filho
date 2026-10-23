@@ -259,8 +259,203 @@ BEGIN
       v_section_id := gen_random_uuid()::text;
     END IF;
     IF v_image_path IS NOT NULL
-       AND v_image_path !~ ('^' || p_tenant_id::text || '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)$') THEN
+       AND v_image_path !~ ('^' || p_tenant_id::text || '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)
+      'id', v_section_id,
+      'title', v_title,
+      'subtitle', v_subtitle,
+      'text', v_text,
+      'imagePath', v_image_path,
+      'imageAlt', v_image_alt
+    ));
+  END LOOP;
+
+  v_about := jsonb_build_object(
+    'title', COALESCE(p_about_content ->> 'title', 'Sobre nós'),
+    'subtitle', COALESCE(p_about_content ->> 'subtitle', ''),
+    'sections', v_sections
+  );
+
+  INSERT INTO public.tenant_site_settings (tenant_id, candidate_signup_enabled, updated_by, updated_at)
+  VALUES (p_tenant_id, p_candidate_signup_enabled, (SELECT auth.uid()), now())
+  ON CONFLICT (tenant_id) DO UPDATE SET
+    candidate_signup_enabled = EXCLUDED.candidate_signup_enabled,
+    updated_by = EXCLUDED.updated_by,
+    updated_at = now();
+
+  PERFORM pg_advisory_xact_lock(hashtextextended('tenant-public-content:' || p_tenant_id::text, 0));
+  SELECT COALESCE(MAX(version), 0) + 1 INTO v_version
+  FROM public.tenant_public_content_versions
+  WHERE tenant_id = p_tenant_id;
+
+  INSERT INTO public.tenant_public_content_versions (
+    tenant_id, version, status, home_message, about_content, change_reason, created_by
+  ) VALUES (
+    p_tenant_id, v_version, 'draft', v_home_message, v_about, v_reason, (SELECT auth.uid())
+  )
+  RETURNING id INTO v_id;
+
+  INSERT INTO public.tenant_audit_logs (
+    tenant_id, actor_id, action, resource_type, resource_id, details
+  ) VALUES (
+    p_tenant_id, (SELECT auth.uid()), 'tenant.public_content.draft_saved',
+    'tenant_public_content', v_id::text,
+    jsonb_build_object('version', v_version, 'candidateSignupEnabled', p_candidate_signup_enabled)
+  );
+
+  RETURN jsonb_build_object('id', v_id, 'version', v_version, 'status', 'draft');
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.save_tenant_public_content_draft(uuid, text, jsonb, boolean, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.save_tenant_public_content_draft(uuid, text, jsonb, boolean, text) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.publish_tenant_public_content_version(
+  p_tenant_id uuid,
+  p_version_id uuid,
+  p_reason text
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'auth', 'pg_temp'
+AS $function$
+DECLARE
+  v_version integer;
+  v_id uuid;
+  v_reason text := trim(COALESCE(p_reason, ''));
+BEGIN
+  IF (SELECT auth.uid()) IS NULL THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'authentication_required';
+  END IF;
+  IF p_tenant_id IS NULL
+     OR public.current_tenant_id() IS DISTINCT FROM p_tenant_id
+     OR NOT public.can_administer_tenant(p_tenant_id) THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'tenant_admin_required';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.tenants t
+    WHERE t.id = p_tenant_id AND t.status = 'active' AND t.kind = 'employer'
+  ) THEN
+    RAISE EXCEPTION USING errcode = '42501', message = 'employer_tenant_required';
+  END IF;
+  IF char_length(v_reason) < 3 OR char_length(v_reason) > 500 THEN
+    RAISE EXCEPTION USING errcode = '22023', message = 'change_reason_required';
+  END IF;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended('tenant-public-content:' || p_tenant_id::text, 0));
+
+  UPDATE public.tenant_public_content_versions
+  SET status = 'published',
+      published_by = (SELECT auth.uid()),
+      published_at = now(),
+      change_reason = v_reason
+  WHERE tenant_id = p_tenant_id AND id = p_version_id AND status = 'draft'
+  RETURNING id, version INTO v_id, v_version;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION USING errcode = 'P0002', message = 'draft_version_not_found';
+  END IF;
+
+  UPDATE public.tenant_public_content_versions
+  SET status = 'archived'
+  WHERE tenant_id = p_tenant_id
+    AND id <> v_id
+    AND status IN ('draft', 'published');
+
+  INSERT INTO public.tenant_audit_logs (
+    tenant_id, actor_id, action, resource_type, resource_id, details
+  ) VALUES (
+    p_tenant_id, (SELECT auth.uid()), 'tenant.public_content.published',
+    'tenant_public_content', v_id::text, jsonb_build_object('version', v_version)
+  );
+
+  RETURN jsonb_build_object('id', v_id, 'version', v_version, 'status', 'published');
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.publish_tenant_public_content_version(uuid, uuid, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.publish_tenant_public_content_version(uuid, uuid, text) TO authenticated;
+
+-- Public tenant context serves only the newest published content. Drafts and
+-- unpublished edits never enter this anonymous/authenticated response.
+CREATE OR REPLACE FUNCTION public.get_public_tenant_context(p_slug text)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'pg_catalog', 'public', 'auth', 'pg_temp'
+AS $function$
+  SELECT jsonb_build_object(
+    'id', t.id,
+    'kind', t.kind,
+    'slug', t.slug,
+    'displayName', t.display_name,
+    'brandingVersion', b.version,
+    'branding', jsonb_build_object(
+      'displayName', b.display_name,
+      'logoPrimaryPath', b.logo_primary_path,
+      'logoLightPath', b.logo_light_path,
+      'faviconPath', b.favicon_path,
+      'sidebarBackground', b.sidebar_background,
+      'sidebarText', b.sidebar_text,
+      'sidebarActive', b.sidebar_active,
+      'sidebarHover', b.sidebar_hover,
+      'homeBackground', b.home_background,
+      'heroBackground', b.hero_background,
+      'heroText', b.hero_text,
+      'primaryAction', b.primary_action,
+      'accent', b.accent,
+      'primaryColor', b.primary_color,
+      'secondaryColor', b.secondary_color,
+      'linkColor', b.link_color,
+      'focusRingColor', b.focus_ring_color
+    ),
+    'candidateSignupEnabled', (
+      t.kind = 'employer'
+      AND COALESCE(site.candidate_signup_enabled, true)
+    ),
+    'publicContent', COALESCE(
+      (
+        SELECT jsonb_build_object(
+          'homeMessage', v.home_message,
+          'about', v.about_content
+        )
+        FROM public.tenant_public_content_versions v
+        WHERE v.tenant_id = t.id AND v.status = 'published'
+        ORDER BY v.version DESC
+        LIMIT 1
+      ),
+      jsonb_build_object(
+        'homeMessage', '',
+        'about', jsonb_build_object(
+          'title', 'Sobre nós',
+          'subtitle', '',
+          'sections', '[]'::jsonb
+        )
+      )
+    )
+  )
+  FROM public.tenants t
+  JOIN public.tenant_branding_versions b
+    ON b.id = t.published_branding_id
+   AND b.tenant_id = t.id
+   AND b.status = 'published'
+  LEFT JOIN public.tenant_site_settings site ON site.tenant_id = t.id
+  WHERE t.slug = public.normalize_tenant_slug(p_slug)
+    AND t.status = 'active';
+$function$;
+
+REVOKE ALL ON FUNCTION public.get_public_tenant_context(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_public_tenant_context(text) TO anon, authenticated, service_role;
+) THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_image_path';
+    END IF;
+    IF v_image_path IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM storage.objects o
+      WHERE o.bucket_id = 'tenant-public-content'
+        AND o.name = v_image_path
+    ) THEN
+      RAISE EXCEPTION USING errcode = '22023', message = 'about_image_not_uploaded';
     END IF;
 
     v_sections := v_sections || jsonb_build_array(jsonb_build_object(
