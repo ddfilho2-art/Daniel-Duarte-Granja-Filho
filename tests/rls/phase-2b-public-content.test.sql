@@ -56,6 +56,13 @@ BEGIN
     RAISE EXCEPTION 'FAIL: draft was not persisted as expected: %', v_saved;
   END IF;
 
+  -- Verify a draft is not exposed through the public context before publication.
+  v_public_view := public.get_public_tenant_context('alpha-test');
+  IF v_public_view IS NOT NULL
+     AND v_public_view #>> '{publicContent,homeMessage}' = 'Mensagem isolada do tenant Alpha' THEN
+    RAISE EXCEPTION 'FAIL: unpublished draft leaked through public tenant context';
+  END IF;
+
   v_published := public.publish_tenant_public_content_version(
     'bbbbbbbb-0000-0000-0000-000000000001'::uuid,
     (v_saved ->> 'id')::uuid,
