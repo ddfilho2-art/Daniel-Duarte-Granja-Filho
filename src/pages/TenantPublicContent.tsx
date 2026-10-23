@@ -9,6 +9,7 @@ interface AboutSection {
   text: string;
   imagePath: string;
   imageAlt: string;
+  layout: "stacked" | "image-top" | "image-left" | "image-right" | "image-only" | "text-only";
 }
 
 interface AboutContent {
@@ -48,6 +49,7 @@ const newSection = (): AboutSection => ({
   text: "",
   imagePath: "",
   imageAlt: "",
+  layout: "stacked",
 });
 
 export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string; status?: string } | null; onFinish?: () => void }) {
@@ -128,6 +130,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             text: typeof section.text === "string" ? section.text : "",
             imagePath: typeof section.imagePath === "string" ? section.imagePath : "",
             imageAlt: typeof section.imageAlt === "string" ? section.imageAlt : "",
+            layout: ["stacked", "image-top", "image-left", "image-right", "image-only", "text-only"].includes(section.layout as string) ? section.layout as AboutSection["layout"] : "stacked",
           }))
         : [];
       setAbout({
@@ -238,6 +241,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               text: section.text,
               imagePath: section.imagePath || null,
               imageAlt: section.imageAlt,
+              layout: section.layout,
             })),
           },
           p_candidate_signup_enabled: candidateSignupEnabled,
@@ -436,6 +440,17 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700">Subtítulo</span>
                   <input value={section.subtitle} maxLength={200} onChange={(event) => updateSection(index, { subtitle: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Diagramação deste bloco</span>
+                  <select value={section.layout} onChange={(event) => updateSection(index, { layout: event.target.value as AboutSection["layout"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="stacked">Texto e imagem empilhados</option>
+                    <option value="image-top">Imagem acima do texto</option>
+                    <option value="image-left">Imagem à esquerda do texto</option>
+                    <option value="image-right">Imagem à direita do texto</option>
+                    <option value="image-only">Somente imagem</option>
+                    <option value="text-only">Somente texto</option>
+                  </select>
                 </label>
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700">Texto (até 3.000 caracteres)</span>
