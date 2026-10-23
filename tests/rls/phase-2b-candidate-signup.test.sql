@@ -117,10 +117,27 @@ ON CONFLICT(tenant_id) DO UPDATE SET candidate_signup_enabled=true,updated_by=NU
   IF v_count<>1 THEN RAISE EXCEPTION 'Candidate membership missing in B'; END IF;
   SELECT count(*) INTO v_count FROM public.tenant_memberships WHERE tenant_id='bbbbbbbb-0000-0000-0000-000000000001' AND user_id=v_candidate AND status='active' AND roles @> ARRAY['candidate'::public.tenant_role];
   IF v_count<>1 THEN RAISE EXCEPTION 'Existing membership in A was not preserved'; END IF;
-  SELECT count(*) INTO v_count FROM public.candidate_signup_intents WHERE user_id=v_candidate AND status='consumed' AND tenant_id='bbbbbbbb-0000-0000-0000-000000000002' AND consumed_at IS NOT NULL;
-  IF v_count<>1 THEN RAISE EXCEPTION 'Intent was not consumed'; END IF;
 END;
 $test$;
+-- Return to the session owner before inspecting a table intentionally hidden
+-- from authenticated clients. No production SELECT grant is required.
+RESET ROLE;
+DO $assert_consumed$
+DECLARE v_candidate uuid; v_count integer;
+BEGIN
+  IF to_regclass('test.phase2b_environment_marker') IS NULL OR to_regclass('test.phase2b_accounts') IS NULL
+     OR current_setting('app.recruta_test_project_ref',true) IS DISTINCT FROM
+        (SELECT project_ref FROM test.phase2b_environment_marker WHERE environment='isolated-test') THEN
+    RAISE EXCEPTION 'Refused: isolated environment marker missing/mismatched.';
+  END IF;
+  SELECT user_id INTO v_candidate FROM test.phase2b_accounts WHERE email='candidate-a@tenant-a.test';
+  SELECT count(*) INTO v_count
+  FROM public.candidate_signup_intents
+  WHERE user_id=v_candidate AND status='consumed'
+    AND tenant_id='bbbbbbbb-0000-0000-0000-000000000002' AND consumed_at IS NOT NULL;
+  IF v_count<>1 THEN RAISE EXCEPTION 'Intent was not consumed'; END IF;
+END;
+$assert_consumed$;
 ROLLBACK;
 
 -- 5. Expired intent must be rejected
