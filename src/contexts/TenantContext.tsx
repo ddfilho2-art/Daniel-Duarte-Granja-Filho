@@ -68,7 +68,7 @@ interface TenantContextValue {
 const HEX_COLOR = /^#[0-9A-Fa-f]{6}$/;
 
 const DEFAULT_BRANDING: TenantBranding = {
-  displayName: "DFL",
+  displayName: "Recruta AÍ",
   logoPrimaryUrl: null,
   logoLightUrl: null,
   faviconUrl: null,
