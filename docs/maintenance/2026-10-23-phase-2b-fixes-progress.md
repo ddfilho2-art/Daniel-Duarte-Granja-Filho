@@ -71,3 +71,39 @@ Essa evidência comprova o replay e o comportamento das políticas/RPCs no ambie
 4. Uma migration reversa ainda **não foi escrita nem testada**. Por isso, o rollout de produção continua bloqueado até que esse procedimento seja implementado e validado.
 
 **Estado final da Fase 2B isolada:** código e suites SQL aprovados no commit `49e38fe06d2770698501519969ec8445db7c551c`; **produção bloqueada**, pelos riscos acima.
+
+
+## Atualização de execução remota — 23/10/2026
+
+A pedido explícito do responsável pelo projeto, a Fase 2B foi integrada à branch `main` e aplicada no projeto Supabase `dmzagrakkduddofkqjhg`. O usuário esclareceu que o sistema está em desenvolvimento; o Vercel, entretanto, identifica o deployment existente como alvo `production`.
+
+### Integração e validação
+
+- PR #13 integrado: https://github.com/ddfilho2-art/Daniel-Duarte-Granja-Filho/pull/13
+- Commit de merge: `6dd734514a8dac7878d69ce860f6543ec7c40b16`.
+- Workflow #40034704377: type-check, Deno checks, build e replay completo das migrations/testes SQL no Supabase local descartável concluídos com sucesso.
+- O teste SQL remoto, executado em transação com usuário sintético sem associação, confirmou `forged_header_denied = true` e `synthetic_user_is_member = false`. A transação foi revertida; nenhum usuário ou registro de negócio foi criado.
+
+### Supabase remoto
+
+- Aplicadas, nesta ordem, as migrations `20261023123200_phase2b_expand_signup_schema`, `20261023123300_tenant_public_content_versions` e `20261023123400_harden_tenant_context_and_candidate_signup`. A listagem de migrations confirmou os três registros.
+- Criado o bucket privado `tenant-public-content`; as três tabelas previstas existem e a antiga policy pública de leitura para esse bucket não existe.
+- Edge Function `email-verification` publicada na versão 13, mantendo `verify_jwt=false` conforme a configuração anterior.
+- Edge Function `tenant-public-content-image` publicada na versão 1, com `verify_jwt=false` para acesso público controlado pela própria função.
+- A primeira tentativa de empacotar `email-verification` falhou por caminho de dependência; não houve publicação nessa tentativa. A tentativa corrigida publicou a versão 13.
+- Verificação HTTP ponta a ponta das Edge Functions, bytes reais de upload/download no Storage e expiração real de URL assinada não foram executados nesta sessão; a ferramenta de execução disponível não forneceu uma chamada HTTP POST para esses endpoints.
+
+### Frontend Vercel — bloqueado por autorização do conector
+
+- Após o merge, a listagem de deployments ainda apontava para o commit anterior `ae2f2f28b155c797958322ba56bce2dd390b0937`; não foi observado novo deployment da `main`.
+- Foi tentada a criação manual de deployment para o commit de merge `6dd734514a8dac7878d69ce860f6543ec7c40b16`, mas a API retornou `403 forbidden` por falta de autorização do escopo da equipe `ddfilho2-4165s-projects`. Nenhum novo deployment Vercel foi criado.
+- A ação de autorização de equipe indicada pelo erro não está disponível entre as ferramentas conectadas desta sessão. A publicação do frontend fica pendente até liberar o acesso do conector ao escopo correto; não foi usado token alternativo nem alteradas permissões de segurança.
+
+### Riscos e pendências pós-execução
+
+- [PENDENTE] Homologar por HTTP os fluxos de cadastro/convite/revogação, leitura de conteúdo publicado, negação de rascunhos e conteúdo de outro tenant, upload/download de PNG/WebP e expiração de URL assinada.
+- [PENDENTE] Publicar o frontend Vercel da `main` após resolver a autorização do escopo e validar o deployment resultante.
+- [PENDENTE] Ensaiar restauração de banco e objetos Storage e criar/testar um plano de reversão de migrations antes de futuras mudanças estruturais.
+- [OBSERVAÇÃO] Os avisos do Security Advisor sobre tabelas novas sem policies RLS são compatíveis com o desenho atual: as tabelas são acessadas por RPCs autorizadas e/ou service role, e os privilégios diretos de `anon`/`authenticated` foram revogados. Os demais avisos do advisor foram preexistentes ou fora do escopo e não foram alterados nesta manutenção.
+
+**Estado desta atualização:** código integrado; migrations aplicadas; Edge Functions publicadas; teste remoto de negação de cabeçalho forjado aprovado; frontend Vercel e E2E HTTP/Storage ainda pendentes.
