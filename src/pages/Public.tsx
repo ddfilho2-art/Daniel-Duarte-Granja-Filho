@@ -1578,8 +1578,12 @@ export function SobreNos() {
             const imageFirst = section.layout === "image-top" || section.layout === "image-left";
             const horizontal = section.layout === "image-left" || section.layout === "image-right";
             const imageElement = image && section.layout !== "text-only" ? (
-              <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
-                loading="lazy" className={horizontal ? "max-h-[480px] w-full rounded-2xl object-contain md:w-2/5" : "max-h-[480px] w-full rounded-2xl object-contain"} />
+              <div className={`flex w-full ${section.imageAlign === "left" ? "justify-start" : section.imageAlign === "right" ? "justify-end" : "justify-center"} `}>
+                <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
+                  loading="lazy"
+                  style={{ width: `${section.imageWidth ?? (horizontal ? 40 : 100)}%`, height: section.imageHeight ? `${section.imageHeight}px` : "auto", maxWidth: "100%", maxHeight: section.imageHeight ? "none" : "480px", objectFit: "contain" }}
+                  className="rounded-2xl" />
+              </div>
             ) : null;
             const textElement = section.layout === "image-only" ? null : (
               <div className={horizontal ? "min-w-0 flex-1" : ""}>
@@ -1589,7 +1593,7 @@ export function SobreNos() {
               </div>
             );
             return (
-              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
+              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, height: section.height ? `${section.height}px` : undefined, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
                 {section.elementType === "divider" ? <hr className="w-full border-slate-300" /> : <>{imageFirst && imageElement}
                 {textElement}
                 {!imageFirst && imageElement}</>}
