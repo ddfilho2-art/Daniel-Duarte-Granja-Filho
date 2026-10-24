@@ -39,3 +39,11 @@ Estado: correção em revisão; sem deploy de produção.
 - Guias automáticas de encaixe/alinhamento não estão incluídas.
 - A alça de redimensionamento permite ajustar largura e altura; conteúdo maior que a área pode exigir rolagem interna.
 - A homologação visual real no navegador ainda precisa ser feita.
+
+
+## Formatação de texto no canvas
+
+- Cada bloco de conteúdo suporta tamanho de letra pequeno/médio/grande, família tipográfica (Arial, Georgia, Times New Roman, Verdana, Tahoma), negrito, itálico, alinhamento e cor.
+- A RPC de rascunho valida a família tipográfica contra uma lista permitida e persiste os indicadores booleanos de negrito e itálico. A implementação mantém `SECURITY DEFINER`, `search_path` fixo e as verificações de autenticação e autorização do tenant.
+- Canvas, prévia e página pública usam quebra automática de palavras (`break-words`/`overflow-wrap: anywhere`) e preservam quebras de linha, para que o texto acompanhe a largura redimensionada.
+- A formatação se aplica ao bloco inteiro; não há formatação de seleção parcial de texto nem editor HTML/rico.
