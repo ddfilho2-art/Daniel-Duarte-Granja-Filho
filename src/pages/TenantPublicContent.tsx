@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useTenant } from "../contexts/TenantContext";
 
@@ -14,10 +14,13 @@ interface AboutSection {
   positionX?: number;
   positionY?: number;
   width?: number;
+  height?: number;
   textAlign?: "left" | "center" | "right";
   fontSize?: "small" | "medium" | "large";
   textColor?: string;
   bold?: boolean;
+  italic?: boolean;
+  fontFamily?: "Arial" | "Georgia" | "Times New Roman" | "Verdana" | "Tahoma";
 }
 
 interface AboutContent {
@@ -62,10 +65,13 @@ const newSection = (): AboutSection => ({
   positionX: 5,
   positionY: 20,
   width: 90,
+  height: 140,
   textAlign: "left",
   fontSize: "medium",
   textColor: "#475569",
   bold: false,
+  italic: false,
+  fontFamily: "Arial",
 });
 
 export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string; status?: string } | null; onFinish?: () => void }) {
@@ -85,6 +91,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
   const [versionHistory, setVersionHistory] = useState<SavedContentVersion[]>([]);
   const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
+  const pointerOperation = useRef<{ mode: "move" | "resize"; index: number; pointerId: number; startX: number; startY: number; originX: number; originY: number; originWidth: number; originHeight: number } | null>(null);
 
   const isEmployerPortal = Boolean(
     effectiveTenant?.kind === "employer" && effectiveTenant?.id,
@@ -151,10 +158,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             positionX: Number.isFinite(section.positionX) ? Math.max(0, Math.min(80, Number(section.positionX))) : 5,
             positionY: Number.isFinite(section.positionY) ? Math.max(0, Math.min(5000, Number(section.positionY))) : 20 + (Array.isArray(sourceAbout.sections) ? sourceAbout.sections.indexOf(section) * 240 : 0),
             width: Number.isFinite(section.width) ? Math.max(20, Math.min(100, Number(section.width))) : 90,
+            height: Number.isFinite(section.height) ? Math.max(40, Math.min(1200, Number(section.height))) : 140,
             textAlign: ["left", "center", "right"].includes(section.textAlign as string) ? section.textAlign as AboutSection["textAlign"] : "left",
             fontSize: ["small", "medium", "large"].includes(section.fontSize as string) ? section.fontSize as AboutSection["fontSize"] : "medium",
             textColor: typeof section.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(section.textColor) ? section.textColor : "#475569",
             bold: section.bold === true,
+            italic: section.italic === true,
+            fontFamily: ["Arial", "Georgia", "Times New Roman", "Verdana", "Tahoma"].includes(section.fontFamily as string) ? section.fontFamily as AboutSection["fontFamily"] : "Arial",
           }))
         : [];
       setAbout({
@@ -192,13 +202,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
     });
   };
 
-  const addSection = () => {
+  const addSection = (layout: AboutSection["layout"] = "stacked") => {
     if (about.sections.length >= 20) {
       setError("O conteúdo Sobre Nós permite até 20 seções.");
       return;
     }
     setError("");
-    setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), positionY: 20 + current.sections.length * 240 }] }));
+    setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), layout, positionY: 20 + current.sections.length * 240 }] }));
   };
 
   const uploadImage = async (
@@ -270,10 +280,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               positionX: section.positionX ?? 5,
               positionY: section.positionY ?? 20,
               width: section.width ?? 90,
+              height: section.height ?? 140,
               textAlign: section.textAlign ?? "left",
               fontSize: section.fontSize ?? "medium",
               textColor: section.textColor ?? "#475569",
               bold: section.bold ?? false,
+              italic: section.italic ?? false,
+              fontFamily: section.fontFamily ?? "Arial",
             })),
           },
           p_candidate_signup_enabled: candidateSignupEnabled,
@@ -437,16 +450,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             <p className="text-sm text-slate-500">Conteúdo em texto simples. HTML e scripts não são aceitos.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={addSection} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
-              Adicionar bloco
-            </button>
+            <button type="button" onClick={() => addSection("text-only")} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">Adicionar texto</button>
+            <button type="button" onClick={() => addSection("image-only")} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">Adicionar imagem</button>
             <button type="button" onClick={() => {
               if (about.sections.length >= 20) { setError("O conteúdo Sobre Nós permite até 20 blocos."); return; }
               setError("");
-              setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), elementType: "divider", positionY: 20 + current.sections.length * 240, title: "", subtitle: "", text: "", imagePath: "", layout: "text-only" }] }));
-            }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
-              Adicionar linha
-            </button>
+              setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), elementType: "divider", positionY: 20 + current.sections.length * 240, title: "", subtitle: "", text: "", imagePath: "", layout: "text-only", width: 90, height: 40 }] }));
+            }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">Adicionar linha</button>
           </div>
         </div>
         <label className="block">
@@ -458,46 +468,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
           <input value={about.subtitle} maxLength={200} onChange={(event) => setAbout((current) => ({ ...current, subtitle: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
         </label>
 
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="font-semibold text-slate-800">Editor visual</h3>
-              <p className="text-xs text-slate-500">Arraste os blocos para posicioná-los. No celular, o conteúdo se reorganiza em coluna.</p>
-            </div>
-            <span className="text-xs text-slate-500">Arrastar e soltar · largura ajustável abaixo</span>
-          </div>
-          <div
-            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
-            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220))}px` } as React.CSSProperties}
-            aria-label="Área visual de edição da página Sobre Nós"
-          >
-            {about.sections.map((section, index) => (
-              <article
-                key={section.id}
-                draggable
-                onDragEnd={(event) => {
-                  const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
-                  if (!bounds) return;
-                  const x = Math.round(Math.max(0, Math.min(100 - (section.width ?? 90), ((event.clientX - bounds.left) / bounds.width) * 100)));
-                  const y = Math.round(Math.max(0, Math.min(5000, event.clientY - bounds.top)));
-                  updateSection(index, { positionX: x, positionY: y });
-                }}
-                className="cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]"
-                style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
-                title="Arraste para reposicionar este bloco"
-              >
-                <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  <span>Bloco {index + 1}</span><span aria-hidden="true">⠿</span>
-                </div>
-                {section.elementType === "divider" ? <hr className="my-3 border-slate-300" /> : <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
-                {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
-                {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}
-                {section.imagePath && <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>}</>}
-              </article>
-            ))}
-            {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
-          </div>
-        </div>
+
 
         {about.sections.length === 0 && (
           <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Nenhuma seção adicionada. Use “Adicionar seção” para começar.</p>
@@ -535,6 +506,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   </select>
                 </label>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <h4 className="text-sm font-semibold text-slate-800 sm:col-span-2">Formatação do texto e dimensões do bloco</h4>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Largura do bloco</span>
                     <input type="range" min={20} max={100} step={5} value={section.width ?? 90} onChange={(event) => { const width = Number(event.target.value); updateSection(index, { width, positionX: Math.min(section.positionX ?? 5, 100 - width) }); }} className="w-full" />
@@ -547,9 +519,9 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     </select>
                   </label>
                   <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">Tamanho do título</span>
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Tamanho da letra</span>
                     <select value={section.fontSize ?? "medium"} onChange={(event) => updateSection(index, { fontSize: event.target.value as AboutSection["fontSize"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                      <option value="small">Pequeno</option><option value="medium">Médio</option><option value="large">Grande</option>
+                      <option value="small">Pequena</option><option value="medium">Média</option><option value="large">Grande</option>
                     </select>
                   </label>
                   <label className="block">
@@ -558,7 +530,17 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   </label>
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" checked={section.bold ?? false} onChange={(event) => updateSection(index, { bold: event.target.checked })} />
-                    Destacar título em negrito
+                    Negrito
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={section.italic ?? false} onChange={(event) => updateSection(index, { italic: event.target.checked })} />
+                    Itálico
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Tipo de letra</span>
+                    <select value={section.fontFamily ?? "Arial"} onChange={(event) => updateSection(index, { fontFamily: event.target.value as AboutSection["fontFamily"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Times New Roman">Times New Roman</option><option value="Verdana">Verdana</option><option value="Tahoma">Tahoma</option>
+                    </select>
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Posição horizontal (%)</span>
@@ -599,6 +581,72 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             );
           })}
         </div>
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-slate-800">Editor visual</h3>
+              <p className="text-xs text-slate-500">Arraste cada elemento para posicionar. Use a alça ↘ para ajustar largura e altura; a imagem é adicionada como elemento independente.</p>
+            </div>
+            <span className="text-xs text-slate-500">Arrastar e redimensionar</span>
+          </div>
+          <div
+            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
+            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + (section.height ?? 140) + 40))}px` } as React.CSSProperties}
+            aria-label="Área visual de edição da página Sobre Nós"
+          >
+            {about.sections.map((section, index) => {
+              const image = section.imagePath ? signedImageUrls[section.imagePath] || null : null;
+              const beginOperation = (mode: "move" | "resize", event: React.PointerEvent<HTMLElement>) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const article = event.currentTarget.closest("article") as HTMLElement | null;
+                const bounds = event.currentTarget.closest("[aria-label='Área visual de edição da página Sobre Nós']")?.getBoundingClientRect();
+                if (!bounds || !article) return;
+                pointerOperation.current = { mode, index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: section.positionX ?? 5, originY: section.positionY ?? 20, originWidth: section.width ?? 90, originHeight: section.height ?? 140 };
+                article.setPointerCapture(event.pointerId);
+              };
+              return (
+                <article
+                  key={section.id}
+                  onPointerDown={(event) => beginOperation("move", event)}
+                  onPointerMove={(event) => {
+                    const active = pointerOperation.current;
+                    if (!active || active.pointerId !== event.pointerId) return;
+                    const bounds = event.currentTarget.closest("[aria-label='Área visual de edição da página Sobre Nós']")?.getBoundingClientRect();
+                    if (!bounds) return;
+                    const dx = event.clientX - active.startX;
+                    const dy = event.clientY - active.startY;
+                    if (active.mode === "move") {
+                      const x = Math.round(Math.max(0, Math.min(100 - active.originWidth, active.originX + (dx / bounds.width) * 100)));
+                      updateSection(active.index, { positionX: x, positionY: Math.round(Math.max(0, Math.min(5000, active.originY + dy))) });
+                    } else {
+                      const width = Math.round(Math.max(20, Math.min(100, active.originWidth + (dx / bounds.width) * 100)));
+                      updateSection(active.index, { width: Math.min(width, 100 - (about.sections[active.index]?.positionX ?? 0)), height: Math.round(Math.max(40, Math.min(1200, active.originHeight + dy))) });
+                    }
+                  }}
+                  onPointerUp={(event) => { if (pointerOperation.current?.pointerId === event.pointerId) pointerOperation.current = null; }}
+                  onPointerCancel={() => { pointerOperation.current = null; }}
+                  className="group relative cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)] md:h-[var(--section-height)] md:min-h-[var(--section-height)]"
+                  style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, "--section-height": `${section.height ?? 140}px`, maxWidth: "100%", overflow: "auto", overflowWrap: "anywhere", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569", fontFamily: section.fontFamily ?? "Arial", fontStyle: section.italic ? "italic" : "normal", fontWeight: section.bold ? 700 : 400 } as React.CSSProperties}
+                  title="Arraste para reposicionar este elemento"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <span>{section.elementType === "divider" ? "Linha" : section.layout === "image-only" ? "Imagem" : "Texto"} {index + 1}</span><span aria-hidden="true">⠿</span>
+                  </div>
+                  {section.elementType === "divider" ? <div className="flex h-full items-center"><hr className="w-full" style={{ height: `${Math.max(1, Math.min(12, Math.round((section.height ?? 40) / 40)))}px`, border: 0, backgroundColor: section.textColor ?? "#94a3b8" }} /></div> : <>
+                    {section.layout !== "image-only" && <>{section.title && <p className={`whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"} ${section.bold ? "font-bold" : "font-medium"} ${section.italic ? "italic" : ""}`}>{section.title}</p>}
+                    {section.subtitle && <p className={`whitespace-pre-wrap break-words opacity-80 ${section.fontSize === "large" ? "text-base" : section.fontSize === "small" ? "text-[10px]" : "text-xs"} ${section.bold ? "font-bold" : "font-normal"} ${section.italic ? "italic" : ""}`}>{section.subtitle}</p>}
+                    {section.text && <p className={`mt-1 whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-base" : section.fontSize === "small" ? "text-[10px]" : "text-xs"} ${section.bold ? "font-bold" : "font-normal"} ${section.italic ? "italic" : ""}`}>{section.text}</p>}</>}
+                    {section.layout !== "text-only" && (image ? <img src={image} alt={section.imageAlt || section.title || "Prévia da imagem"} className="mt-1 w-full rounded object-contain" style={{ maxHeight: `${Math.max(30, (section.height ?? 140) - 45)}px` }} /> : section.layout === "image-only" ? <p className="flex h-full items-center justify-center text-xs text-slate-400">Envie uma imagem no formulário abaixo</p> : null)}
+                  </>}
+                  <button type="button" aria-label={`Redimensionar elemento ${index + 1}`} title="Arraste para redimensionar" onPointerDown={(event) => beginOperation("resize", event)} className="absolute bottom-0 right-0 z-10 h-5 w-5 cursor-nwse-resize rounded-tl border border-slate-400 bg-slate-200 text-xs text-slate-700">↘</button>
+                </article>
+              );
+            })}
+            {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione texto, imagem ou linha para começar a montar a página.</p>}
+          </div>
+        </div>
       </section>
 
       <section className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-5">
@@ -620,9 +668,9 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             ) : null;
             const textElement = section.layout === "image-only" ? null : (
               <div className={horizontal ? "min-w-0 flex-1" : ""}>
-                {section.title && <h4 className="font-semibold text-slate-900">{index + 1}. {section.title}</h4>}
-                {section.subtitle && <p className="mt-1 font-medium text-slate-700">{section.subtitle}</p>}
-                {section.text && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{section.text}</p>}
+                {section.title && <h4 className={`whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-2xl" : section.fontSize === "small" ? "text-base" : "text-lg"} ${section.bold ? "font-bold" : "font-semibold"} ${section.italic ? "italic" : ""}`} style={{ fontFamily: section.fontFamily ?? "Arial", color: section.textColor ?? "#0f172a" }}>{index + 1}. {section.title}</h4>}
+                {section.subtitle && <p className={`mt-1 whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-xl" : section.fontSize === "small" ? "text-sm" : "text-base"} ${section.bold ? "font-bold" : "font-medium"} ${section.italic ? "italic" : ""}`} style={{ fontFamily: section.fontFamily ?? "Arial", color: section.textColor ?? "#475569" }}>{section.subtitle}</p>}
+                {section.text && <p className={`mt-2 whitespace-pre-wrap break-words leading-6 ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-sm" : "text-base"} ${section.bold ? "font-bold" : "font-normal"} ${section.italic ? "italic" : ""}`} style={{ fontFamily: section.fontFamily ?? "Arial", color: section.textColor ?? "#475569", overflowWrap: "anywhere" }}>{section.text}</p>}
               </div>
             );
             return (

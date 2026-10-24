@@ -1,42 +1,49 @@
 # Manutenção — Editor visual da página Sobre Nós
 
 Data: 2026-10-24  
-Branch: `feature/about-us-hybrid-editor`  
-Estado: implementação em revisão; migration aplicada ao Supabase de produção, frontend ainda não publicado.
+Branch de correção: `fix/about-us-editor-drag-resize`  
+Estado: correção em revisão; sem deploy de produção.
 
 ## Escopo
 
 - Editor visual restrito à página **Sobre Nós**.
-- Arraste de blocos, largura ajustável, posição horizontal/vertical, alinhamento de texto, tamanho do título, cor, negrito e linha horizontal independente.
-- Layout responsivo: canvas posicionado em telas maiores e conteúdo em fluxo vertical em telas estreitas.
-- Propriedades salvas junto ao JSON de cada seção, mantendo o formato legado de texto/imagem e os layouts existentes.
+- Posicionamento de elementos por arraste com pointer events.
+- Redimensionamento de largura e altura, com limites.
+- Criação de elementos de texto, imagem independente e linha horizontal.
+- Prévia da imagem vinculada no canvas quando o URL assinado estiver disponível.
+- Canvas colocado imediatamente antes da seção **Prévia do conteúdo atual**, seguida pelos botões Salvar rascunho e Publicar.
+- Layout responsivo: elementos em fluxo em telas estreitas e posicionamento absoluto em telas maiores.
 
 ## Segurança e persistência
 
-- A migration `20261024112002_about_us_hybrid_canvas.sql` substitui a definição da RPC `save_tenant_public_content_draft` preservando verificações de autenticação, tenant, tipo de empresa, imagem vinculada, auditoria e versionamento.
-- As propriedades visuais têm listas permitidas e limites numéricos; cor aceita somente hexadecimal `#RRGGBB`.
-- A migration está versionada no repositório e foi aplicada ao Supabase de produção sob a versão `20261024112002`.
-- Nenhuma tabela nova, política RLS ou credencial foi alterada.
+- A migration anterior `20261024112002_about_us_hybrid_canvas.sql` substitui a definição da RPC `save_tenant_public_content_draft` preservando as verificações existentes de autenticação, tenant, tipo de empresa, imagem vinculada, auditoria e versionamento.
+- A migration proposta `20261024143000_about_us_canvas_height.sql` estende a mesma RPC para persistir `height` como inteiro entre 40 e 1200. Ela mantém `SECURITY DEFINER`, `search_path` fixo e as verificações de autenticação/tenant já existentes.
+- A nova migration foi adicionada somente à branch de correção; **não foi aplicada em produção**.
+- Nenhuma tabela nova, política RLS, credencial ou dependência foi adicionada nesta correção.
 
 ## Checklist de validação
 
-- [ ] CI final: TypeScript e build após a correção de sintaxe.
-- [x] Replay de migrations em banco isolado e testes SQL Phase 2B passaram no GitHub Actions.
-- [ ] Salvar, recarregar e publicar conteúdo com propriedades visuais usando sessão autenticada e dados fictícios.
-- [ ] Verificar renderização em desktop e celular.
-- [ ] Verificar conteúdo antigo sem propriedades visuais.
-- [ ] Testar isolamento: Tenant A não pode ler, alterar ou enumerar conteúdo/imagens do Tenant B.
+- [ ] CI: TypeScript e build.
+- [ ] Replay de migrations em banco isolado e testes SQL.
+- [ ] Arrastar e redimensionar texto, imagem e linha em desktop.
+- [ ] Validar layout responsivo em celular.
+- [ ] Salvar, recarregar e publicar conteúdo com dados fictícios.
+- [ ] Confirmar altura persistida no conteúdo salvo e renderizada na página pública.
+- [ ] Verificar conteúdo legado sem propriedade `height`.
+- [ ] Testar isolamento: Tenant A não pode ler ou alterar conteúdo/imagens do Tenant B.
 - [ ] Confirmar rejeição de operações administrativas sem autenticação.
+- [ ] Revisar diff e CI antes de merge; produção continua pendente de autorização separada.
 
 ## Limitações conhecidas
 
-- Texto e imagem continuam agrupados dentro do bloco legado; para posicionar apenas a imagem, usar o layout `image-only`.
-- Guias automáticas de encaixe/alinhamento (snap guides) não estão incluídas.
-- A prévia visual e a página publicada precisam ser homologadas em desktop e celular antes da conclusão.
+- Guias automáticas de encaixe/alinhamento não estão incluídas.
+- A alça de redimensionamento permite ajustar largura e altura; conteúdo maior que a área pode exigir rolagem interna.
+- A homologação visual real no navegador ainda precisa ser feita.
 
-## Registro de alterações
 
-- Criado editor de posicionamento por arraste e controles de largura/estilo.
-- Adicionado elemento de linha horizontal independente.
-- Atualizada a renderização pública para propriedades visuais e fluxo vertical em telas estreitas.
-- Criada migration para validar e normalizar as propriedades visuais.
+## Formatação de texto no canvas
+
+- Cada bloco de conteúdo suporta tamanho de letra pequeno/médio/grande, família tipográfica (Arial, Georgia, Times New Roman, Verdana, Tahoma), negrito, itálico, alinhamento e cor.
+- A RPC de rascunho valida a família tipográfica contra uma lista permitida e persiste os indicadores booleanos de negrito e itálico. A implementação mantém `SECURITY DEFINER`, `search_path` fixo e as verificações de autenticação e autorização do tenant.
+- Canvas, prévia e página pública usam quebra automática de palavras (`break-words`/`overflow-wrap: anywhere`) e preservam quebras de linha, para que o texto acompanhe a largura redimensionada.
+- A formatação se aplica ao bloco inteiro; não há formatação de seleção parcial de texto nem editor HTML/rico.

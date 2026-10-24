@@ -40,10 +40,13 @@ interface PublicAboutSection {
   positionX?: number;
   positionY?: number;
   width?: number;
+  height?: number;
   textAlign?: "left" | "center" | "right";
   fontSize?: "small" | "medium" | "large";
+  fontFamily?: "Arial" | "Georgia" | "Times New Roman" | "Verdana" | "Tahoma";
   textColor?: string;
   bold?: boolean;
+  italic?: boolean;
 }
 
 interface PublicTenantContent {
