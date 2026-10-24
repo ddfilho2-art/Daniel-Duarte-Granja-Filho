@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import DOMPurify from "dompurify";
 import { supabase } from "../lib/supabase";
 import { useTenant } from "../contexts/TenantContext";
 
@@ -44,6 +45,109 @@ interface AdminContentResponse {
   history?: SavedContentVersion[];
 }
 
+
+const richTextSanitizeConfig = {
+  ALLOWED_TAGS: ["b", "strong", "i", "em", "u", "br", "p", "div", "ul", "ol", "li"],
+  ALLOWED_ATTR: [],
+};
+
+const toSafeRichTextHtml = (value: string) => {
+  const hasFormattingTags = /<\/?(?:b|strong|i|em|u|br|p|div|ul|ol|li)\b[^>]*>/i.test(value);
+  if (hasFormattingTags) return DOMPurify.sanitize(value, richTextSanitizeConfig);
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r?\n/g, "<br>");
+};
+
+const renderSafeRichTextNodes = (value: string): React.ReactNode => {
+  const parsed = new DOMParser().parseFromString(toSafeRichTextHtml(value), "text/html");
+  const renderNode = (node: Node, key: string): React.ReactNode => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return null;
+    const element = node as HTMLElement;
+    const children = Array.from(element.childNodes).map((child, index) => renderNode(child, `${key}-${index}`));
+    switch (element.tagName.toLowerCase()) {
+      case "b": return <b key={key}>{children}</b>;
+      case "strong": return <strong key={key}>{children}</strong>;
+      case "i": return <i key={key}>{children}</i>;
+      case "em": return <em key={key}>{children}</em>;
+      case "u": return <u key={key}>{children}</u>;
+      case "br": return <br key={key} />;
+      case "p": return <p key={key}>{children}</p>;
+      case "div": return <div key={key}>{children}</div>;
+      case "ul": return <ul key={key} className="list-disc pl-5">{children}</ul>;
+      case "ol": return <ol key={key} className="list-decimal pl-5">{children}</ol>;
+      case "li": return <li key={key}>{children}</li>;
+      default: return children;
+    }
+  };
+  return Array.from(parsed.body.childNodes).map((node, index) => renderNode(node, `rich-${index}`));
+};
+
+function RichTextEditor({ value, onChange, label }: { value: string; onChange: (value: string) => void; label: string }) {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const lastEmittedValueRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (lastEmittedValueRef.current === value) {
+      lastEmittedValueRef.current = null;
+      return;
+    }
+    const parsed = new DOMParser().parseFromString(toSafeRichTextHtml(value), "text/html");
+    editorRef.current.replaceChildren(...Array.from(parsed.body.childNodes).map((node) => document.importNode(node, true)));
+  }, [value]);
+
+  const serializeEditor = () => {
+    if (!editorRef.current) return;
+    const serializer = new XMLSerializer();
+    const html = DOMPurify.sanitize(
+      Array.from(editorRef.current.childNodes).map((node) => serializer.serializeToString(node)).join(""),
+      richTextSanitizeConfig,
+    );
+    if (html.length > 3000) return;
+    lastEmittedValueRef.current = html;
+    onChange(html);
+  };
+
+  const applyFormat = (tagName: "b" | "i" | "u") => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || !editorRef.current) return;
+    const range = selection.getRangeAt(0);
+    if (range.collapsed || !editorRef.current.contains(range.commonAncestorContainer)) return;
+    const wrapper = document.createElement(tagName);
+    wrapper.appendChild(range.extractContents());
+    range.insertNode(wrapper);
+    const nextRange = document.createRange();
+    nextRange.selectNodeContents(wrapper);
+    selection.removeAllRanges();
+    selection.addRange(nextRange);
+    serializeEditor();
+    editorRef.current.focus();
+  };
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-300 bg-white focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
+      <div role="toolbar" aria-label={`Formatação de ${label}`} className="flex items-center gap-1 border-b border-slate-200 bg-slate-50 p-2">
+        {([
+          ["b", "B", "Negrito"],
+          ["i", "I", "Itálico"],
+          ["u", "U", "Sublinhado"],
+        ] as const).map(([tagName, symbol, title]) => (
+          <button key={tagName} type="button" title={title} aria-label={title}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => applyFormat(tagName)}
+            className={`min-w-9 rounded border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-800 hover:bg-slate-100 ${tagName === "b" ? "font-bold" : tagName === "i" ? "italic" : "underline"}`}>
+            {symbol}
+          </button>
+        ))}
+        <span className="ml-2 text-xs text-slate-500">Selecione o texto e aplique a formatação</span>
+      </div>
+      <div ref={editorRef} contentEditable suppressContentEditableWarning role="textbox" aria-label={label} aria-multiline="true"
+        onInput={serializeEditor}
+        className="min-h-28 whitespace-pre-wrap px-3 py-2 text-sm leading-6 outline-none [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5" />
+    </div>
+  );
+}
+
 const emptyAbout = (): AboutContent => ({
   title: "Sobre nós",
   subtitle: "",
@@ -85,6 +189,9 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
   const [versionHistory, setVersionHistory] = useState<SavedContentVersion[]>([]);
   const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const pointerActionRef = useRef<{ index: number; mode: "move" | "resize"; pointerId: number; startX: number; startY: number; initialX: number; initialY: number; initialWidth: number; canvasWidth: number } | null>(null);
 
   const isEmployerPortal = Boolean(
     effectiveTenant?.kind === "employer" && effectiveTenant?.id,
@@ -434,7 +541,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Sobre Nós</h2>
-            <p className="text-sm text-slate-500">Conteúdo em texto simples. HTML e scripts não são aceitos.</p>
+            <p className="text-sm text-slate-500">Arraste os blocos pelo botão Mover, ajuste a largura pela alça ↔ ou use os controles numéricos. A barra de formatação aceita negrito, itálico e sublinhado.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={addSection} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
@@ -462,11 +569,27 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 className="font-semibold text-slate-800">Editor visual</h3>
-              <p className="text-xs text-slate-500">Arraste os blocos para posicioná-los. No celular, o conteúdo se reorganiza em coluna.</p>
+              <p className="text-xs text-slate-500">Selecione um bloco e arraste por Mover para posicioná-lo. Use a alça ↔ para redimensionar. No celular, os blocos ficam em coluna.</p>
             </div>
             <span className="text-xs text-slate-500">Arrastar e soltar · largura ajustável abaixo</span>
           </div>
           <div
+            ref={canvasRef}
+            onPointerMove={(event) => {
+              const action = pointerActionRef.current;
+              if (!action || action.pointerId !== event.pointerId || action.canvasWidth <= 0) return;
+              const deltaXPercent = ((event.clientX - action.startX) / action.canvasWidth) * 100;
+              const deltaY = event.clientY - action.startY;
+              if (action.mode === "resize") {
+                updateSection(action.index, { width: Math.round(Math.max(20, Math.min(100 - action.initialX, action.initialWidth + deltaXPercent))) });
+              } else {
+                const positionX = Math.round(Math.max(0, Math.min(100 - action.initialWidth, action.initialX + deltaXPercent)));
+                const positionY = Math.round(Math.max(0, Math.min(5000, action.initialY + deltaY)));
+                updateSection(action.index, { positionX, positionY });
+              }
+            }}
+            onPointerUp={(event) => { if (pointerActionRef.current?.pointerId === event.pointerId) pointerActionRef.current = null; }}
+            onPointerCancel={() => { pointerActionRef.current = null; }}
             className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
             style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220))}px` } as React.CSSProperties}
             aria-label="Área visual de edição da página Sobre Nós"
@@ -474,25 +597,34 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             {about.sections.map((section, index) => (
               <article
                 key={section.id}
-                draggable
-                onDragEnd={(event) => {
-                  const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
-                  if (!bounds) return;
-                  const x = Math.round(Math.max(0, Math.min(100 - (section.width ?? 90), ((event.clientX - bounds.left) / bounds.width) * 100)));
-                  const y = Math.round(Math.max(0, Math.min(5000, event.clientY - bounds.top)));
-                  updateSection(index, { positionX: x, positionY: y });
-                }}
-                className="cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]"
+                onPointerDown={() => setSelectedSectionId(section.id)}
+                className={`touch-none rounded-lg border bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)] ${selectedSectionId === section.id ? "border-primary ring-2 ring-primary/20" : "border-slate-300"}`}
                 style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
                 title="Arraste para reposicionar este bloco"
               >
-                <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  <span>Bloco {index + 1}</span><span aria-hidden="true">⠿</span>
+                <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  <button type="button" onPointerDown={(event) => {
+                    event.preventDefault(); event.stopPropagation();
+                    const bounds = canvasRef.current?.getBoundingClientRect();
+                    if (!bounds) return;
+                    setSelectedSectionId(section.id);
+                    pointerActionRef.current = { index, mode: "move", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, canvasWidth: bounds.width };
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                  }} className="cursor-move rounded bg-slate-100 px-2 py-1 text-slate-700" aria-label={`Mover bloco ${index + 1}`} title="Segure e arraste para mover">Mover ⠿</button>
+                  <span>{Math.round(section.width ?? 90)}%</span>
                 </div>
                 {section.elementType === "divider" ? <hr className="my-3 border-slate-300" /> : <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
                 {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
-                {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}
-                {section.imagePath && <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>}</>}
+                {section.text && <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs">{renderSafeRichTextNodes(section.text)}</div>}
+                {section.imagePath && (signedImageUrls[section.imagePath] ? <img src={signedImageUrls[section.imagePath]} alt={section.imageAlt || "Prévia da imagem"} className="mt-2 max-h-24 max-w-full object-contain" /> : <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>)}</>}
+                <button type="button" onPointerDown={(event) => {
+                  event.preventDefault(); event.stopPropagation();
+                  const bounds = canvasRef.current?.getBoundingClientRect();
+                  if (!bounds) return;
+                  setSelectedSectionId(section.id);
+                  pointerActionRef.current = { index, mode: "resize", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, canvasWidth: bounds.width };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }} aria-label={`Redimensionar bloco ${index + 1}`} title="Segure e arraste para redimensionar a largura" className="absolute bottom-0 right-0 h-5 w-5 cursor-ew-resize rounded-tl-md bg-primary text-xs font-bold text-white">↔</button>
               </article>
             ))}
             {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
@@ -537,7 +669,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Largura do bloco</span>
-                    <input type="range" min={20} max={100} step={5} value={section.width ?? 90} onChange={(event) => { const width = Number(event.target.value); updateSection(index, { width, positionX: Math.min(section.positionX ?? 5, 100 - width) }); }} className="w-full" />
+                    <input type="range" min={20} max={100} step={1} value={section.width ?? 90} onChange={(event) => { const width = Number(event.target.value); updateSection(index, { width, positionX: Math.min(section.positionX ?? 5, 100 - width) }); }} className="w-full" />
                     <span className="text-xs text-slate-500">{section.width ?? 90}% da área</span>
                   </label>
                   <label className="block">
@@ -569,10 +701,10 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     <input type="number" min={0} max={5000} value={section.positionY ?? 20} onChange={(event) => updateSection(index, { positionY: Math.max(0, Math.min(5000, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                   </label>
                 </div>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium text-slate-700">Texto (até 3.000 caracteres)</span>
-                  <textarea value={section.text} maxLength={3000} rows={5} onChange={(event) => updateSection(index, { text: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-                </label>
+                <div className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Texto formatado (até 3.000 caracteres, incluindo marcação)</span>
+                  <RichTextEditor label={`Texto da seção ${index + 1}`} value={section.text} onChange={(text) => updateSection(index, { text })} />
+                </div>
                 <div className="space-y-2">
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Texto alternativo da imagem</span>
@@ -622,7 +754,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               <div className={horizontal ? "min-w-0 flex-1" : ""}>
                 {section.title && <h4 className="font-semibold text-slate-900">{index + 1}. {section.title}</h4>}
                 {section.subtitle && <p className="mt-1 font-medium text-slate-700">{section.subtitle}</p>}
-                {section.text && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{section.text}</p>}
+                {section.text && <div className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{renderSafeRichTextNodes(section.text)}</div>}
               </div>
             );
             return (
