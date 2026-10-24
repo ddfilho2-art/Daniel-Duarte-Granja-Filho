@@ -4,6 +4,8 @@
 
 - [x] Replay da cadeia de migrations em banco local isolado concluído no GitHub Actions; os testes SQL Phase 2B do job também passaram.
 - [x] Migration `20261024112002_about_us_hybrid_canvas.sql` aplicada e registrada no Supabase de produção; guardas de autenticação/tenant e rejeição de chamada sem autenticação verificadas.
+- [x] Migration `20261024201051_about_section_dimensions.sql` aplicada e registrada no Supabase; consulta de verificação confirmou os novos campos, o tipo `image`, autenticação e validação do tenant.
+- [x] `SECURITY DEFINER`, `search_path` fixo e grants da RPC preservados.
 - [x] TypeScript e build de produção passaram no GitHub Actions (run `40128076098`).
 - [ ] Testar salvar, recarregar, publicar e histórico de versões com conteúdo fictício.
 - [ ] Homologar o canvas e a página pública em desktop e celular.
