@@ -260,7 +260,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
       const sections = Array.isArray(sourceAbout.sections)
         ? sourceAbout.sections.map((section): AboutSection => ({
             id: typeof section.id === "string" ? section.id : crypto.randomUUID(),
-            elementType: section.elementType === "divider" ? "divider" : "content",
+            elementType: section.elementType === "divider" ? "divider" : section.elementType === "image" ? "image" : "content",
             title: typeof section.title === "string" ? section.title : "",
             subtitle: typeof section.subtitle === "string" ? section.subtitle : "",
             text: typeof section.text === "string" ? section.text : "",
@@ -573,6 +573,15 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), elementType: "divider", positionY: 20 + current.sections.length * 240, title: "", subtitle: "", text: "", imagePath: "", layout: "text-only" }] }));
             }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
               Adicionar linha
+            </button>
+            <button type="button" onClick={() => {
+              if (about.sections.length >= 20) { setError("O conteúdo Sobre Nós permite até 20 blocos."); return; }
+              setError("");
+              const imageSection = { ...newSection(), elementType: "image" as const, layout: "image-only" as const, width: 50, positionY: 20 + about.sections.length * 240, title: "", subtitle: "", text: "" };
+              setAbout((current) => ({ ...current, sections: [...current.sections, imageSection] }));
+              setSelectedSectionId(imageSection.id);
+            }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+              Adicionar imagem independente
             </button>
           </div>
         </div>
