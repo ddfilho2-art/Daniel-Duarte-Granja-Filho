@@ -18,7 +18,8 @@ BEGIN
     '  v_text_align text;' || chr(10) ||
     '  v_font_size text;' || chr(10) ||
     '  v_text_color text;' || chr(10) ||
-    '  v_bold boolean;';
+    '  v_bold boolean;' || chr(10) ||
+    '  v_element_type text;';
   v_count := (length(v_definition) - length(replace(v_definition, v_old, ''))) / length(v_old);
   IF v_count <> 1 THEN RAISE EXCEPTION 'Expected one layout declaration, found %', v_count; END IF;
   v_definition := replace(v_definition, v_old, v_new);
@@ -31,7 +32,8 @@ BEGIN
     '       OR (v_section ? ''textAlign'' AND COALESCE(jsonb_typeof(v_section -> ''textAlign''), ''null'') <> ''string'')' || chr(10) ||
     '       OR (v_section ? ''fontSize'' AND COALESCE(jsonb_typeof(v_section -> ''fontSize''), ''null'') <> ''string'')' || chr(10) ||
     '       OR (v_section ? ''textColor'' AND COALESCE(jsonb_typeof(v_section -> ''textColor''), ''null'') <> ''string'')' || chr(10) ||
-    '       OR (v_section ? ''bold'' AND jsonb_typeof(v_section -> ''bold'') <> ''boolean'') THEN';
+    '       OR (v_section ? ''bold'' AND jsonb_typeof(v_section -> ''bold'') <> ''boolean'')' || chr(10) ||
+    '       OR (v_section ? ''elementType'' AND COALESCE(jsonb_typeof(v_section -> ''elementType''), ''null'') <> ''string'') THEN';
   v_count := (length(v_definition) - length(replace(v_definition, v_old, ''))) / length(v_old);
   IF v_count <> 1 THEN RAISE EXCEPTION 'Expected one section type guard, found %', v_count; END IF;
   v_definition := replace(v_definition, v_old, v_new);
@@ -52,11 +54,37 @@ BEGIN
     '    v_font_size := COALESCE(v_section ->> ''fontSize'', ''medium'');' || chr(10) ||
     '    v_text_color := COALESCE(v_section ->> ''textColor'', ''#475569'');' || chr(10) ||
     '    v_bold := COALESCE((v_section ->> ''bold'')::boolean, false);' || chr(10) ||
+    '    v_element_type := COALESCE(v_section ->> ''elementType'', ''content'');' || chr(10) ||
     '    IF v_position_x < 0 OR v_position_x > 80 OR v_position_y < 0 OR v_position_y > 5000' || chr(10) ||
     '       OR v_width < 20 OR v_width > 100' || chr(10) ||
     '       OR v_text_align NOT IN (''left'', ''center'', ''right'')' || chr(10) ||
     '       OR v_font_size NOT IN (''small'', ''medium'', ''large'')' || chr(10) ||
-    '       OR v_text_color !~ ''^#[0-9A-Fa-f]{6}$'' THEN' || chr(10) ||
+    '       OR v_text_color !~ ''^#[0-9A-Fa-f]{6}
+    '      RAISE EXCEPTION USING errcode = ''22023'', message = ''invalid_about_section_presentation'';' || chr(10) ||
+    '    END IF;';
+  v_count := (length(v_definition) - length(replace(v_definition, v_old, ''))) / length(v_old);
+  IF v_count <> 1 THEN RAISE EXCEPTION 'Expected one layout validation block, found %', v_count; END IF;
+  v_definition := replace(v_definition, v_old, v_new);
+
+  v_old := '      ''layout'', v_layout' || chr(10) || '    ));';
+  v_new := '      ''layout'', v_layout,' || chr(10) ||
+    '      ''elementType'', v_element_type,' || chr(10) ||
+    '      ''positionX'', v_position_x,' || chr(10) ||
+    '      ''positionY'', v_position_y,' || chr(10) ||
+    '      ''width'', v_width,' || chr(10) ||
+    '      ''textAlign'', v_text_align,' || chr(10) ||
+    '      ''fontSize'', v_font_size,' || chr(10) ||
+    '      ''textColor'', v_text_color,' || chr(10) ||
+    '      ''bold'', v_bold' || chr(10) || '    ));';
+  v_count := (length(v_definition) - length(replace(v_definition, v_old, ''))) / length(v_old);
+  IF v_count <> 1 THEN RAISE EXCEPTION 'Expected one normalized JSON builder, found %', v_count; END IF;
+  v_definition := replace(v_definition, v_old, v_new);
+
+  EXECUTE v_definition;
+END;
+$migration$;
+'' || chr(10) ||
+    '       OR v_element_type NOT IN (''content'', ''divider'') THEN' || chr(10) ||
     '      RAISE EXCEPTION USING errcode = ''22023'', message = ''invalid_about_section_presentation'';' || chr(10) ||
     '    END IF;';
   v_count := (length(v_definition) - length(replace(v_definition, v_old, ''))) / length(v_old);
