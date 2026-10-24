@@ -305,6 +305,6 @@ A execução posterior da CI de manutenção concluiu com sucesso type-check e b
 
 O editor Sobre Nós usa o campo `text` já existente para guardar conteúdo textual. A nova formatação permite apenas negrito, itálico, sublinhado, quebras de linha, parágrafos e listas simples. A marcação é sanitizada com DOMPurify, sem atributos HTML, scripts ou estilos fornecidos pelo usuário. O renderizador converte apenas tags permitidas em nós React.
 
-Os blocos mantêm coordenadas X/Y e largura no modelo atual. O movimento usa pointer events e a largura pode ser ajustada por alça; imagem e linha acompanham a largura do bloco. Altura persistida e tamanho independente da imagem não fazem parte desta alteração, pois exigiriam extensão do modelo de dados e validação adicional.
+Os blocos mantêm coordenadas X/Y, largura e altura opcional; altura 0 significa automática. As imagens têm largura percentual, altura opcional e alinhamento independentes. A migration `20261024153000_about_section_dimensions.sql` estende a validação e a normalização da RPC existente sem alterar sua autorização, versionamento ou auditoria. A homologação de persistência, renderização pública e isolamento entre tenants continua obrigatória antes de merge/deploy.
 
 A manutenção deve ser considerada pendente até o build/typecheck automatizado e a homologação manual de salvar, recarregar, publicar e validar isolamento multi-tenant.
