@@ -581,12 +581,12 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 if (event.button !== 0) return;
                 event.preventDefault();
                 event.stopPropagation();
+                const article = event.currentTarget.closest("article");
                 const bounds = event.currentTarget.closest("[aria-label='Área visual de edição da página Sobre Nós']")?.getBoundingClientRect();
-                if (!bounds) return;
+                if (!bounds || !article) return;
                 pointerOperation.current = { mode, index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: section.positionX ?? 5, originY: section.positionY ?? 20, originWidth: section.width ?? 90, originHeight: section.height ?? 140 };
-                event.currentTarget.setPointerCapture(event.pointerId);
+                article.setPointerCapture(event.pointerId);
               };
-              const operation = pointerOperation.current;
               return (
                 <article
                   key={section.id}
@@ -608,8 +608,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   }}
                   onPointerUp={(event) => { if (pointerOperation.current?.pointerId === event.pointerId) pointerOperation.current = null; }}
                   onPointerCancel={() => { pointerOperation.current = null; }}
-                  className="group cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]"
-                  style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", minHeight: `${section.height ?? 140}px`, height: `${section.height ?? 140}px`, overflow: "auto", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
+                  className="group relative cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)] md:h-[var(--section-height)] md:min-h-[var(--section-height)]"
+                  style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, "--section-height": `${section.height ?? 140}px`, maxWidth: "100%", overflow: "auto", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
                   title="Arraste para reposicionar este elemento"
                 >
                   <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
