@@ -974,3 +974,13 @@ Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-
 - Se houver falha, registrar o primeiro erro e sua resposta de rede; não redefinir senhas nem alterar permissões antes de confirmar a causa.
 
 **Critério de encerramento:** o build passou, mas esta manutenção não deve ser considerada funcionalmente validada até concluir o deploy manual e os dois testes de login.
+
+## 2026-10-24 — Editor visual Sobre Nós (PR #17)
+
+- [x] TypeScript e build de produção passaram no GitHub Actions (run `40128076098`).
+- [x] Replay integral de migrations e testes SQL Phase 2B passaram em banco local isolado (run `40128076098`).
+- [x] Controles para altura do bloco, dimensões/alinhamento da imagem e bloco de imagem independente implementados.
+- [ ] Homologar com sessão autenticada: editar, salvar, recarregar, publicar e confirmar renderização pública.
+- [ ] Testar isolamento Tenant A/B para conteúdo e imagens antes de merge/deploy.
+- [x] Migration `20261024201051_about_section_dimensions.sql` aplicada e verificada no Supabase de produção.
+- [ ] Homologar no frontend após o deploy manual do usuário; não fazer merge ou deploy pela manutenção.

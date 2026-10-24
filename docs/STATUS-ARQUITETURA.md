@@ -853,3 +853,51 @@ Commit: `d0a064e9de1ed43528c1f7f08f38d6e319c0d391`.
 ### Limitação atual
 
 Nenhuma data de encerramento foi gravada, nenhum acesso foi revogado e nenhum dado foi apagado nesta etapa. O diagnóstico identificou dependências importantes; a implementação deve continuar por migrations versionadas e backend, sem executar exclusões genéricas.
+
+
+## Manutenção 2026-10-24 — Editor visual Sobre Nós
+
+### Escopo implementado em branch isolada
+
+- Substituído o arraste nativo HTML por controles de ponteiro para mover blocos com coordenadas proporcionais ao canvas.
+- Adicionada alça para ajustar a largura do bloco em incrementos livres, respeitando os limites de 20% a 100% e a posição horizontal.
+- A prévia do editor agora exibe as imagens vinculadas quando há URL assinada disponível.
+- Adicionado editor de texto com botões de negrito, itálico e sublinhado.
+- O texto formatado é sanitizado com DOMPurify e convertido em nós React permitidos antes da renderização, tanto na prévia administrativa quanto na página pública.
+- Mantidos os campos existentes, os RPCs, o fluxo de rascunho/publicação e o histórico de versões.
+- Nenhuma migration, mudança em Auth/RLS ou dependência nova foi introduzida.
+
+### Limites e validação pendente
+
+- A largura é redimensionável pelo mouse; altura de caixas não foi adicionada porque o modelo persistido atual não possui esse campo e exigiria alteração de schema/RPC.
+- A largura da imagem acompanha a largura do bloco; não foi introduzida uma dimensão independente para a imagem.
+- A implementação precisa passar pelo build/typecheck automatizado e pela homologação visual no navegador.
+- Testes reais de persistência após recarregar, publicação, formatação e isolamento entre tenants ainda estão pendentes.
+- Não realizar deploy de produção até concluir os testes e aprovar a integração.
+
+### Checklist
+
+- [x] Implementação isolada no branch `fix/editor-visual-word-formatting`
+- [x] Sanitização de marcação permitida para o texto formatado
+- [x] Migration de dimensões aplicada no Supabase; Auth e RLS não foram alterados
+- [x] TypeScript/build verificados por execução em CI; CI do último commit após alinhamento do nome da migration pendente
+- [ ] Teste manual de mover/redimensionar blocos
+- [ ] Teste de negrito, itálico e sublinhado após salvar/recarregar
+- [ ] Teste de publicação e renderização pública
+- [ ] Teste de isolamento Tenant A/Tenant B e usuário não autenticado
+- [ ] Revisão do PR antes de integração
+
+
+## Manutenção 2026-10-24 — dimensões independentes do editor Sobre Nós
+
+- [x] Campos de altura opcional do bloco e dimensões/alinhamento da imagem adicionados ao modelo JSON no frontend.
+- [x] Bloco de imagem independente adicionado para movimento/redimensionamento separado do texto.
+- [x] Alças para ajustar largura, altura ou ambas no editor visual.
+- [x] Renderizador público atualizado para respeitar altura do bloco e dimensões/alinhamento da imagem.
+- [x] Migration versionada criada para validar e persistir os novos campos na RPC existente, preservando verificações de tenant, storage, auditoria e versionamento.
+- [x] Typecheck e build passaram no GitHub Actions run `40128384714`; CI do commit mais recente após renomear a migration ainda está em execução.
+- [x] Replay integral das migrations em banco isolado e testes SQL Phase 2B passaram no run `40128384714`; replay da versão final da migration será confirmado pela CI atual.
+- [ ] Homologação manual: editar, salvar, recarregar, publicar e verificar layout no portal público.
+- [ ] Teste de isolamento Tenant A/Tenant B para conteúdo e imagens.
+- [x] Migration `20261024201051_about_section_dimensions.sql` aplicada e verificada no Supabase de produção.
+- [x] Nenhum merge ou deploy do frontend executado; homologação funcional e isolamento Tenant A/B continuam pendentes.

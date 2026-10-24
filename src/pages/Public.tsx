@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import DOMPurify from "dompurify";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import {
   Search,
@@ -1475,6 +1476,41 @@ export function PlatformHome() {
   );
 }
 
+
+const publicRichTextConfig = {
+  ALLOWED_TAGS: ["b", "strong", "i", "em", "u", "br", "p", "div", "ul", "ol", "li"],
+  ALLOWED_ATTR: [],
+};
+
+const renderPublicRichText = (value: string): React.ReactNode => {
+  const hasFormattingTags = /<\/?(?:b|strong|i|em|u|br|p|div|ul|ol|li)\b[^>]*>/i.test(value);
+  const safeHtml = hasFormattingTags
+    ? DOMPurify.sanitize(value, publicRichTextConfig)
+    : value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\r?\n/g, "<br>");
+  const parsed = new DOMParser().parseFromString(safeHtml, "text/html");
+  const renderNode = (node: Node, key: string): React.ReactNode => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent;
+    if (node.nodeType !== Node.ELEMENT_NODE) return null;
+    const element = node as HTMLElement;
+    const children = Array.from(element.childNodes).map((child, index) => renderNode(child, `${key}-${index}`));
+    switch (element.tagName.toLowerCase()) {
+      case "b": return <b key={key}>{children}</b>;
+      case "strong": return <strong key={key}>{children}</strong>;
+      case "i": return <i key={key}>{children}</i>;
+      case "em": return <em key={key}>{children}</em>;
+      case "u": return <u key={key}>{children}</u>;
+      case "br": return <br key={key} />;
+      case "p": return <p key={key}>{children}</p>;
+      case "div": return <div key={key}>{children}</div>;
+      case "ul": return <ul key={key} className="list-disc pl-5">{children}</ul>;
+      case "ol": return <ol key={key} className="list-decimal pl-5">{children}</ol>;
+      case "li": return <li key={key}>{children}</li>;
+      default: return children;
+    }
+  };
+  return Array.from(parsed.body.childNodes).map((node, index) => renderNode(node, `public-rich-${index}`));
+};
+
 export function SobreNos() {
   const { tenant, branding } = useTenant();
   const companyName = tenant?.displayName || branding.displayName;
@@ -1542,18 +1578,22 @@ export function SobreNos() {
             const imageFirst = section.layout === "image-top" || section.layout === "image-left";
             const horizontal = section.layout === "image-left" || section.layout === "image-right";
             const imageElement = image && section.layout !== "text-only" ? (
-              <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
-                loading="lazy" className={horizontal ? "max-h-[480px] w-full rounded-2xl object-contain md:w-2/5" : "max-h-[480px] w-full rounded-2xl object-contain"} />
+              <div className={`flex ${horizontal ? "w-full md:w-2/5 md:flex-none" : "w-full"} ${section.imageAlign === "left" ? "justify-start" : section.imageAlign === "right" ? "justify-end" : "justify-center"}`}>
+                <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
+                  loading="lazy"
+                  style={{ width: `${section.imageWidth ?? (horizontal ? 40 : 100)}%`, height: section.imageHeight ? `${section.imageHeight}px` : "auto", maxWidth: "100%", maxHeight: section.imageHeight ? "none" : "480px", objectFit: "contain" }}
+                  className="rounded-2xl" />
+              </div>
             ) : null;
             const textElement = section.layout === "image-only" ? null : (
               <div className={horizontal ? "min-w-0 flex-1" : ""}>
                 {section.title?.trim() && <h2 className={`font-semibold ${section.fontSize === "large" ? "text-3xl" : section.fontSize === "small" ? "text-lg" : "text-2xl"} ${section.bold ? "font-bold" : ""}`} style={{ color: section.textColor ?? "#0f172a" }}>{section.title}</h2>}
                 {section.subtitle?.trim() && <h3 className="mt-2 text-lg font-medium text-slate-700">{section.subtitle}</h3>}
-                {section.text?.trim() && <p className="mt-3 whitespace-pre-line leading-7" style={{ color: section.textColor ?? "#475569" }}>{section.text}</p>}
+                {section.text?.trim() && <div className="mt-3 whitespace-pre-wrap leading-7" style={{ color: section.textColor ?? "#475569" }}>{renderPublicRichText(section.text)}</div>}
               </div>
             );
             return (
-              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
+              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, height: section.height ? `${section.height}px` : undefined, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
                 {section.elementType === "divider" ? <hr className="w-full border-slate-300" /> : <>{imageFirst && imageElement}
                 {textElement}
                 {!imageFirst && imageElement}</>}
