@@ -8,6 +8,7 @@
 - [x] Criada branch isolada para correção do canvas, com eventos Pointer e altura persistível.
 - [ ] Validar CI desta correção: TypeScript, build, replay de migrations e testes SQL.
 - [ ] Validar arraste, redimensionamento e upload de imagem independente em desktop e celular com conteúdo fictício.
+- [ ] Validar formatação persistida: tamanho da letra, família tipográfica, negrito, itálico, cor e quebra automática de texto após redimensionar.
 - [ ] Validar salvar/recarregar/publicar e renderização do tamanho na página pública.
 - [ ] Validar isolamento Tenant A/Tenant B e rejeição de chamadas não autenticadas nos testes de banco.
 - [ ] Revisar a nova migration `20261024143000_about_us_canvas_height.sql`; **não aplicar em produção sem autorização específica após validação**.
@@ -17,5 +18,5 @@
 ## Limitações conhecidas / fora do escopo
 
 - Guias automáticas de encaixe/alinhamento (snap guides) não estão incluídas.
-- Formatação permanece limitada às opções já existentes; não foi introduzido editor HTML/rico.
+- Formatação disponível por bloco: tamanho pequeno/médio/grande, família tipográfica (Arial, Georgia, Times New Roman, Verdana ou Tahoma), negrito, itálico, alinhamento e cor. Não foi introduzido editor HTML/rico nem formatação parcial de palavras dentro do mesmo bloco.
 - A alça de redimensionamento controla largura e altura do elemento; conteúdo maior que a área pode exigir rolagem interna.
