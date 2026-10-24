@@ -31,6 +31,8 @@ DECLARE
   v_font_size text;
   v_text_color text;
   v_bold boolean;
+  v_italic boolean;
+  v_font_family text;
   v_element_type text;
   v_section_id text;
   v_version integer;
@@ -110,6 +112,8 @@ BEGIN
        OR (v_section ? 'fontSize' AND COALESCE(jsonb_typeof(v_section -> 'fontSize'), 'null') <> 'string')
        OR (v_section ? 'textColor' AND COALESCE(jsonb_typeof(v_section -> 'textColor'), 'null') <> 'string')
        OR (v_section ? 'bold' AND jsonb_typeof(v_section -> 'bold') <> 'boolean')
+       OR (v_section ? 'italic' AND jsonb_typeof(v_section -> 'italic') <> 'boolean')
+       OR (v_section ? 'fontFamily' AND COALESCE(jsonb_typeof(v_section -> 'fontFamily'), 'null') <> 'string')
        OR (v_section ? 'elementType' AND COALESCE(jsonb_typeof(v_section -> 'elementType'), 'null') <> 'string') THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_section_field_type';
     END IF;
@@ -138,6 +142,8 @@ BEGIN
     v_font_size := COALESCE(v_section ->> 'fontSize', 'medium');
     v_text_color := COALESCE(v_section ->> 'textColor', '#475569');
     v_bold := COALESCE((v_section ->> 'bold')::boolean, false);
+    v_italic := COALESCE((v_section ->> 'italic')::boolean, false);
+    v_font_family := COALESCE(v_section ->> 'fontFamily', 'Arial');
     v_element_type := COALESCE(v_section ->> 'elementType', 'content');
 
     IF v_position_x < 0 OR v_position_x > 100 - v_width
@@ -146,6 +152,7 @@ BEGIN
        OR v_height < 40 OR v_height > 1200
        OR v_text_align NOT IN ('left', 'center', 'right')
        OR v_font_size NOT IN ('small', 'medium', 'large')
+       OR v_font_family NOT IN ('Arial', 'Georgia', 'Times New Roman', 'Verdana', 'Tahoma')
        OR char_length(v_text_color) <> 7 OR v_text_color !~ '^#[0-9A-Fa-f]{6}'
        OR v_element_type NOT IN ('content', 'divider') THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_section_presentation';
@@ -197,7 +204,9 @@ BEGIN
       'textAlign', v_text_align,
       'fontSize', v_font_size,
       'textColor', v_text_color,
-      'bold', v_bold
+      'bold', v_bold,
+      'italic', v_italic,
+      'fontFamily', v_font_family
     ));
   END LOOP;
 
