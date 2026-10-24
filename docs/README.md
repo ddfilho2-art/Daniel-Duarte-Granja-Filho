@@ -33,3 +33,8 @@ O Recruta AÍ é uma plataforma multi-tenant com uma única aplicação implanta
 - a equipe clínica é transversal às empresas e atende a fase de exame ocupacional.
 
 O tenant não deve ser confundido com o usuário nem com o papel do usuário.
+
+
+## Editor visual de conteúdo público
+
+O editor da página Sobre Nós permite posicionar blocos no canvas, ajustar sua largura e formatar o texto com negrito, itálico e sublinhado. A marcação é sanitizada antes da renderização. Consulte o histórico de manutenção e as pendências de homologação em [STATUS-ARQUITETURA.md](./STATUS-ARQUITETURA.md) e as decisões técnicas em [BASE_CONHECIMENTO.md](./BASE_CONHECIMENTO.md).
