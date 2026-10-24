@@ -15,6 +15,10 @@ interface AboutSection {
   positionX?: number;
   positionY?: number;
   width?: number;
+  height?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageAlign?: "left" | "center" | "right";
   textAlign?: "left" | "center" | "right";
   fontSize?: "small" | "medium" | "large";
   textColor?: string;
@@ -170,6 +174,10 @@ const newSection = (): AboutSection => ({
   positionX: 5,
   positionY: 20,
   width: 90,
+  height: 0,
+  imageWidth: 100,
+  imageHeight: 0,
+  imageAlign: "center",
   textAlign: "left",
   fontSize: "medium",
   textColor: "#475569",
@@ -195,7 +203,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
   const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const pointerActionRef = useRef<{ index: number; mode: "move" | "resize"; pointerId: number; startX: number; startY: number; initialX: number; initialY: number; initialWidth: number; canvasWidth: number } | null>(null);
+  const pointerActionRef = useRef<{ index: number; mode: "move" | "resize-width" | "resize-height" | "resize-both"; pointerId: number; startX: number; startY: number; initialX: number; initialY: number; initialWidth: number; initialHeight: number; canvasWidth: number } | null>(null);
 
   const isEmployerPortal = Boolean(
     effectiveTenant?.kind === "employer" && effectiveTenant?.id,
@@ -262,6 +270,10 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             positionX: Number.isFinite(section.positionX) ? Math.max(0, Math.min(80, Number(section.positionX))) : 5,
             positionY: Number.isFinite(section.positionY) ? Math.max(0, Math.min(5000, Number(section.positionY))) : 20 + (Array.isArray(sourceAbout.sections) ? sourceAbout.sections.indexOf(section) * 240 : 0),
             width: Number.isFinite(section.width) ? Math.max(20, Math.min(100, Number(section.width))) : 90,
+            height: Number.isFinite(section.height) ? Math.max(0, Math.min(3000, Number(section.height))) : 0,
+            imageWidth: Number.isFinite(section.imageWidth) ? Math.max(10, Math.min(100, Number(section.imageWidth))) : 100,
+            imageHeight: Number.isFinite(section.imageHeight) ? Math.max(0, Math.min(1000, Number(section.imageHeight))) : 0,
+            imageAlign: ["left", "center", "right"].includes(section.imageAlign as string) ? section.imageAlign as AboutSection["imageAlign"] : "center",
             textAlign: ["left", "center", "right"].includes(section.textAlign as string) ? section.textAlign as AboutSection["textAlign"] : "left",
             fontSize: ["small", "medium", "large"].includes(section.fontSize as string) ? section.fontSize as AboutSection["fontSize"] : "medium",
             textColor: typeof section.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(section.textColor) ? section.textColor : "#475569",
@@ -381,6 +393,10 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               positionX: section.positionX ?? 5,
               positionY: section.positionY ?? 20,
               width: section.width ?? 90,
+              height: section.height ?? 0,
+              imageWidth: section.imageWidth ?? 100,
+              imageHeight: section.imageHeight ?? 0,
+              imageAlign: section.imageAlign ?? "center",
               textAlign: section.textAlign ?? "left",
               fontSize: section.fontSize ?? "medium",
               textColor: section.textColor ?? "#475569",
@@ -584,8 +600,12 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               if (!action || action.pointerId !== event.pointerId || action.canvasWidth <= 0) return;
               const deltaXPercent = ((event.clientX - action.startX) / action.canvasWidth) * 100;
               const deltaY = event.clientY - action.startY;
-              if (action.mode === "resize") {
-                updateSection(action.index, { width: Math.round(Math.max(20, Math.min(100 - action.initialX, action.initialWidth + deltaXPercent))) });
+              if (action.mode === "resize-width" || action.mode === "resize-both") {
+                const width = Math.round(Math.max(20, Math.min(100 - action.initialX, action.initialWidth + deltaXPercent)));
+                if (action.mode === "resize-both") updateSection(action.index, { width, height: Math.round(Math.max(0, Math.min(3000, action.initialHeight + deltaY))) });
+                else updateSection(action.index, { width });
+              } else if (action.mode === "resize-height") {
+                updateSection(action.index, { height: Math.round(Math.max(0, Math.min(3000, action.initialHeight + deltaY))) });
               } else {
                 const positionX = Math.round(Math.max(0, Math.min(100 - action.initialWidth, action.initialX + deltaXPercent)));
                 const positionY = Math.round(Math.max(0, Math.min(5000, action.initialY + deltaY)));
@@ -595,7 +615,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             onPointerUp={(event) => { if (pointerActionRef.current?.pointerId === event.pointerId) pointerActionRef.current = null; }}
             onPointerCancel={() => { pointerActionRef.current = null; }}
             className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
-            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220))}px` } as React.CSSProperties}
+            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + (section.height || 220) + 40))}px` } as React.CSSProperties}
             aria-label="Área visual de edição da página Sobre Nós"
           >
             {about.sections.map((section, index) => (
@@ -603,7 +623,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 key={section.id}
                 onPointerDown={() => setSelectedSectionId(section.id)}
                 className={`touch-none rounded-lg border bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)] ${selectedSectionId === section.id ? "border-primary ring-2 ring-primary/20" : "border-slate-300"}`}
-                style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
+                style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", height: section.height ? `${section.height}px` : undefined, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
                 title="Arraste para reposicionar este bloco"
               >
                 <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
@@ -620,15 +640,31 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 {section.elementType === "divider" ? <hr className="my-3 border-slate-300" /> : <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
                 {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
                 {section.text && <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs">{renderSafeRichTextNodes(section.text)}</div>}
-                {section.imagePath && (signedImageUrls[section.imagePath] ? <img src={signedImageUrls[section.imagePath]} alt={section.imageAlt || "Prévia da imagem"} className="mt-2 max-h-24 w-full max-w-full object-contain" /> : <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>)}</>}
+                {section.imagePath && (signedImageUrls[section.imagePath] ? <div className={`mt-2 flex ${section.imageAlign === "left" ? "justify-start" : section.imageAlign === "right" ? "justify-end" : "justify-center"}`}><img src={signedImageUrls[section.imagePath]} alt={section.imageAlt || "Prévia da imagem"} style={{ width: `${section.imageWidth ?? 100}%`, height: section.imageHeight ? `${section.imageHeight}px` : "auto", maxWidth: "100%", objectFit: "contain" }} /> </div> : <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>)}</>}
                 <button type="button" onPointerDown={(event) => {
                   event.preventDefault(); event.stopPropagation();
                   const bounds = canvasRef.current?.getBoundingClientRect();
                   if (!bounds) return;
                   setSelectedSectionId(section.id);
-                  pointerActionRef.current = { index, mode: "resize", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, canvasWidth: bounds.width };
+                  pointerActionRef.current = { index, mode: "resize-width", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }} aria-label={`Redimensionar bloco ${index + 1}`} title="Segure e arraste para redimensionar a largura" className="absolute bottom-0 right-0 h-5 w-5 cursor-ew-resize rounded-tl-md bg-primary text-xs font-bold text-white">↔</button>
+                <button type="button" onPointerDown={(event) => {
+                  event.preventDefault(); event.stopPropagation();
+                  const bounds = canvasRef.current?.getBoundingClientRect();
+                  if (!bounds) return;
+                  setSelectedSectionId(section.id);
+                  pointerActionRef.current = { index, mode: "resize-height", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }} aria-label={`Redimensionar altura do bloco ${index + 1}`} title="Segure e arraste para ajustar a altura" className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-ns-resize rounded-t bg-slate-400" />
+                <button type="button" onPointerDown={(event) => {
+                  event.preventDefault(); event.stopPropagation();
+                  const bounds = canvasRef.current?.getBoundingClientRect();
+                  if (!bounds) return;
+                  setSelectedSectionId(section.id);
+                  pointerActionRef.current = { index, mode: "resize-both", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                }} aria-label={`Redimensionar largura e altura do bloco ${index + 1}`} title="Arraste para ajustar largura e altura" className="absolute bottom-0 right-0 z-10 h-5 w-5 cursor-nwse-resize rounded-tl-md bg-slate-700 text-[10px] font-bold text-white">↘</button>
               </article>
             ))}
             {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
@@ -677,6 +713,10 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     <span className="text-xs text-slate-500">{section.width ?? 90}% da área</span>
                   </label>
                   <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Altura do bloco (px, 0 = automática)</span>
+                    <input type="number" min={0} max={3000} value={section.height ?? 0} onChange={(event) => updateSection(index, { height: Math.max(0, Math.min(3000, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  </label>
+                  <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Alinhamento do texto</span>
                     <select value={section.textAlign ?? "left"} onChange={(event) => updateSection(index, { textAlign: event.target.value as AboutSection["textAlign"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
                       <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
@@ -710,6 +750,22 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   <RichTextEditor label={`Texto da seção ${index + 1}`} value={section.text} onChange={(text) => updateSection(index, { text })} />
                 </div>
                 <div className="space-y-2">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-slate-700">Largura da imagem (%)</span>
+                      <input type="number" min={10} max={100} value={section.imageWidth ?? 100} onChange={(event) => updateSection(index, { imageWidth: Math.max(10, Math.min(100, Number(event.target.value) || 10)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-slate-700">Altura da imagem (px, 0 = automática)</span>
+                      <input type="number" min={0} max={1000} value={section.imageHeight ?? 0} onChange={(event) => updateSection(index, { imageHeight: Math.max(0, Math.min(1000, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                    </label>
+                    <label className="block">
+                      <span className="mb-1 block text-sm font-medium text-slate-700">Alinhamento da imagem</span>
+                      <select value={section.imageAlign ?? "center"} onChange={(event) => updateSection(index, { imageAlign: event.target.value as AboutSection["imageAlign"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                        <option value="left">À esquerda</option><option value="center">Centralizada</option><option value="right">À direita</option>
+                      </select>
+                    </label>
+                  </div>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Texto alternativo da imagem</span>
                     <input value={section.imageAlt} maxLength={180} onChange={(event) => updateSection(index, { imageAlt: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
