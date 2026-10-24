@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useTenant } from "../contexts/TenantContext";
 
@@ -14,6 +14,7 @@ interface AboutSection {
   positionX?: number;
   positionY?: number;
   width?: number;
+  height?: number;
   textAlign?: "left" | "center" | "right";
   fontSize?: "small" | "medium" | "large";
   textColor?: string;
@@ -62,6 +63,7 @@ const newSection = (): AboutSection => ({
   positionX: 5,
   positionY: 20,
   width: 90,
+  height: 140,
   textAlign: "left",
   fontSize: "medium",
   textColor: "#475569",
@@ -85,6 +87,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
   const [versionHistory, setVersionHistory] = useState<SavedContentVersion[]>([]);
   const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
+  const pointerOperation = useRef<{ mode: "move" | "resize"; index: number; pointerId: number; startX: number; startY: number; originX: number; originY: number; originWidth: number; originHeight: number } | null>(null);
 
   const isEmployerPortal = Boolean(
     effectiveTenant?.kind === "employer" && effectiveTenant?.id,
@@ -151,6 +154,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             positionX: Number.isFinite(section.positionX) ? Math.max(0, Math.min(80, Number(section.positionX))) : 5,
             positionY: Number.isFinite(section.positionY) ? Math.max(0, Math.min(5000, Number(section.positionY))) : 20 + (Array.isArray(sourceAbout.sections) ? sourceAbout.sections.indexOf(section) * 240 : 0),
             width: Number.isFinite(section.width) ? Math.max(20, Math.min(100, Number(section.width))) : 90,
+            height: Number.isFinite(section.height) ? Math.max(40, Math.min(1200, Number(section.height))) : 140,
             textAlign: ["left", "center", "right"].includes(section.textAlign as string) ? section.textAlign as AboutSection["textAlign"] : "left",
             fontSize: ["small", "medium", "large"].includes(section.fontSize as string) ? section.fontSize as AboutSection["fontSize"] : "medium",
             textColor: typeof section.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(section.textColor) ? section.textColor : "#475569",
@@ -192,13 +196,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
     });
   };
 
-  const addSection = () => {
+  const addSection = (layout: AboutSection["layout"] = "stacked") => {
     if (about.sections.length >= 20) {
       setError("O conteúdo Sobre Nós permite até 20 seções.");
       return;
     }
     setError("");
-    setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), positionY: 20 + current.sections.length * 240 }] }));
+    setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), layout, positionY: 20 + current.sections.length * 240 }] }));
   };
 
   const uploadImage = async (
@@ -270,6 +274,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               positionX: section.positionX ?? 5,
               positionY: section.positionY ?? 20,
               width: section.width ?? 90,
+              height: section.height ?? 140,
               textAlign: section.textAlign ?? "left",
               fontSize: section.fontSize ?? "medium",
               textColor: section.textColor ?? "#475569",
@@ -437,16 +442,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             <p className="text-sm text-slate-500">Conteúdo em texto simples. HTML e scripts não são aceitos.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={addSection} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
-              Adicionar bloco
-            </button>
+            <button type="button" onClick={() => addSection("text-only")} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">Adicionar texto</button>
+            <button type="button" onClick={() => addSection("image-only")} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">Adicionar imagem</button>
             <button type="button" onClick={() => {
               if (about.sections.length >= 20) { setError("O conteúdo Sobre Nós permite até 20 blocos."); return; }
               setError("");
-              setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), elementType: "divider", positionY: 20 + current.sections.length * 240, title: "", subtitle: "", text: "", imagePath: "", layout: "text-only" }] }));
-            }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
-              Adicionar linha
-            </button>
+              setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), elementType: "divider", positionY: 20 + current.sections.length * 240, title: "", subtitle: "", text: "", imagePath: "", layout: "text-only", width: 90, height: 40 }] }));
+            }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">Adicionar linha</button>
           </div>
         </div>
         <label className="block">
@@ -458,46 +460,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
           <input value={about.subtitle} maxLength={200} onChange={(event) => setAbout((current) => ({ ...current, subtitle: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
         </label>
 
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="font-semibold text-slate-800">Editor visual</h3>
-              <p className="text-xs text-slate-500">Arraste os blocos para posicioná-los. No celular, o conteúdo se reorganiza em coluna.</p>
-            </div>
-            <span className="text-xs text-slate-500">Arrastar e soltar · largura ajustável abaixo</span>
-          </div>
-          <div
-            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
-            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220))}px` } as React.CSSProperties}
-            aria-label="Área visual de edição da página Sobre Nós"
-          >
-            {about.sections.map((section, index) => (
-              <article
-                key={section.id}
-                draggable
-                onDragEnd={(event) => {
-                  const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
-                  if (!bounds) return;
-                  const x = Math.round(Math.max(0, Math.min(100 - (section.width ?? 90), ((event.clientX - bounds.left) / bounds.width) * 100)));
-                  const y = Math.round(Math.max(0, Math.min(5000, event.clientY - bounds.top)));
-                  updateSection(index, { positionX: x, positionY: y });
-                }}
-                className="cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]"
-                style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
-                title="Arraste para reposicionar este bloco"
-              >
-                <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
-                  <span>Bloco {index + 1}</span><span aria-hidden="true">⠿</span>
-                </div>
-                {section.elementType === "divider" ? <hr className="my-3 border-slate-300" /> : <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
-                {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
-                {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}
-                {section.imagePath && <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>}</>}
-              </article>
-            ))}
-            {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
-          </div>
-        </div>
+
 
         {about.sections.length === 0 && (
           <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Nenhuma seção adicionada. Use “Adicionar seção” para começar.</p>
@@ -598,6 +561,72 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               </article>
             );
           })}
+        </div>
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-slate-800">Editor visual</h3>
+              <p className="text-xs text-slate-500">Arraste cada elemento para posicionar. Use a alça ↘ para ajustar largura e altura; a imagem é adicionada como elemento independente.</p>
+            </div>
+            <span className="text-xs text-slate-500">Arrastar e redimensionar</span>
+          </div>
+          <div
+            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
+            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + (section.height ?? 140) + 40))}px` } as React.CSSProperties}
+            aria-label="Área visual de edição da página Sobre Nós"
+          >
+            {about.sections.map((section, index) => {
+              const image = section.imagePath ? signedImageUrls[section.imagePath] || null : null;
+              const beginOperation = (mode: "move" | "resize", event: React.PointerEvent<HTMLElement>) => {
+                if (event.button !== 0) return;
+                event.preventDefault();
+                event.stopPropagation();
+                const bounds = event.currentTarget.closest("[aria-label='Área visual de edição da página Sobre Nós']")?.getBoundingClientRect();
+                if (!bounds) return;
+                pointerOperation.current = { mode, index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: section.positionX ?? 5, originY: section.positionY ?? 20, originWidth: section.width ?? 90, originHeight: section.height ?? 140 };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              };
+              const operation = pointerOperation.current;
+              return (
+                <article
+                  key={section.id}
+                  onPointerDown={(event) => beginOperation("move", event)}
+                  onPointerMove={(event) => {
+                    const active = pointerOperation.current;
+                    if (!active || active.pointerId !== event.pointerId) return;
+                    const bounds = event.currentTarget.closest("[aria-label='Área visual de edição da página Sobre Nós']")?.getBoundingClientRect();
+                    if (!bounds) return;
+                    const dx = event.clientX - active.startX;
+                    const dy = event.clientY - active.startY;
+                    if (active.mode === "move") {
+                      const x = Math.round(Math.max(0, Math.min(100 - active.originWidth, active.originX + (dx / bounds.width) * 100)));
+                      updateSection(active.index, { positionX: x, positionY: Math.round(Math.max(0, Math.min(5000, active.originY + dy))) });
+                    } else {
+                      const width = Math.round(Math.max(20, Math.min(100, active.originWidth + (dx / bounds.width) * 100)));
+                      updateSection(active.index, { width: Math.min(width, 100 - (about.sections[active.index]?.positionX ?? 0)), height: Math.round(Math.max(40, Math.min(1200, active.originHeight + dy))) });
+                    }
+                  }}
+                  onPointerUp={(event) => { if (pointerOperation.current?.pointerId === event.pointerId) pointerOperation.current = null; }}
+                  onPointerCancel={() => { pointerOperation.current = null; }}
+                  className="group cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]"
+                  style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", minHeight: `${section.height ?? 140}px`, height: `${section.height ?? 140}px`, overflow: "auto", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
+                  title="Arraste para reposicionar este elemento"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                    <span>{section.elementType === "divider" ? "Linha" : section.layout === "image-only" ? "Imagem" : "Texto"} {index + 1}</span><span aria-hidden="true">⠿</span>
+                  </div>
+                  {section.elementType === "divider" ? <div className="flex h-full items-center"><hr className="w-full border-slate-400" /></div> : <>
+                    {section.layout !== "image-only" && <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
+                    {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
+                    {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}</>}
+                    {section.layout !== "text-only" && (image ? <img src={image} alt={section.imageAlt || section.title || "Prévia da imagem"} className="mt-1 w-full rounded object-contain" style={{ maxHeight: `${Math.max(30, (section.height ?? 140) - 45)}px` }} /> : section.layout === "image-only" ? <p className="flex h-full items-center justify-center text-xs text-slate-400">Envie uma imagem no formulário abaixo</p> : null)}
+                  </>}
+                  <button type="button" aria-label={`Redimensionar elemento ${index + 1}`} title="Arraste para redimensionar" onPointerDown={(event) => beginOperation("resize", event)} className="absolute bottom-0 right-0 z-10 h-5 w-5 cursor-nwse-resize rounded-tl border border-slate-400 bg-slate-200 text-xs text-slate-700">↘</button>
+                </article>
+              );
+            })}
+            {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione texto, imagem ou linha para começar a montar a página.</p>}
+          </div>>
         </div>
       </section>
 
