@@ -30,7 +30,7 @@ interface TenantBrandingPayload {
 
 interface PublicAboutSection {
   id?: string;
-  elementType?: "content" | "divider";
+  elementType?: "content" | "divider" | "image";
   title?: string;
   subtitle?: string;
   text?: string;
