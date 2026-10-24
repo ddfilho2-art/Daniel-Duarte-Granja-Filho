@@ -1578,7 +1578,7 @@ export function SobreNos() {
             const imageFirst = section.layout === "image-top" || section.layout === "image-left";
             const horizontal = section.layout === "image-left" || section.layout === "image-right";
             const imageElement = image && section.layout !== "text-only" ? (
-              <div className={`flex w-full ${section.imageAlign === "left" ? "justify-start" : section.imageAlign === "right" ? "justify-end" : "justify-center"} `}>
+              <div className={`flex ${horizontal ? "w-full md:w-2/5 md:flex-none" : "w-full"} ${section.imageAlign === "left" ? "justify-start" : section.imageAlign === "right" ? "justify-end" : "justify-center"}`}>
                 <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
                   loading="lazy"
                   style={{ width: `${section.imageWidth ?? (horizontal ? 40 : 100)}%`, height: section.imageHeight ? `${section.imageHeight}px` : "auto", maxWidth: "100%", maxHeight: section.imageHeight ? "none" : "480px", objectFit: "contain" }}
