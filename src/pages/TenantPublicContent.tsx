@@ -19,6 +19,8 @@ interface AboutSection {
   fontSize?: "small" | "medium" | "large";
   textColor?: string;
   bold?: boolean;
+  italic?: boolean;
+  fontFamily?: "Arial" | "Georgia" | "Times New Roman" | "Verdana" | "Tahoma";
 }
 
 interface AboutContent {
@@ -68,6 +70,8 @@ const newSection = (): AboutSection => ({
   fontSize: "medium",
   textColor: "#475569",
   bold: false,
+  italic: false,
+  fontFamily: "Arial",
 });
 
 export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string; status?: string } | null; onFinish?: () => void }) {
@@ -159,6 +163,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             fontSize: ["small", "medium", "large"].includes(section.fontSize as string) ? section.fontSize as AboutSection["fontSize"] : "medium",
             textColor: typeof section.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(section.textColor) ? section.textColor : "#475569",
             bold: section.bold === true,
+            italic: section.italic === true,
+            fontFamily: ["Arial", "Georgia", "Times New Roman", "Verdana", "Tahoma"].includes(section.fontFamily as string) ? section.fontFamily as AboutSection["fontFamily"] : "Arial",
           }))
         : [];
       setAbout({
@@ -279,6 +285,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               fontSize: section.fontSize ?? "medium",
               textColor: section.textColor ?? "#475569",
               bold: section.bold ?? false,
+              italic: section.italic ?? false,
+              fontFamily: section.fontFamily ?? "Arial",
             })),
           },
           p_candidate_signup_enabled: candidateSignupEnabled,
@@ -510,9 +518,9 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     </select>
                   </label>
                   <label className="block">
-                    <span className="mb-1 block text-sm font-medium text-slate-700">Tamanho do título</span>
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Tamanho da letra</span>
                     <select value={section.fontSize ?? "medium"} onChange={(event) => updateSection(index, { fontSize: event.target.value as AboutSection["fontSize"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                      <option value="small">Pequeno</option><option value="medium">Médio</option><option value="large">Grande</option>
+                      <option value="small">Pequena</option><option value="medium">Média</option><option value="large">Grande</option>
                     </select>
                   </label>
                   <label className="block">
@@ -521,7 +529,17 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   </label>
                   <label className="flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" checked={section.bold ?? false} onChange={(event) => updateSection(index, { bold: event.target.checked })} />
-                    Destacar título em negrito
+                    Negrito
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={section.italic ?? false} onChange={(event) => updateSection(index, { italic: event.target.checked })} />
+                    Itálico
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Tipo de letra</span>
+                    <select value={section.fontFamily ?? "Arial"} onChange={(event) => updateSection(index, { fontFamily: event.target.value as AboutSection["fontFamily"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Times New Roman">Times New Roman</option><option value="Verdana">Verdana</option><option value="Tahoma">Tahoma</option>
+                    </select>
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Posição horizontal (%)</span>
@@ -609,16 +627,16 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   onPointerUp={(event) => { if (pointerOperation.current?.pointerId === event.pointerId) pointerOperation.current = null; }}
                   onPointerCancel={() => { pointerOperation.current = null; }}
                   className="group relative cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)] md:h-[var(--section-height)] md:min-h-[var(--section-height)]"
-                  style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, "--section-height": `${section.height ?? 140}px`, maxWidth: "100%", overflow: "auto", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
+                  style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, "--section-height": `${section.height ?? 140}px`, maxWidth: "100%", overflow: "auto", overflowWrap: "anywhere", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569", fontFamily: section.fontFamily ?? "Arial", fontStyle: section.italic ? "italic" : "normal", fontWeight: section.bold ? 700 : 400 } as React.CSSProperties}
                   title="Arraste para reposicionar este elemento"
                 >
                   <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     <span>{section.elementType === "divider" ? "Linha" : section.layout === "image-only" ? "Imagem" : "Texto"} {index + 1}</span><span aria-hidden="true">⠿</span>
                   </div>
                   {section.elementType === "divider" ? <div className="flex h-full items-center"><hr className="w-full" style={{ height: `${Math.max(1, Math.min(12, Math.round((section.height ?? 40) / 40)))}px`, border: 0, backgroundColor: section.textColor ?? "#94a3b8" }} /></div> : <>
-                    {section.layout !== "image-only" && <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
-                    {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
-                    {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}</>}
+                    {section.layout !== "image-only" && <>{section.title && <p className={`whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
+                    {section.subtitle && <p className={`whitespace-pre-wrap break-words opacity-80 ${section.fontSize === "large" ? "text-base" : section.fontSize === "small" ? "text-[10px]" : "text-xs"}`}>{section.subtitle}</p>}
+                    {section.text && <p className={`mt-1 whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-base" : section.fontSize === "small" ? "text-[10px]" : "text-xs"}`}>{section.text}</p>}</>}
                     {section.layout !== "text-only" && (image ? <img src={image} alt={section.imageAlt || section.title || "Prévia da imagem"} className="mt-1 w-full rounded object-contain" style={{ maxHeight: `${Math.max(30, (section.height ?? 140) - 45)}px` }} /> : section.layout === "image-only" ? <p className="flex h-full items-center justify-center text-xs text-slate-400">Envie uma imagem no formulário abaixo</p> : null)}
                   </>}
                   <button type="button" aria-label={`Redimensionar elemento ${index + 1}`} title="Arraste para redimensionar" onPointerDown={(event) => beginOperation("resize", event)} className="absolute bottom-0 right-0 z-10 h-5 w-5 cursor-nwse-resize rounded-tl border border-slate-400 bg-slate-200 text-xs text-slate-700">↘</button>
