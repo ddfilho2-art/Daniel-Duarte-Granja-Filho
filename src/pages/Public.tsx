@@ -1554,9 +1554,9 @@ export function SobreNos() {
             );
             return (
               <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
-                {imageFirst && imageElement}
+                {section.elementType === "divider" ? <hr className="w-full border-slate-300" /> : <>{imageFirst && imageElement}
                 {textElement}
-                {!imageFirst && imageElement}
+                {!imageFirst && imageElement}</>}
               </article>
             );
           })}
