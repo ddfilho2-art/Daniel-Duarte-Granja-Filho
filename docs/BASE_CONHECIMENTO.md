@@ -299,3 +299,12 @@ A execução posterior da CI de manutenção concluiu com sucesso type-check e b
 - O follow-up ainda deve passar por typecheck, build e replay integral de migrations na CI.
 - Não declarar o login como validado até deploy manual da Vercel e testes reais com administrador da plataforma e administrador da Control Med.
 - Registro técnico: [Follow-up — login de administradores da plataforma e da clínica](maintenance/2026-10-11-login-admin-routing-followup.md).
+
+
+## Editor visual da página pública da empresa — 2026-10-24
+
+O editor Sobre Nós usa o campo `text` já existente para guardar conteúdo textual. A nova formatação permite apenas negrito, itálico, sublinhado, quebras de linha, parágrafos e listas simples. A marcação é sanitizada com DOMPurify, sem atributos HTML, scripts ou estilos fornecidos pelo usuário. O renderizador converte apenas tags permitidas em nós React.
+
+Os blocos mantêm coordenadas X/Y e largura no modelo atual. O movimento usa pointer events e a largura pode ser ajustada por alça; imagem e linha acompanham a largura do bloco. Altura persistida e tamanho independente da imagem não fazem parte desta alteração, pois exigiriam extensão do modelo de dados e validação adicional.
+
+A manutenção deve ser considerada pendente até o build/typecheck automatizado e a homologação manual de salvar, recarregar, publicar e validar isolamento multi-tenant.
