@@ -561,7 +561,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Sobre Nós</h2>
-            <p className="text-sm text-slate-500">Arraste os blocos pelo botão Mover, ajuste a largura pela alça ↔ ou use os controles numéricos. A barra de formatação aceita negrito, itálico e sublinhado.</p>
+            <p className="text-sm text-slate-500">Arraste os blocos pelo botão Mover. Use ↔ para largura, a alça inferior para altura ou ↘ para ambas. Ajuste também o tamanho/alinhamento da imagem e formate o texto.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={addSection} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
@@ -664,7 +664,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   setSelectedSectionId(section.id);
                   pointerActionRef.current = { index, mode: "resize-both", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
                   event.currentTarget.setPointerCapture(event.pointerId);
-                }} aria-label={`Redimensionar largura e altura do bloco ${index + 1}`} title="Arraste para ajustar largura e altura" className="absolute bottom-0 right-0 z-10 h-5 w-5 cursor-nwse-resize rounded-tl-md bg-slate-700 text-[10px] font-bold text-white">↘</button>
+                }} aria-label={`Redimensionar largura e altura do bloco ${index + 1}`} title="Arraste para ajustar largura e altura" className="absolute right-0 top-0 z-10 h-5 w-5 cursor-nwse-resize rounded-bl-md bg-slate-700 text-[10px] font-bold text-white">↘</button>
               </article>
             ))}
             {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
