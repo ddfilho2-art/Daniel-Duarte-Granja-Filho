@@ -103,7 +103,11 @@ function RichTextEditor({ value, onChange, label }: { value: string; onChange: (
       Array.from(editorRef.current.childNodes).map((node) => serializer.serializeToString(node)).join(""),
       richTextSanitizeConfig,
     );
-    if (html.length > 3000) return;
+    if (html.length > 3000) {
+      const parsed = new DOMParser().parseFromString(toSafeRichTextHtml(value), "text/html");
+      editorRef.current.replaceChildren(...Array.from(parsed.body.childNodes).map((node) => document.importNode(node, true)));
+      return;
+    }
     lastEmittedValueRef.current = html;
     onChange(html);
   };
