@@ -853,3 +853,36 @@ Commit: `d0a064e9de1ed43528c1f7f08f38d6e319c0d391`.
 ### Limitação atual
 
 Nenhuma data de encerramento foi gravada, nenhum acesso foi revogado e nenhum dado foi apagado nesta etapa. O diagnóstico identificou dependências importantes; a implementação deve continuar por migrations versionadas e backend, sem executar exclusões genéricas.
+
+
+## Manutenção 2026-10-24 — Editor visual Sobre Nós
+
+### Escopo implementado em branch isolada
+
+- Substituído o arraste nativo HTML por controles de ponteiro para mover blocos com coordenadas proporcionais ao canvas.
+- Adicionada alça para ajustar a largura do bloco em incrementos livres, respeitando os limites de 20% a 100% e a posição horizontal.
+- A prévia do editor agora exibe as imagens vinculadas quando há URL assinada disponível.
+- Adicionado editor de texto com botões de negrito, itálico e sublinhado.
+- O texto formatado é sanitizado com DOMPurify e convertido em nós React permitidos antes da renderização, tanto na prévia administrativa quanto na página pública.
+- Mantidos os campos existentes, os RPCs, o fluxo de rascunho/publicação e o histórico de versões.
+- Nenhuma migration, mudança em Auth/RLS ou dependência nova foi introduzida.
+
+### Limites e validação pendente
+
+- A largura é redimensionável pelo mouse; altura de caixas não foi adicionada porque o modelo persistido atual não possui esse campo e exigiria alteração de schema/RPC.
+- A largura da imagem acompanha a largura do bloco; não foi introduzida uma dimensão independente para a imagem.
+- A implementação precisa passar pelo build/typecheck automatizado e pela homologação visual no navegador.
+- Testes reais de persistência após recarregar, publicação, formatação e isolamento entre tenants ainda estão pendentes.
+- Não realizar deploy de produção até concluir os testes e aprovar a integração.
+
+### Checklist
+
+- [x] Implementação isolada no branch `fix/editor-visual-word-formatting`
+- [x] Sanitização de marcação permitida para o texto formatado
+- [x] Sem alterações em banco, Auth ou RLS
+- [ ] Build e TypeScript verificados por execução
+- [ ] Teste manual de mover/redimensionar blocos
+- [ ] Teste de negrito, itálico e sublinhado após salvar/recarregar
+- [ ] Teste de publicação e renderização pública
+- [ ] Teste de isolamento Tenant A/Tenant B e usuário não autenticado
+- [ ] Revisão do PR antes de integração
