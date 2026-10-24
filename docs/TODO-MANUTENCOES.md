@@ -982,4 +982,5 @@ Roteiro consolidado: [Validação integrada dos Lotes 16–19](maintenance/2026-
 - [x] Controles para altura do bloco, dimensões/alinhamento da imagem e bloco de imagem independente implementados.
 - [ ] Homologar com sessão autenticada: editar, salvar, recarregar, publicar e confirmar renderização pública.
 - [ ] Testar isolamento Tenant A/B para conteúdo e imagens antes de merge/deploy.
-- [ ] Não aplicar a migration ao Supabase de produção nem implantar até concluir homologação e aprovar o merge.
+- [x] Migration `20261024201051_about_section_dimensions.sql` aplicada e verificada no Supabase de produção.
+- [ ] Homologar no frontend após o deploy manual do usuário; não fazer merge ou deploy pela manutenção.
