@@ -620,7 +620,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 {section.elementType === "divider" ? <hr className="my-3 border-slate-300" /> : <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
                 {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
                 {section.text && <div className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs">{renderSafeRichTextNodes(section.text)}</div>}
-                {section.imagePath && (signedImageUrls[section.imagePath] ? <img src={signedImageUrls[section.imagePath]} alt={section.imageAlt || "Prévia da imagem"} className="mt-2 max-h-24 max-w-full object-contain" /> : <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>)}</>}
+                {section.imagePath && (signedImageUrls[section.imagePath] ? <img src={signedImageUrls[section.imagePath]} alt={section.imageAlt || "Prévia da imagem"} className="mt-2 max-h-24 w-full max-w-full object-contain" /> : <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>)}</>}
                 <button type="button" onPointerDown={(event) => {
                   event.preventDefault(); event.stopPropagation();
                   const bounds = canvasRef.current?.getBoundingClientRect();
