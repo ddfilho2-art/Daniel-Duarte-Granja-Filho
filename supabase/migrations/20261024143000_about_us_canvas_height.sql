@@ -168,7 +168,9 @@ BEGIN
     IF v_image_path IS NOT NULL
        AND (char_length(v_image_path) NOT IN (90, 91)
          OR v_image_path !~ ('^' || p_tenant_id::text ||
-         '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)')) THEN
+         '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)')
+         OR NOT ((char_length(v_image_path) = 90 AND right(v_image_path, 4) = '.png')
+              OR (char_length(v_image_path) = 91 AND right(v_image_path, 5) = '.webp'))) THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_image_path';
     END IF;
     IF v_image_path IS NOT NULL AND NOT EXISTS (
