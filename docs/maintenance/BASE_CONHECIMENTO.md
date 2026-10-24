@@ -22,4 +22,4 @@ O conteúdo institucional é salvo como JSON versionado em `tenant_public_conten
 - `bold`: booleano.
 
 ### Estado
-Implementação em revisão. A migration ainda não foi aplicada à produção. CI final, testes de persistência, responsividade e isolamento multi-tenant permanecem pendentes.
+Estado em 2026-10-24: migration `20261024112002_about_us_hybrid_canvas.sql` aplicada e registrada no Supabase de produção. O frontend ainda não foi implantado. Replay de migrations e testes SQL Phase 2B passaram no job isolado do GitHub Actions; testes autenticados de persistência, renderização responsiva e isolamento Tenant A/Tenant B permanecem pendentes. O CI identificou erro de sintaxe TypeScript no editor, corrigido no PR; aguardar nova execução antes de integrar.
