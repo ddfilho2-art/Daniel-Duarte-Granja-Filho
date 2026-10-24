@@ -1480,6 +1480,8 @@ export function SobreNos() {
   const companyName = tenant?.displayName || branding.displayName;
   const about = tenant?.publicContent?.about;
   const sections = Array.isArray(about?.sections) ? about.sections : [];
+  const hasCanvasLayout = sections.some((section) => typeof section.positionX === "number" || typeof section.positionY === "number");
+  const canvasHeight = Math.max(600, ...sections.map((section) => (typeof section.positionY === "number" ? section.positionY : 20) + 260));
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const hasPublishedAbout = Boolean(
     (about?.title && about.title.trim() && about.title.trim().toLocaleLowerCase("pt-BR") !== "sobre nós") ||
@@ -1534,7 +1536,7 @@ export function SobreNos() {
             sua história, cultura e valores poderão ser configuradas pela própria empresa.
           </p>
         )}
-        <div className="mt-8 space-y-8">
+        <div className={`mt-8 ${hasCanvasLayout ? "relative md:min-h-[var(--canvas-height)]" : "space-y-8"}`} style={hasCanvasLayout ? ({ "--canvas-height": `${canvasHeight}px` } as React.CSSProperties) : undefined}>
           {sections.map((section, index) => {
             const image = section.imagePath ? imageUrls[section.imagePath] || null : null;
             const imageFirst = section.layout === "image-top" || section.layout === "image-left";
@@ -1545,13 +1547,13 @@ export function SobreNos() {
             ) : null;
             const textElement = section.layout === "image-only" ? null : (
               <div className={horizontal ? "min-w-0 flex-1" : ""}>
-                {section.title?.trim() && <h2 className="text-2xl font-semibold text-slate-900">{section.title}</h2>}
+                {section.title?.trim() && <h2 className={`font-semibold ${section.fontSize === "large" ? "text-3xl" : section.fontSize === "small" ? "text-lg" : "text-2xl"} ${section.bold ? "font-bold" : ""}`} style={{ color: section.textColor ?? "#0f172a" }}>{section.title}</h2>}
                 {section.subtitle?.trim() && <h3 className="mt-2 text-lg font-medium text-slate-700">{section.subtitle}</h3>}
-                {section.text?.trim() && <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">{section.text}</p>}
+                {section.text?.trim() && <p className="mt-3 whitespace-pre-line leading-7" style={{ color: section.textColor ?? "#475569" }}>{section.text}</p>}
               </div>
             );
             return (
-              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-8 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"}`}>
+              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
                 {imageFirst && imageElement}
                 {textElement}
                 {!imageFirst && imageElement}
