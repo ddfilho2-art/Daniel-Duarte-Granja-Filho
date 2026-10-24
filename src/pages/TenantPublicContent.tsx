@@ -506,6 +506,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   </select>
                 </label>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <h4 className="text-sm font-semibold text-slate-800 sm:col-span-2">Formatação do texto e dimensões do bloco</h4>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Largura do bloco</span>
                     <input type="range" min={20} max={100} step={5} value={section.width ?? 90} onChange={(event) => { const width = Number(event.target.value); updateSection(index, { width, positionX: Math.min(section.positionX ?? 5, 100 - width) }); }} className="w-full" />
