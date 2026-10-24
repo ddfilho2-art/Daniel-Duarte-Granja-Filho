@@ -126,7 +126,8 @@ BEGIN
 
     IF (v_section ? 'positionX' AND (v_section ->> 'positionX') !~ '^[0-9]+$')
        OR (v_section ? 'positionY' AND (v_section ->> 'positionY') !~ '^[0-9]+$')
-       OR (v_section ? 'width' AND (v_section ->> 'width') !~ '^[0-9]+
+       OR (v_section ? 'width' AND (v_section ->> 'width') !~ '^[0-9]+$')
+       OR (v_section ? 'height' AND (v_section ->> 'height') !~ '^[0-9]+$') THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_section_position_type';
     END IF;
     v_position_x := COALESCE((v_section ->> 'positionX')::integer, 5);
