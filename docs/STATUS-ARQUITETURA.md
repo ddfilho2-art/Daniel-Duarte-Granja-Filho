@@ -886,3 +886,16 @@ Nenhuma data de encerramento foi gravada, nenhum acesso foi revogado e nenhum da
 - [ ] Teste de publicação e renderização pública
 - [ ] Teste de isolamento Tenant A/Tenant B e usuário não autenticado
 - [ ] Revisão do PR antes de integração
+
+
+## Manutenção 2026-10-24 — dimensões independentes do editor Sobre Nós
+
+- [x] Campos de altura opcional do bloco e dimensões/alinhamento da imagem adicionados ao modelo JSON no frontend.
+- [x] Alças para ajustar largura, altura ou ambas no editor visual.
+- [x] Renderizador público atualizado para respeitar altura do bloco e dimensões/alinhamento da imagem.
+- [x] Migration versionada criada para validar e persistir os novos campos na RPC existente, preservando verificações de tenant, storage, auditoria e versionamento.
+- [ ] Typecheck e build da revisão final.
+- [ ] Replay integral das migrations em banco isolado.
+- [ ] Homologação manual: editar, salvar, recarregar, publicar e verificar layout no portal público.
+- [ ] Teste de isolamento Tenant A/Tenant B para conteúdo e imagens.
+- [ ] Nenhuma migration aplicada ao Supabase de produção; nenhum merge ou deploy executado.
