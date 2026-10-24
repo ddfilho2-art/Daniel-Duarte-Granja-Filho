@@ -136,7 +136,7 @@ BEGIN
     v_bold := COALESCE((v_section ->> 'bold')::boolean, false);
     v_element_type := COALESCE(v_section ->> 'elementType', 'content');
 
-    IF v_position_x < 0 OR v_position_x > 80
+    IF v_position_x < 0 OR v_position_x > 100 - v_width
        OR v_position_y < 0 OR v_position_y > 5000
        OR v_width < 20 OR v_width > 100
        OR v_text_align NOT IN ('left', 'center', 'right')
