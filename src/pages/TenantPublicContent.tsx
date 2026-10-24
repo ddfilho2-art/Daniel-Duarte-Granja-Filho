@@ -195,7 +195,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
       return;
     }
     setError("");
-    setAbout((current) => ({ ...current, sections: [...current.sections, newSection()] }));
+    setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), positionY: 20 + current.sections.length * 240 }] }));
   };
 
   const uploadImage = async (
@@ -445,6 +445,47 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
           <input value={about.subtitle} maxLength={200} onChange={(event) => setAbout((current) => ({ ...current, subtitle: event.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
         </label>
 
+        <div>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-slate-800">Editor visual</h3>
+              <p className="text-xs text-slate-500">Arraste os blocos para posicioná-los. No celular, o conteúdo se reorganiza em coluna.</p>
+            </div>
+            <span className="text-xs text-slate-500">Arrastar e soltar · largura ajustável abaixo</span>
+          </div>
+          <div
+            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50"
+            style={{ minHeight: Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220)) }}
+            aria-label="Área visual de edição da página Sobre Nós"
+          >
+            {about.sections.map((section, index) => (
+              <article
+                key={section.id}
+                draggable
+                onDragEnd={(event) => {
+                  const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
+                  if (!bounds) return;
+                  const x = Math.round(Math.max(0, Math.min(80, ((event.clientX - bounds.left) / bounds.width) * 100)));
+                  const y = Math.round(Math.max(0, Math.min(5000, event.clientY - bounds.top)));
+                  updateSection(index, { positionX: x, positionY: y });
+                }}
+                className="absolute cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm"
+                style={{ left: `${section.positionX ?? 5}%`, top: section.positionY ?? 20, width: `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" }}
+                title="Arraste para reposicionar este bloco"
+              >
+                <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                  <span>Bloco {index + 1}</span><span aria-hidden="true">⠿</span>
+                </div>
+                {section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
+                {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
+                {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}
+                {section.imagePath && <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>}
+              </article>
+            ))}
+            {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
+          </div>
+        </div>
+
         {about.sections.length === 0 && (
           <p className="rounded-lg bg-slate-50 p-4 text-sm text-slate-500">Nenhuma seção adicionada. Use “Adicionar seção” para começar.</p>
         )}
@@ -480,6 +521,37 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     <option value="text-only">Somente texto</option>
                   </select>
                 </label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Largura do bloco</span>
+                    <input type="range" min={20} max={100} step={5} value={section.width ?? 90} onChange={(event) => updateSection(index, { width: Number(event.target.value) })} className="w-full" />
+                    <span className="text-xs text-slate-500">{section.width ?? 90}% da área</span>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Alinhamento do texto</span>
+                    <select value={section.textAlign ?? "left"} onChange={(event) => updateSection(index, { textAlign: event.target.value as AboutSection["textAlign"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="left">À esquerda</option><option value="center">Centralizado</option><option value="right">À direita</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Tamanho do título</span>
+                    <select value={section.fontSize ?? "medium"} onChange={(event) => updateSection(index, { fontSize: event.target.value as AboutSection["fontSize"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                      <option value="small">Pequeno</option><option value="medium">Médio</option><option value="large">Grande</option>
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Cor do texto</span>
+                    <input type="color" value={section.textColor ?? "#475569"} onChange={(event) => updateSection(index, { textColor: event.target.value })} className="h-10 w-full rounded-lg border border-slate-300 p-1" />
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={section.bold ?? false} onChange={(event) => updateSection(index, { bold: event.target.checked })} />
+                    Destacar título em negrito
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Posição vertical (px)</span>
+                    <input type="number" min={0} max={5000} value={section.positionY ?? 20} onChange={(event) => updateSection(index, { positionY: Math.max(0, Math.min(5000, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  </label>
+                </div>
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700">Texto (até 3.000 caracteres)</span>
                   <textarea value={section.text} maxLength={3000} rows={5} onChange={(event) => updateSection(index, { text: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
