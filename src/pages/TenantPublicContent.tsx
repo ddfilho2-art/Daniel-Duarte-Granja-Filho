@@ -139,7 +139,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
       setHomeMessage(source?.homeMessage || "");
       const sourceAbout = source?.about || {};
       const sections = Array.isArray(sourceAbout.sections)
-        ? sourceAbout.sections.map((section) => ({
+        ? sourceAbout.sections.map((section): AboutSection => ({
             id: typeof section.id === "string" ? section.id : crypto.randomUUID(),
             elementType: section.elementType === "divider" ? "divider" : "content",
             title: typeof section.title === "string" ? section.title : "",
