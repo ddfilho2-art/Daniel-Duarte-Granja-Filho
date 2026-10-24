@@ -581,7 +581,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 if (event.button !== 0) return;
                 event.preventDefault();
                 event.stopPropagation();
-                const article = event.currentTarget.closest("article");
+                const article = event.currentTarget.closest("article") as HTMLElement | null;
                 const bounds = event.currentTarget.closest("[aria-label='Área visual de edição da página Sobre Nós']")?.getBoundingClientRect();
                 if (!bounds || !article) return;
                 pointerOperation.current = { mode, index, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, originX: section.positionX ?? 5, originY: section.positionY ?? 20, originWidth: section.width ?? 90, originHeight: section.height ?? 140 };
