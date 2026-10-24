@@ -43,4 +43,5 @@ Estado: implementação em revisão; migration aplicada ao Supabase de produçã
 - Atualizada a renderização pública para propriedades visuais e fluxo vertical em telas estreitas.
 - Criada migration para validar e normalizar as propriedades visuais.
 - Adicionada migration para dimensões do bloco, dimensões/alinhamento da imagem e tipo de bloco `image`.
+- Migration `20261024201051_about_section_dimensions.sql` aplicada ao Supabase de produção e verificada por consulta read-only; nenhuma mudança em Auth/RLS.
 - TypeScript/build e replay de migrations/testes SQL Phase 2B passaram no run `40128076098`.
