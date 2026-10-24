@@ -15,6 +15,6 @@ Estado em 2026-10-24: migration `20261024112002_about_us_hybrid_canvas.sql` apli
 - Adicionada altura opcional para blocos, com redimensionamento por alça de altura e alça combinada.
 - Adicionadas largura, altura opcional e alinhamento independentes para imagens.
 - Adicionado bloco de imagem independente, que pode ser movido/redimensionado sem mover o texto.
-- Migration `20261024153000_about_section_dimensions.sql` estende a validação/normalização da RPC existente, mantendo autorização por tenant, validação do caminho de imagem, auditoria e versionamento.
+- Migration `20261024201051_about_section_dimensions.sql` estende a validação/normalização da RPC existente, mantendo autorização por tenant, validação do caminho de imagem, auditoria e versionamento.
 - TypeScript/build, replay integral de migrations e testes SQL Phase 2B passaram no GitHub Actions (run `40128076098`).
 - Não houve aplicação de migration no Supabase de produção, merge ou deploy. A homologação autenticada e o teste específico Tenant A/B permanecem pendentes.
