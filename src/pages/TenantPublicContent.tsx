@@ -654,7 +654,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   const bounds = canvasRef.current?.getBoundingClientRect();
                   if (!bounds) return;
                   setSelectedSectionId(section.id);
-                  pointerActionRef.current = { index, mode: "resize-height", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
+                  const initialHeight = section.height || event.currentTarget.closest("article")?.getBoundingClientRect().height || 0;
+                  pointerActionRef.current = { index, mode: "resize-height", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight, canvasWidth: bounds.width };
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }} aria-label={`Redimensionar altura do bloco ${index + 1}`} title="Segure e arraste para ajustar a altura" className="absolute bottom-0 left-1/2 h-2 w-12 -translate-x-1/2 cursor-ns-resize rounded-t bg-slate-400" />
                 <button type="button" onPointerDown={(event) => {
@@ -662,7 +663,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   const bounds = canvasRef.current?.getBoundingClientRect();
                   if (!bounds) return;
                   setSelectedSectionId(section.id);
-                  pointerActionRef.current = { index, mode: "resize-both", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
+                  const initialHeight = section.height || event.currentTarget.closest("article")?.getBoundingClientRect().height || 0;
+                  pointerActionRef.current = { index, mode: "resize-both", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight, canvasWidth: bounds.width };
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }} aria-label={`Redimensionar largura e altura do bloco ${index + 1}`} title="Arraste para ajustar largura e altura" className="absolute right-0 top-0 z-10 h-5 w-5 cursor-nwse-resize rounded-bl-md bg-slate-700 text-[10px] font-bold text-white">↘</button>
               </article>
