@@ -478,7 +478,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 onDragEnd={(event) => {
                   const bounds = event.currentTarget.parentElement?.getBoundingClientRect();
                   if (!bounds) return;
-                  const x = Math.round(Math.max(0, Math.min(80, ((event.clientX - bounds.left) / bounds.width) * 100)));
+                  const x = Math.round(Math.max(0, Math.min(100 - (section.width ?? 90), ((event.clientX - bounds.left) / bounds.width) * 100)));
                   const y = Math.round(Math.max(0, Math.min(5000, event.clientY - bounds.top)));
                   updateSection(index, { positionX: x, positionY: y });
                 }}
@@ -537,7 +537,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Largura do bloco</span>
-                    <input type="range" min={20} max={100} step={5} value={section.width ?? 90} onChange={(event) => updateSection(index, { width: Number(event.target.value) })} className="w-full" />
+                    <input type="range" min={20} max={100} step={5} value={section.width ?? 90} onChange={(event) => { const width = Number(event.target.value); updateSection(index, { width, positionX: Math.min(section.positionX ?? 5, 100 - width) }); }} className="w-full" />
                     <span className="text-xs text-slate-500">{section.width ?? 90}% da área</span>
                   </label>
                   <label className="block">
@@ -562,7 +562,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Posição horizontal (%)</span>
-                    <input type="number" min={0} max={80} value={section.positionX ?? 5} onChange={(event) => updateSection(index, { positionX: Math.max(0, Math.min(80, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                    <input type="number" min={0} max={100 - (section.width ?? 90)} value={section.positionX ?? 5} onChange={(event) => updateSection(index, { positionX: Math.max(0, Math.min(100 - (section.width ?? 90), Number(event.target.value) || 0)) }) className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Posição vertical (px)</span>
