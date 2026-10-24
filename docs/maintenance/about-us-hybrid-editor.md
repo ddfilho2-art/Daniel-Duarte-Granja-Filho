@@ -2,7 +2,7 @@
 
 Data: 2026-10-24  
 Branch: `feature/about-us-hybrid-editor`  
-Estado: implementação em revisão; não publicada em produção.
+Estado: implementação em revisão; migration aplicada ao Supabase de produção, frontend ainda não publicado.
 
 ## Escopo
 
@@ -15,14 +15,14 @@ Estado: implementação em revisão; não publicada em produção.
 
 - A migration `20261024112002_about_us_hybrid_canvas.sql` substitui a definição da RPC `save_tenant_public_content_draft` preservando verificações de autenticação, tenant, tipo de empresa, imagem vinculada, auditoria e versionamento.
 - As propriedades visuais têm listas permitidas e limites numéricos; cor aceita somente hexadecimal `#RRGGBB`.
-- A migration está versionada no repositório e **não foi aplicada ao banco de produção** nesta etapa.
+- A migration está versionada no repositório e foi aplicada ao Supabase de produção sob a versão `20261024112002`.
 - Nenhuma tabela nova, política RLS ou credencial foi alterada.
 
 ## Checklist de validação
 
-- [ ] CI final: TypeScript e build na versão mais recente.
-- [ ] Migration aplicada em banco isolado e testada com dados fictícios.
-- [ ] Salvar, recarregar e publicar conteúdo com propriedades visuais.
+- [ ] CI final: TypeScript e build após a correção de sintaxe.
+- [x] Replay de migrations em banco isolado e testes SQL Phase 2B passaram no GitHub Actions.
+- [ ] Salvar, recarregar e publicar conteúdo com propriedades visuais usando sessão autenticada e dados fictícios.
 - [ ] Verificar renderização em desktop e celular.
 - [ ] Verificar conteúdo antigo sem propriedades visuais.
 - [ ] Testar isolamento: Tenant A não pode ler, alterar ou enumerar conteúdo/imagens do Tenant B.
