@@ -4,6 +4,7 @@ import { useTenant } from "../contexts/TenantContext";
 
 interface AboutSection {
   id: string;
+  elementType?: "content" | "divider";
   title: string;
   subtitle: string;
   text: string;
@@ -51,6 +52,7 @@ const emptyAbout = (): AboutContent => ({
 
 const newSection = (): AboutSection => ({
   id: crypto.randomUUID(),
+  elementType: "content",
   title: "",
   subtitle: "",
   text: "",
@@ -139,6 +141,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
       const sections = Array.isArray(sourceAbout.sections)
         ? sourceAbout.sections.map((section) => ({
             id: typeof section.id === "string" ? section.id : crypto.randomUUID(),
+            elementType: section.elementType === "divider" ? "divider" : "content",
             title: typeof section.title === "string" ? section.title : "",
             subtitle: typeof section.subtitle === "string" ? section.subtitle : "",
             text: typeof section.text === "string" ? section.text : "",
@@ -257,6 +260,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             subtitle: about.subtitle,
             sections: about.sections.map((section) => ({
               id: section.id,
+              elementType: section.elementType ?? "content",
               title: section.title,
               subtitle: section.subtitle,
               text: section.text,
@@ -432,9 +436,18 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             <h2 className="text-lg font-semibold text-slate-900">Sobre Nós</h2>
             <p className="text-sm text-slate-500">Conteúdo em texto simples. HTML e scripts não são aceitos.</p>
           </div>
-          <button type="button" onClick={addSection} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
-            Adicionar seção
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={addSection} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+              Adicionar bloco
+            </button>
+            <button type="button" onClick={() => {
+              if (about.sections.length >= 20) { setError("O conteúdo Sobre Nós permite até 20 blocos."); return; }
+              setError("");
+              setAbout((current) => ({ ...current, sections: [...current.sections, { ...newSection(), elementType: "divider", positionY: 20 + current.sections.length * 240, title: "", subtitle: "", text: "", imagePath: "", layout: "text-only" }] }));
+            }} disabled={about.sections.length >= 20} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-50 disabled:opacity-50">
+              Adicionar linha
+            </button>
+          </div>
         </div>
         <label className="block">
           <span className="mb-1 block text-sm font-medium text-slate-700">Título da página</span>
@@ -476,10 +489,10 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                 <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   <span>Bloco {index + 1}</span><span aria-hidden="true">⠿</span>
                 </div>
-                {section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
+                {section.elementType === "divider" ? <hr className="my-3 border-slate-300" /> : <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
                 {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
                 {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}
-                {section.imagePath && <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>}
+                {section.imagePath && <p className="mt-1 text-[10px] text-slate-400">Imagem vinculada</p>}</>}
               </article>
             ))}
             {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione uma seção para começar a montar a página.</p>}
