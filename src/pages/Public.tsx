@@ -1537,15 +1537,24 @@ export function SobreNos() {
         <div className="mt-8 space-y-8">
           {sections.map((section, index) => {
             const image = section.imagePath ? imageUrls[section.imagePath] || null : null;
-            return (
-              <article key={section.id || `about-section-${index}`} className="border-t border-slate-100 pt-8">
+            const imageFirst = section.layout === "image-top" || section.layout === "image-left";
+            const horizontal = section.layout === "image-left" || section.layout === "image-right";
+            const imageElement = image && section.layout !== "text-only" ? (
+              <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
+                loading="lazy" className={horizontal ? "max-h-[480px] w-full rounded-2xl object-contain md:w-2/5" : "max-h-[480px] w-full rounded-2xl object-contain"} />
+            ) : null;
+            const textElement = section.layout === "image-only" ? null : (
+              <div className={horizontal ? "min-w-0 flex-1" : ""}>
                 {section.title?.trim() && <h2 className="text-2xl font-semibold text-slate-900">{section.title}</h2>}
                 {section.subtitle?.trim() && <h3 className="mt-2 text-lg font-medium text-slate-700">{section.subtitle}</h3>}
                 {section.text?.trim() && <p className="mt-3 whitespace-pre-line leading-7 text-slate-600">{section.text}</p>}
-                {image && (
-                  <img src={image} alt={section.imageAlt || section.title || `Imagem de ${companyName}`}
-                    loading="lazy" className="mt-5 max-h-[480px] w-full rounded-2xl object-contain" />
-                )}
+              </div>
+            );
+            return (
+              <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-8 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"}`}>
+                {imageFirst && imageElement}
+                {textElement}
+                {!imageFirst && imageElement}
               </article>
             );
           })}

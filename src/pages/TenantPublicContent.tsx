@@ -9,6 +9,7 @@ interface AboutSection {
   text: string;
   imagePath: string;
   imageAlt: string;
+  layout: "stacked" | "image-top" | "image-left" | "image-right" | "image-only" | "text-only";
 }
 
 interface AboutContent {
@@ -48,10 +49,12 @@ const newSection = (): AboutSection => ({
   text: "",
   imagePath: "",
   imageAlt: "",
+  layout: "stacked",
 });
 
-export function TenantPublicContent() {
+export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string; status?: string } | null; onFinish?: () => void }) {
   const { tenant, isTenantRoute } = useTenant();
+  const effectiveTenant = masterTenant || (isTenantRoute ? tenant : null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -68,8 +71,9 @@ export function TenantPublicContent() {
   const [signedImageUrls, setSignedImageUrls] = useState<Record<string, string>>({});
 
   const isEmployerPortal = Boolean(
-    isTenantRoute && tenant?.kind === "employer" && tenant?.id,
+    effectiveTenant?.kind === "employer" && effectiveTenant?.id,
   );
+  const canPublish = !masterTenant || masterTenant.status !== "configuring";
   const imagePathSignature = [...new Set(
     about.sections.map((section) => section.imagePath).filter(Boolean),
   )].join("|");
@@ -77,11 +81,11 @@ export function TenantPublicContent() {
   useEffect(() => {
     let cancelled = false;
     setSignedImageUrls({});
-    if (!tenant?.id || !isEmployerPortal || !imagePathSignature) return () => { cancelled = true; };
+    if (!effectiveTenant?.id || !isEmployerPortal || !imagePathSignature) return () => { cancelled = true; };
     const paths = imagePathSignature.split("|");
     const loadSignedUrls = async () => {
       const entries = await Promise.all(paths.map(async (path) => {
-        const prefix = `${tenant.id}/site-content/`;
+        const prefix = `${effectiveTenant!.id}/site-content/`;
         const filename = path.startsWith(prefix) ? path.slice(prefix.length) : "";
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|webp)$/.test(filename)) return [path, null] as const;
         const { data, error } = await supabase.storage.from("tenant-public-content").createSignedUrl(path, 3600);
@@ -94,10 +98,10 @@ export function TenantPublicContent() {
     };
     void loadSignedUrls();
     return () => { cancelled = true; };
-  }, [tenant?.id, isEmployerPortal, imagePathSignature]);
+  }, [effectiveTenant?.id, isEmployerPortal, imagePathSignature]);
 
   const loadContent = useCallback(async () => {
-    if (!isEmployerPortal || !tenant?.id) {
+    if (!isEmployerPortal || !effectiveTenant?.id) {
       setLoading(false);
       return;
     }
@@ -106,7 +110,7 @@ export function TenantPublicContent() {
     try {
       const { data, error: rpcError } = await supabase.rpc(
         "get_tenant_public_content_admin",
-        { p_tenant_id: tenant.id },
+        { p_tenant_id: effectiveTenant!.id },
       );
       if (rpcError) throw rpcError;
       const response = data as AdminContentResponse;
@@ -126,6 +130,7 @@ export function TenantPublicContent() {
             text: typeof section.text === "string" ? section.text : "",
             imagePath: typeof section.imagePath === "string" ? section.imagePath : "",
             imageAlt: typeof section.imageAlt === "string" ? section.imageAlt : "",
+            layout: ["stacked", "image-top", "image-left", "image-right", "image-only", "text-only"].includes(section.layout as string) ? section.layout as AboutSection["layout"] : "stacked",
           }))
         : [];
       setAbout({
@@ -138,7 +143,7 @@ export function TenantPublicContent() {
     } finally {
       setLoading(false);
     }
-  }, [isEmployerPortal, tenant?.id]);
+  }, [isEmployerPortal, effectiveTenant?.id]);
 
   useEffect(() => {
     void loadContent();
@@ -179,7 +184,7 @@ export function TenantPublicContent() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!tenant?.id || !isEmployerPortal) {
+    if (!effectiveTenant?.id || !isEmployerPortal) {
       setError("Selecione uma empresa autorizada antes de enviar imagens.");
       return;
     }
@@ -197,7 +202,7 @@ export function TenantPublicContent() {
     setNotice("");
     try {
       const extension = file.type === "image/png" ? "png" : "webp";
-      const path = `${tenant.id}/site-content/${crypto.randomUUID()}.${extension}`;
+      const path = `${effectiveTenant!.id}/site-content/${crypto.randomUUID()}.${extension}`;
       const { error: uploadError } = await supabase.storage
         .from("tenant-public-content")
         .upload(path, file, {
@@ -216,7 +221,7 @@ export function TenantPublicContent() {
   };
 
   const saveDraft = async () => {
-    if (!tenant?.id || !isEmployerPortal) return;
+    if (!effectiveTenant?.id || !isEmployerPortal) return;
     setSaving(true);
     setError("");
     setNotice("");
@@ -224,7 +229,7 @@ export function TenantPublicContent() {
       const { data, error: rpcError } = await supabase.rpc(
         "save_tenant_public_content_draft",
         {
-          p_tenant_id: tenant.id,
+          p_tenant_id: effectiveTenant!.id,
           p_home_message: homeMessage,
           p_about_content: {
             title: about.title,
@@ -236,6 +241,7 @@ export function TenantPublicContent() {
               text: section.text,
               imagePath: section.imagePath || null,
               imageAlt: section.imageAlt,
+              layout: section.layout,
             })),
           },
           p_candidate_signup_enabled: candidateSignupEnabled,
@@ -256,7 +262,7 @@ export function TenantPublicContent() {
   };
 
   const publishDraft = async () => {
-    if (!tenant?.id || !draftId || !isEmployerPortal) {
+    if (!effectiveTenant?.id || !draftId || !isEmployerPortal || !canPublish) {
       setError("Salve o rascunho antes de publicar.");
       return;
     }
@@ -267,7 +273,7 @@ export function TenantPublicContent() {
       const { error: rpcError } = await supabase.rpc(
         "publish_tenant_public_content_version",
         {
-          p_tenant_id: tenant.id,
+          p_tenant_id: effectiveTenant!.id,
           p_version_id: draftId,
           p_reason: "Publicação do conteúdo do site",
         },
@@ -300,7 +306,7 @@ export function TenantPublicContent() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Site público da empresa</h1>
         <p className="mt-2 text-sm text-slate-600">
-          Configure a mensagem da Home, o cadastro de candidatos e a página Sobre Nós de {tenant?.displayName}.
+          Configure a mensagem da Home, o cadastro de candidatos e a página Sobre Nós de {effectiveTenant?.displayName}.
         </p>
         <p className="mt-1 text-xs text-slate-500">
           Versão publicada: {publishedVersion ?? "nenhuma"} · Rascunho: {draftVersion ?? "nenhum"}
@@ -374,7 +380,7 @@ export function TenantPublicContent() {
             rows={4}
             onChange={(event) => setHomeMessage(event.target.value)}
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            placeholder={`Encontre oportunidades na ${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}
+            placeholder={`Encontre oportunidades na ${effectiveTenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}
           />
           <span className="mt-1 block text-right text-xs text-slate-400">{homeMessage.length}/500</span>
         </label>
@@ -436,6 +442,17 @@ export function TenantPublicContent() {
                   <input value={section.subtitle} maxLength={200} onChange={(event) => updateSection(index, { subtitle: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
                 <label className="block">
+                  <span className="mb-1 block text-sm font-medium text-slate-700">Diagramação deste bloco</span>
+                  <select value={section.layout} onChange={(event) => updateSection(index, { layout: event.target.value as AboutSection["layout"] })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <option value="stacked">Texto e imagem empilhados</option>
+                    <option value="image-top">Imagem acima do texto</option>
+                    <option value="image-left">Imagem à esquerda do texto</option>
+                    <option value="image-right">Imagem à direita do texto</option>
+                    <option value="image-only">Somente imagem</option>
+                    <option value="text-only">Somente texto</option>
+                  </select>
+                </label>
+                <label className="block">
                   <span className="mb-1 block text-sm font-medium text-slate-700">Texto (até 3.000 caracteres)</span>
                   <textarea value={section.text} maxLength={3000} rows={5} onChange={(event) => updateSection(index, { text: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                 </label>
@@ -471,7 +488,7 @@ export function TenantPublicContent() {
         <h2 className="text-lg font-semibold text-slate-900">Prévia do conteúdo atual</h2>
         <div className="rounded-lg bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Home</p>
-          <p className="mt-2 whitespace-pre-line text-slate-700">{homeMessage.trim() || `Encontre oportunidades na ${tenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}</p>
+          <p className="mt-2 whitespace-pre-line text-slate-700">{homeMessage.trim() || `Encontre oportunidades na ${effectiveTenant?.displayName || "empresa"} e acompanhe o processo seletivo.`}</p>
         </div>
         <div className="rounded-lg bg-white p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Sobre Nós</p>
@@ -479,12 +496,23 @@ export function TenantPublicContent() {
           {about.subtitle && <p className="mt-2 text-slate-600">{about.subtitle}</p>}
           {about.sections.map((section, index) => {
             const image = section.imagePath ? signedImageUrls[section.imagePath] || null : null;
-            return (
-              <div key={section.id} className="mt-5 border-t border-slate-100 pt-4">
+            const imageFirst = section.layout === "image-top" || section.layout === "image-left";
+            const horizontal = section.layout === "image-left" || section.layout === "image-right";
+            const imageElement = image && section.layout !== "text-only" ? (
+              <img src={image} alt={section.imageAlt || section.title || "Imagem de prévia"} className={horizontal ? "max-h-64 w-full rounded-lg object-contain md:w-2/5" : "max-h-64 w-full rounded-lg object-contain"} />
+            ) : null;
+            const textElement = section.layout === "image-only" ? null : (
+              <div className={horizontal ? "min-w-0 flex-1" : ""}>
                 {section.title && <h4 className="font-semibold text-slate-900">{index + 1}. {section.title}</h4>}
                 {section.subtitle && <p className="mt-1 font-medium text-slate-700">{section.subtitle}</p>}
                 {section.text && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{section.text}</p>}
-                {image && <img src={image} alt={section.imageAlt || section.title || "Imagem de prévia"} className="mt-3 max-h-64 rounded-lg object-contain" />}
+              </div>
+            );
+            return (
+              <div key={section.id} className={`mt-5 border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-4 md:flex-row" : "space-y-3"}`}>
+                {imageFirst && imageElement}
+                {textElement}
+                {!imageFirst && imageElement}
               </div>
             );
           })}
@@ -495,10 +523,18 @@ export function TenantPublicContent() {
         <button type="button" onClick={() => void saveDraft()} disabled={saving || publishing || uploadingIndex !== null} className="rounded-lg bg-primary px-5 py-3 text-sm font-semibold text-white disabled:opacity-50">
           {saving ? "Salvando rascunho..." : "Salvar rascunho"}
         </button>
-        <button type="button" onClick={() => void publishDraft()} disabled={!draftId || saving || publishing || uploadingIndex !== null} className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 disabled:opacity-50">
-          {publishing ? "Publicando..." : "Publicar versão salva"}
+        <button type="button" onClick={() => void publishDraft()} disabled={!draftId || !canPublish || saving || publishing || uploadingIndex !== null} className="rounded-lg border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 disabled:opacity-50">
+          {publishing ? "Publicando..." : canPublish ? "Publicar versão salva" : "Publicação após ativação"}
         </button>
       </div>
+      {onFinish && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4">
+          <p className="text-sm text-slate-600">Salve um rascunho para concluir esta etapa. Depois, você poderá continuar a edição em Conteúdo dos Portais. A publicação só será liberada após a ativação da empresa.</p>
+          <button type="button" onClick={onFinish} disabled={!draftId || saving || publishing || uploadingIndex !== null} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50">
+            Concluir cadastro e voltar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

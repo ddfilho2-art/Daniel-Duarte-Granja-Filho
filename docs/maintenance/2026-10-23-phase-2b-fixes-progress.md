@@ -107,3 +107,32 @@ A pedido explícito do responsável pelo projeto, a Fase 2B foi integrada à bra
 - [OBSERVAÇÃO] Os avisos do Security Advisor sobre tabelas novas sem policies RLS são compatíveis com o desenho atual: as tabelas são acessadas por RPCs autorizadas e/ou service role, e os privilégios diretos de `anon`/`authenticated` foram revogados. Os demais avisos do advisor foram preexistentes ou fora do escopo e não foram alterados nesta manutenção.
 
 **Estado desta atualização:** código integrado; migrations aplicadas; Edge Functions publicadas; teste remoto de negação de cabeçalho forjado aprovado; frontend Vercel e E2E HTTP/Storage ainda pendentes.
+
+
+## Conteúdo público durante o cadastro da empresa — 23/10/2026
+
+### Objetivo e evidências
+- [VERIFICADO] O formulário `TenantProvisionForm` em `src/pages/Master.tsx` cria empresas com status `configuring`; o editor de conteúdo existente só aceitava tenants `active`.
+- [VERIFICADO] A autorização existente exige autenticação, contexto de tenant e `can_administer_tenant`; `current_tenant_id()` reconhece o administrador global apenas para IDs de tenants existentes.
+- [INFERIDO] A configuração inicial pode reutilizar as RPCs existentes se o guard de status permitir `configuring` exclusivamente ao administrador global, sem mudar a autorização de publicação.
+
+### Implementação nesta branch
+- Adicionada migration `20261023233828_allow_master_content_during_tenant_setup.sql`. Ela preserva o corpo e as validações das RPCs de leitura/salvamento e altera apenas o guard de status para permitir tenant `configuring` ao administrador global autenticado. A RPC de publicação não foi ampliada.
+- Aplicada no Supabase remoto `dmzagrakkduddofkqjhg`; resposta da ferramenta: `success: true`.
+- Consulta SQL posterior confirmou que `get_tenant_public_content_admin` e `save_tenant_public_content_draft` contêm o guard de configuração exclusivo para administrador global, enquanto `publish_tenant_public_content_version` mantém o requisito de tenant ativo.
+- O formulário de criação agora segue para uma etapa de conteúdo inicial para empresas empregadoras, reutilizando rascunhos, upload de imagens e histórico já existentes. A publicação permanece bloqueada enquanto o tenant está em configuração.
+- Criada a rota `/master/site-publico` e a opção de menu “Conteúdo dos Portais”, incluindo empresas ativas e em configuração.
+
+### Validação e limitações
+- [TESTADO AGORA] Aplicação da migration remota e consulta posterior das definições das três RPCs.
+- [INSPECIONADO] Código de autorização e validações existentes nas RPCs; a migration não altera a RPC de publicação nem remove grants/revokes.
+- [PENDENTE] Type-check/build do branch via CI, teste de UI real, teste de upload Storage e teste de isolamento com dois tenants. Não declarar a funcionalidade concluída até o CI e a homologação.
+- [VERIFICADO] O editor oferece blocos reordenáveis com layout empilhado, imagem acima, imagem à esquerda/direita, somente imagem ou somente texto. A migration `20261023234018_about_section_layout_options.sql` valida e persiste o layout; a página pública usa a mesma opção ao renderizar.
+- [PENDENTE] O editor não oferece arrastar-e-soltar livre nem um construtor visual de colunas arbitrárias. A composição é livre dentro das opções de layout oferecidas por bloco.
+
+
+### Extensão de diagramação dos blocos — 23/10/2026
+- [VERIFICADO] Aplicada a migration `about_section_layout_options` no Supabase remoto. Consulta SQL confirmou que a RPC `save_tenant_public_content_draft` contém a variável de layout, valida os valores permitidos e persiste o campo no JSON.
+- O editor agora oferece seis opções por bloco: empilhado, imagem acima, imagem à esquerda, imagem à direita, somente imagem e somente texto.
+- A prévia administrativa e a página pública foram adaptadas para renderizar a escolha do bloco.
+- [PENDENTE] CI/build após a extensão de layout e homologação visual em navegador.
