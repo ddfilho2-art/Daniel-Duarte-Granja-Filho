@@ -13,7 +13,7 @@ Estado: implementação em revisão; não publicada em produção.
 
 ## Segurança e persistência
 
-- A migration `20261024120000_about_us_hybrid_canvas.sql` substitui a definição da RPC `save_tenant_public_content_draft` preservando verificações de autenticação, tenant, tipo de empresa, imagem vinculada, auditoria e versionamento.
+- A migration `20261024112002_about_us_hybrid_canvas.sql` substitui a definição da RPC `save_tenant_public_content_draft` preservando verificações de autenticação, tenant, tipo de empresa, imagem vinculada, auditoria e versionamento.
 - As propriedades visuais têm listas permitidas e limites numéricos; cor aceita somente hexadecimal `#RRGGBB`.
 - A migration está versionada no repositório e **não foi aplicada ao banco de produção** nesta etapa.
 - Nenhuma tabela nova, política RLS ou credencial foi alterada.
