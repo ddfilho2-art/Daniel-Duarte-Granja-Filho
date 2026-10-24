@@ -1554,7 +1554,7 @@ export function SobreNos() {
             );
             return (
               <article key={section.id || `about-section-${index}`} className={`border-t border-slate-100 pt-4 ${horizontal ? "flex flex-col items-start gap-6 md:flex-row" : "space-y-5"} ${hasCanvasLayout ? "md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)] md:h-[var(--section-height)] md:min-h-[var(--section-height)]" : ""}`} style={hasCanvasLayout ? ({ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? index * 240 + 20}px`, "--section-width": `${section.width ?? 90}%`, "--section-height": `${typeof section.height === "number" ? section.height : 140}px`, textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties) : undefined}>
-                {section.elementType === "divider" ? <hr className="w-full border-slate-300" /> : <>{imageFirst && imageElement}
+                {section.elementType === "divider" ? <hr className="w-full" style={{ height: `${Math.max(1, Math.min(12, Math.round((section.height ?? 40) / 40)))}px`, border: 0, backgroundColor: section.textColor ?? "#cbd5e1" }} /> : <>{imageFirst && imageElement}
                 {textElement}
                 {!imageFirst && imageElement}</>}
               </article>
