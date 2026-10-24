@@ -10,6 +10,13 @@ interface AboutSection {
   imagePath: string;
   imageAlt: string;
   layout: "stacked" | "image-top" | "image-left" | "image-right" | "image-only" | "text-only";
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  textAlign?: "left" | "center" | "right";
+  fontSize?: "small" | "medium" | "large";
+  textColor?: string;
+  bold?: boolean;
 }
 
 interface AboutContent {
@@ -50,6 +57,13 @@ const newSection = (): AboutSection => ({
   imagePath: "",
   imageAlt: "",
   layout: "stacked",
+  positionX: 5,
+  positionY: 20,
+  width: 90,
+  textAlign: "left",
+  fontSize: "medium",
+  textColor: "#475569",
+  bold: false,
 });
 
 export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?: { id: string; kind: string; displayName: string; status?: string } | null; onFinish?: () => void }) {
@@ -131,6 +145,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             imagePath: typeof section.imagePath === "string" ? section.imagePath : "",
             imageAlt: typeof section.imageAlt === "string" ? section.imageAlt : "",
             layout: ["stacked", "image-top", "image-left", "image-right", "image-only", "text-only"].includes(section.layout as string) ? section.layout as AboutSection["layout"] : "stacked",
+            positionX: Number.isFinite(section.positionX) ? Math.max(0, Math.min(80, Number(section.positionX))) : 5,
+            positionY: Number.isFinite(section.positionY) ? Math.max(0, Math.min(5000, Number(section.positionY))) : 20 + (Array.isArray(sourceAbout.sections) ? sourceAbout.sections.indexOf(section) * 240 : 0),
+            width: Number.isFinite(section.width) ? Math.max(20, Math.min(100, Number(section.width))) : 90,
+            textAlign: ["left", "center", "right"].includes(section.textAlign as string) ? section.textAlign as AboutSection["textAlign"] : "left",
+            fontSize: ["small", "medium", "large"].includes(section.fontSize as string) ? section.fontSize as AboutSection["fontSize"] : "medium",
+            textColor: typeof section.textColor === "string" && /^#[0-9a-fA-F]{6}$/.test(section.textColor) ? section.textColor : "#475569",
+            bold: section.bold === true,
           }))
         : [];
       setAbout({
@@ -242,6 +263,13 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               imagePath: section.imagePath || null,
               imageAlt: section.imageAlt,
               layout: section.layout,
+              positionX: section.positionX ?? 5,
+              positionY: section.positionY ?? 20,
+              width: section.width ?? 90,
+              textAlign: section.textAlign ?? "left",
+              fontSize: section.fontSize ?? "medium",
+              textColor: section.textColor ?? "#475569",
+              bold: section.bold ?? false,
             })),
           },
           p_candidate_signup_enabled: candidateSignupEnabled,
