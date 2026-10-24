@@ -30,12 +30,20 @@ interface TenantBrandingPayload {
 
 interface PublicAboutSection {
   id?: string;
+  elementType?: "content" | "divider";
   title?: string;
   subtitle?: string;
   text?: string;
   imagePath?: string | null;
   imageAlt?: string;
   layout?: "stacked" | "image-top" | "image-left" | "image-right" | "image-only" | "text-only";
+  positionX?: number;
+  positionY?: number;
+  width?: number;
+  textAlign?: "left" | "center" | "right";
+  fontSize?: "small" | "medium" | "large";
+  textColor?: string;
+  bold?: boolean;
 }
 
 interface PublicTenantContent {
