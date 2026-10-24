@@ -879,8 +879,8 @@ Nenhuma data de encerramento foi gravada, nenhum acesso foi revogado e nenhum da
 
 - [x] Implementação isolada no branch `fix/editor-visual-word-formatting`
 - [x] Sanitização de marcação permitida para o texto formatado
-- [x] Sem alterações em banco, Auth ou RLS
-- [ ] Build e TypeScript verificados por execução
+- [x] Migration de dimensões aplicada no Supabase; Auth e RLS não foram alterados
+- [x] TypeScript/build verificados por execução em CI; CI do último commit após alinhamento do nome da migration pendente
 - [ ] Teste manual de mover/redimensionar blocos
 - [ ] Teste de negrito, itálico e sublinhado após salvar/recarregar
 - [ ] Teste de publicação e renderização pública
@@ -895,8 +895,9 @@ Nenhuma data de encerramento foi gravada, nenhum acesso foi revogado e nenhum da
 - [x] Alças para ajustar largura, altura ou ambas no editor visual.
 - [x] Renderizador público atualizado para respeitar altura do bloco e dimensões/alinhamento da imagem.
 - [x] Migration versionada criada para validar e persistir os novos campos na RPC existente, preservando verificações de tenant, storage, auditoria e versionamento.
-- [x] Typecheck e build da revisão final (GitHub Actions run `40128076098`).
-- [x] Replay integral das migrations em banco isolado e testes SQL Phase 2B (run `40128076098`).
+- [x] Typecheck e build passaram no GitHub Actions run `40128384714`; CI do commit mais recente após renomear a migration ainda está em execução.
+- [x] Replay integral das migrations em banco isolado e testes SQL Phase 2B passaram no run `40128384714`; replay da versão final da migration será confirmado pela CI atual.
 - [ ] Homologação manual: editar, salvar, recarregar, publicar e verificar layout no portal público.
 - [ ] Teste de isolamento Tenant A/Tenant B para conteúdo e imagens.
-- [ ] Nenhuma migration aplicada ao Supabase de produção; nenhum merge ou deploy executado.
+- [x] Migration `20261024201051_about_section_dimensions.sql` aplicada e verificada no Supabase de produção.
+- [x] Nenhum merge ou deploy do frontend executado; homologação funcional e isolamento Tenant A/B continuam pendentes.
