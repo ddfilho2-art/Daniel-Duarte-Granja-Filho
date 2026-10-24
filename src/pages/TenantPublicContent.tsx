@@ -454,8 +454,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             <span className="text-xs text-slate-500">Arrastar e soltar · largura ajustável abaixo</span>
           </div>
           <div
-            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50"
-            style={{ minHeight: Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220)) }}
+            className="relative overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 md:min-h-[var(--canvas-height)]"
+            style={{ "--canvas-height": `${Math.max(360, ...about.sections.map((section) => (section.positionY ?? 20) + 220))}px` } as React.CSSProperties}
             aria-label="Área visual de edição da página Sobre Nós"
           >
             {about.sections.map((section, index) => (
@@ -469,8 +469,8 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   const y = Math.round(Math.max(0, Math.min(5000, event.clientY - bounds.top)));
                   updateSection(index, { positionX: x, positionY: y });
                 }}
-                className="absolute cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm"
-                style={{ left: `${section.positionX ?? 5}%`, top: section.positionY ?? 20, width: `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" }}
+                className="cursor-move touch-none rounded-lg border border-slate-300 bg-white p-3 shadow-sm md:absolute md:left-[var(--section-x)] md:top-[var(--section-y)] md:w-[var(--section-width)]"
+                style={{ "--section-x": `${section.positionX ?? 5}%`, "--section-y": `${section.positionY ?? 20}px`, "--section-width": `${section.width ?? 90}%`, maxWidth: "100%", textAlign: section.textAlign ?? "left", color: section.textColor ?? "#475569" } as React.CSSProperties}
                 title="Arraste para reposicionar este bloco"
               >
                 <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
