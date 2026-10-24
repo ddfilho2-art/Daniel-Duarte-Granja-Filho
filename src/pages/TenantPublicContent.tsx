@@ -626,7 +626,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
               );
             })}
             {about.sections.length === 0 && <p className="absolute inset-0 flex items-center justify-center p-4 text-center text-sm text-slate-400">Adicione texto, imagem ou linha para começar a montar a página.</p>}
-          </div>>
+          </div>
         </div>
       </section>
 
