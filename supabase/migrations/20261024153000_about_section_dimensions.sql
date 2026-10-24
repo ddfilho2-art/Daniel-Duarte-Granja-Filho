@@ -71,6 +71,12 @@ BEGIN
   IF v_count <> 1 THEN RAISE EXCEPTION 'Expected one normalized width field, found %', v_count; END IF;
   v_definition := replace(v_definition, v_old, v_new);
 
+  v_old := 'v_element_type NOT IN (''content'', ''divider'')';
+  v_new := 'v_element_type NOT IN (''content'', ''divider'', ''image'')';
+  v_count := (length(v_definition) - length(replace(v_definition, v_old, ''))) / length(v_old);
+  IF v_count <> 1 THEN RAISE EXCEPTION 'Expected one allowed element type guard, found %', v_count; END IF;
+  v_definition := replace(v_definition, v_old, v_new);
+
   EXECUTE v_definition;
 END;
 $migration$;
