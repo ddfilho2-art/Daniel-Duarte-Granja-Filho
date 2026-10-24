@@ -124,10 +124,10 @@ BEGIN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_section_layout';
     END IF;
 
-    IF (v_section ? 'positionX' AND (v_section ->> 'positionX') !~ '^[0-9]+$')
-       OR (v_section ? 'positionY' AND (v_section ->> 'positionY') !~ '^[0-9]+$')
-       OR (v_section ? 'width' AND (v_section ->> 'width') !~ '^[0-9]+$')
-       OR (v_section ? 'height' AND (v_section ->> 'height') !~ '^[0-9]+$') THEN
+    IF (v_section ? 'positionX' AND ((v_section ->> 'positionX') !~ '^[0-9]+' OR (v_section ->> 'positionX') ~ '[^0-9]'))
+       OR (v_section ? 'positionY' AND ((v_section ->> 'positionY') !~ '^[0-9]+' OR (v_section ->> 'positionY') ~ '[^0-9]'))
+       OR (v_section ? 'width' AND ((v_section ->> 'width') !~ '^[0-9]+' OR (v_section ->> 'width') ~ '[^0-9]'))
+       OR (v_section ? 'height' AND ((v_section ->> 'height') !~ '^[0-9]+' OR (v_section ->> 'height') ~ '[^0-9]')) THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_section_position_type';
     END IF;
     v_position_x := COALESCE((v_section ->> 'positionX')::integer, 5);
@@ -146,7 +146,7 @@ BEGIN
        OR v_height < 40 OR v_height > 1200
        OR v_text_align NOT IN ('left', 'center', 'right')
        OR v_font_size NOT IN ('small', 'medium', 'large')
-       OR v_text_color !~ '^#[0-9A-Fa-f]{6}$'
+       OR char_length(v_text_color) <> 7 OR v_text_color !~ '^#[0-9A-Fa-f]{6}'
        OR v_element_type NOT IN ('content', 'divider') THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_section_presentation';
     END IF;
@@ -160,13 +160,15 @@ BEGIN
     END IF;
 
     IF v_section_id IS NULL
-       OR v_section_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN
+       OR char_length(v_section_id) <> 36
+       OR v_section_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}' THEN
       v_section_id := gen_random_uuid()::text;
     END IF;
 
     IF v_image_path IS NOT NULL
-       AND v_image_path !~ ('^' || p_tenant_id::text ||
-         '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)$') THEN
+       AND (char_length(v_image_path) NOT IN (90, 91)
+         OR v_image_path !~ ('^' || p_tenant_id::text ||
+         '/site-content/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}[.](png|webp)')) THEN
       RAISE EXCEPTION USING errcode = '22023', message = 'invalid_about_image_path';
     END IF;
     IF v_image_path IS NOT NULL AND NOT EXISTS (
