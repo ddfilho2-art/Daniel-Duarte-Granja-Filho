@@ -615,7 +615,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                   <div className="mb-1 flex items-center justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                     <span>{section.elementType === "divider" ? "Linha" : section.layout === "image-only" ? "Imagem" : "Texto"} {index + 1}</span><span aria-hidden="true">⠿</span>
                   </div>
-                  {section.elementType === "divider" ? <div className="flex h-full items-center"><hr className="w-full border-slate-400" /></div> : <>
+                  {section.elementType === "divider" ? <div className="flex h-full items-center"><hr className="w-full" style={{ height: `${Math.max(1, Math.min(12, Math.round((section.height ?? 40) / 40)))}px`, border: 0, backgroundColor: section.textColor ?? "#94a3b8" }} /></div> : <>
                     {section.layout !== "image-only" && <>{section.title && <p className={`truncate ${section.bold ? "font-bold" : "font-semibold"} ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-xs" : "text-sm"}`}>{section.title}</p>}
                     {section.subtitle && <p className="truncate text-xs opacity-80">{section.subtitle}</p>}
                     {section.text && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs">{section.text}</p>}</>}
