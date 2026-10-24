@@ -40,6 +40,10 @@ interface PublicAboutSection {
   positionX?: number;
   positionY?: number;
   width?: number;
+  height?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageAlign?: "left" | "center" | "right";
   textAlign?: "left" | "center" | "right";
   fontSize?: "small" | "medium" | "large";
   textColor?: string;
