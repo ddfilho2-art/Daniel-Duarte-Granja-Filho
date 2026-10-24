@@ -667,9 +667,9 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
             ) : null;
             const textElement = section.layout === "image-only" ? null : (
               <div className={horizontal ? "min-w-0 flex-1" : ""}>
-                {section.title && <h4 className="font-semibold text-slate-900">{index + 1}. {section.title}</h4>}
-                {section.subtitle && <p className="mt-1 font-medium text-slate-700">{section.subtitle}</p>}
-                {section.text && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{section.text}</p>}
+                {section.title && <h4 className={`whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-2xl" : section.fontSize === "small" ? "text-base" : "text-lg"} ${section.bold ? "font-bold" : "font-semibold"} ${section.italic ? "italic" : ""}`} style={{ fontFamily: section.fontFamily ?? "Arial", color: section.textColor ?? "#0f172a" }}>{index + 1}. {section.title}</h4>}
+                {section.subtitle && <p className={`mt-1 whitespace-pre-wrap break-words ${section.fontSize === "large" ? "text-xl" : section.fontSize === "small" ? "text-sm" : "text-base"} ${section.bold ? "font-bold" : "font-medium"} ${section.italic ? "italic" : ""}`} style={{ fontFamily: section.fontFamily ?? "Arial", color: section.textColor ?? "#475569" }}>{section.subtitle}</p>}
+                {section.text && <p className={`mt-2 whitespace-pre-wrap break-words leading-6 ${section.fontSize === "large" ? "text-lg" : section.fontSize === "small" ? "text-sm" : "text-base"} ${section.bold ? "font-bold" : "font-normal"} ${section.italic ? "italic" : ""}`} style={{ fontFamily: section.fontFamily ?? "Arial", color: section.textColor ?? "#475569", overflowWrap: "anywhere" }}>{section.text}</p>}
               </div>
             );
             return (
