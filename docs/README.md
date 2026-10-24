@@ -37,4 +37,4 @@ O tenant não deve ser confundido com o usuário nem com o papel do usuário.
 
 ## Editor visual de conteúdo público
 
-O editor da página Sobre Nós permite posicionar blocos no canvas, ajustar sua largura e formatar o texto com negrito, itálico e sublinhado. A marcação é sanitizada antes da renderização. Consulte o histórico de manutenção e as pendências de homologação em [STATUS-ARQUITETURA.md](./STATUS-ARQUITETURA.md) e as decisões técnicas em [BASE_CONHECIMENTO.md](./BASE_CONHECIMENTO.md).
+O editor da página Sobre Nós permite mover blocos, ajustar largura/altura, criar linhas e imagens independentes, ajustar dimensões/alinhamento de imagens e formatar texto com negrito, itálico, sublinhado, parágrafos e listas simples. A marcação é sanitizada antes da renderização. Consulte [STATUS-ARQUITETURA.md](./STATUS-ARQUITETURA.md), [BASE_CONHECIMENTO.md](./BASE_CONHECIMENTO.md) e [maintenance/about-us-hybrid-editor.md](./maintenance/about-us-hybrid-editor.md) para decisões e homologação pendente.

@@ -1,10 +1,10 @@
 # TODO de manutenção
 
-## Editor visual Sobre Nós — PR #15
+## Editor visual Sobre Nós — PR #17
 
 - [x] Replay da cadeia de migrations em banco local isolado concluído no GitHub Actions; os testes SQL Phase 2B do job também passaram.
 - [x] Migration `20261024112002_about_us_hybrid_canvas.sql` aplicada e registrada no Supabase de produção; guardas de autenticação/tenant e rejeição de chamada sem autenticação verificadas.
-- [ ] Aguardar CI final de TypeScript e build após a correção de sintaxe.
+- [x] TypeScript e build de produção passaram no GitHub Actions (run `40128076098`).
 - [ ] Testar salvar, recarregar, publicar e histórico de versões com conteúdo fictício.
 - [ ] Homologar o canvas e a página pública em desktop e celular.
 - [ ] Confirmar renderização de conteúdo legado sem propriedades visuais.
@@ -13,7 +13,8 @@
 - [ ] Executar testes autenticados de salvar/recarregar/publicar com dados fictícios e verificar isolamento Tenant A/Tenant B antes do merge.
 - [ ] Só então considerar merge e implantação controlada.
 
-## Limitações conhecidas
-- Texto e imagem permanecem no mesmo bloco legado; o layout `image-only` permite posicionar uma imagem sem texto.
-- Não há guias automáticas de encaixe/alinhamento.
-- Formatação limitada a alinhamento, tamanho do título, cor e negrito; não há editor rico completo.
+## Limitações restantes
+- Imagens em conteúdo legado podem continuar vinculadas ao bloco de texto; use “Adicionar imagem independente” para posicionar/redimensionar uma imagem como bloco próprio.
+- Guias automáticas de encaixe/alinhamento (snap) não estão incluídas.
+- Formatação por trecho permite negrito, itálico, sublinhado, parágrafos e listas simples; não há formatação de fontes/cor por trecho.
+- Homologação autenticada de salvar/recarregar/publicar e teste específico Tenant A/B continuam pendentes.

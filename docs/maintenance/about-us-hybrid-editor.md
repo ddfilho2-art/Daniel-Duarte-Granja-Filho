@@ -20,8 +20,8 @@ Estado: implementação em revisão; migration aplicada ao Supabase de produçã
 
 ## Checklist de validação
 
-- [ ] CI final: TypeScript e build após a correção de sintaxe.
-- [x] Replay de migrations em banco isolado e testes SQL Phase 2B passaram no GitHub Actions.
+- [x] CI: TypeScript e build de produção passaram no run `40128076098`.
+- [x] Replay integral de migrations em banco isolado e testes SQL Phase 2B passaram no run `40128076098`.
 - [ ] Salvar, recarregar e publicar conteúdo com propriedades visuais usando sessão autenticada e dados fictícios.
 - [ ] Verificar renderização em desktop e celular.
 - [ ] Verificar conteúdo antigo sem propriedades visuais.
@@ -30,8 +30,10 @@ Estado: implementação em revisão; migration aplicada ao Supabase de produçã
 
 ## Limitações conhecidas
 
-- Texto e imagem continuam agrupados dentro do bloco legado; para posicionar apenas a imagem, usar o layout `image-only`.
+- Imagens em conteúdo legado podem permanecer agrupadas ao texto; use “Adicionar imagem independente” para criar um bloco de imagem que pode ser movido/redimensionado separadamente.
+- Agora é possível ajustar largura/altura do bloco, largura/altura da imagem e alinhamento da imagem.
 - Guias automáticas de encaixe/alinhamento (snap guides) não estão incluídas.
+- Formatação por trecho continua limitada a negrito, itálico, sublinhado, parágrafos e listas simples.
 - A prévia visual e a página publicada precisam ser homologadas em desktop e celular antes da conclusão.
 
 ## Registro de alterações
@@ -40,3 +42,5 @@ Estado: implementação em revisão; migration aplicada ao Supabase de produçã
 - Adicionado elemento de linha horizontal independente.
 - Atualizada a renderização pública para propriedades visuais e fluxo vertical em telas estreitas.
 - Criada migration para validar e normalizar as propriedades visuais.
+- Adicionada migration para dimensões do bloco, dimensões/alinhamento da imagem e tipo de bloco `image`.
+- TypeScript/build e replay de migrations/testes SQL Phase 2B passaram no run `40128076098`.
