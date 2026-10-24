@@ -548,6 +548,10 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     Destacar título em negrito
                   </label>
                   <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-slate-700">Posição horizontal (%)</span>
+                    <input type="number" min={0} max={80} value={section.positionX ?? 5} onChange={(event) => updateSection(index, { positionX: Math.max(0, Math.min(80, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+                  </label>
+                  <label className="block">
                     <span className="mb-1 block text-sm font-medium text-slate-700">Posição vertical (px)</span>
                     <input type="number" min={0} max={5000} value={section.positionY ?? 20} onChange={(event) => updateSection(index, { positionY: Math.max(0, Math.min(5000, Number(event.target.value) || 0)) })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
                   </label>
