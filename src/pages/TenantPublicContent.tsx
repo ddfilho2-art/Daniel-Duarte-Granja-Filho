@@ -632,7 +632,7 @@ export function TenantPublicContent({ masterTenant, onFinish }: { masterTenant?:
                     const bounds = canvasRef.current?.getBoundingClientRect();
                     if (!bounds) return;
                     setSelectedSectionId(section.id);
-                    pointerActionRef.current = { index, mode: "move", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, canvasWidth: bounds.width };
+                    pointerActionRef.current = { index, mode: "move", pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, initialX: section.positionX ?? 5, initialY: section.positionY ?? 20, initialWidth: section.width ?? 90, initialHeight: section.height ?? 0, canvasWidth: bounds.width };
                     event.currentTarget.setPointerCapture(event.pointerId);
                   }} className="cursor-move rounded bg-slate-100 px-2 py-1 text-slate-700" aria-label={`Mover bloco ${index + 1}`} title="Segure e arraste para mover">Mover ⠿</button>
                   <span>{Math.round(section.width ?? 90)}%</span>
