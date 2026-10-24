@@ -31,7 +31,7 @@ BEGIN
   PERFORM set_config('role','authenticated',true);
 v_saved:=public.save_tenant_public_content_draft('bbbbbbbb-0000-0000-0000-000000000001','Synthetic Alpha home message',
  jsonb_build_object('title','About Alpha','subtitle','Synthetic subtitle','sections',jsonb_build_array(
- jsonb_build_object('id','11111111-1111-4111-8111-111111111111','title','Synthetic section','subtitle','','text','Synthetic text only.','imagePath','bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png','imageAlt','Synthetic image','height',320))),
+ jsonb_build_object('id','11111111-1111-4111-8111-111111111111','title','Synthetic section','subtitle','','text','Synthetic text only.','imagePath','bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png','imageAlt','Synthetic image','height',320,'bold',true,'italic',true,'fontFamily','Georgia'))),
  true,'Synthetic content test');
 IF v_saved->>'status'<>'draft' THEN RAISE EXCEPTION 'Draft save failed'; END IF;
 v_public:=public.get_public_tenant_context('alpha-test');
@@ -44,11 +44,17 @@ IF v_pub->>'status'<>'published' THEN RAISE EXCEPTION 'Publish failed'; END IF;
 v_admin:=public.get_tenant_public_content_admin('bbbbbbbb-0000-0000-0000-000000000001');
 IF v_admin#>>'{published,homeMessage}'<>'Synthetic Alpha home message' OR v_admin#>>'{published,about,title}'<>'About Alpha'
  OR COALESCE((v_admin#>>'{published,about,sections,0,height}')::integer,0)<>320
+ OR v_admin#>>'{published,about,sections,0,fontFamily}'<>'Georgia'
+ OR v_admin#>>'{published,about,sections,0,italic}'<>'true'
+ OR v_admin#>>'{published,about,sections,0,bold}'<>'true'
  OR jsonb_array_length(v_admin->'history')<1 OR v_admin->'draft'<>'null'::jsonb THEN RAISE EXCEPTION 'Admin content/history/element height mismatch'; END IF;
 v_public:=public.get_public_tenant_context('alpha-test');
 IF v_public#>>'{publicContent,homeMessage}'<>'Synthetic Alpha home message'
    OR v_public#>>'{publicContent,about,title}'<>'About Alpha'
    OR COALESCE((v_public#>>'{publicContent,about,sections,0,height}')::integer,0)<>320
+   OR v_public#>>'{publicContent,about,sections,0,fontFamily}'<>'Georgia'
+   OR v_public#>>'{publicContent,about,sections,0,italic}'<>'true'
+   OR v_public#>>'{publicContent,about,sections,0,bold}'<>'true'
    OR v_public#>>'{publicContent,about,sections,0,imagePath}'<>'bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png' THEN
   RAISE EXCEPTION 'Published content/image reference missing';
 END IF;
