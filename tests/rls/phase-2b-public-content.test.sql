@@ -48,6 +48,7 @@ IF v_admin#>>'{published,homeMessage}'<>'Synthetic Alpha home message' OR v_admi
 v_public:=public.get_public_tenant_context('alpha-test');
 IF v_public#>>'{publicContent,homeMessage}'<>'Synthetic Alpha home message'
    OR v_public#>>'{publicContent,about,title}'<>'About Alpha'
+   OR COALESCE((v_public#>>'{publicContent,about,sections,0,height}')::integer,0)<>320
    OR v_public#>>'{publicContent,about,sections,0,imagePath}'<>'bbbbbbbb-0000-0000-0000-000000000001/site-content/11111111-1111-4111-8111-111111111111.png' THEN
   RAISE EXCEPTION 'Published content/image reference missing';
 END IF;
